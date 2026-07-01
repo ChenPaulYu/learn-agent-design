@@ -13,9 +13,9 @@ tags:
 
 ## 文件
 
-- [five-layer-framework](2026-07-01-five-layer-framework.md) — 五層各自的定義、回答的問題、例子
-- [orthogonal-analysis](2026-07-01-orthogonal-analysis.md) — 五層是不是真的互相獨立?找到的隱藏邊
-- [computation-model-first-principles](2026-07-01-computation-model-first-principles.md) —
+- [five-layer-framework](docs/2026-07-01-five-layer-framework.md) — 五層各自的定義、回答的問題、例子
+- [orthogonal-analysis](docs/2026-07-01-orthogonal-analysis.md) — 五層是不是真的互相獨立?找到的隱藏邊
+- [computation-model-first-principles](docs/2026-07-01-computation-model-first-principles.md) —
   Computation Model 這一層,從第一原理重新挖出來的定義
 
 ## 出處

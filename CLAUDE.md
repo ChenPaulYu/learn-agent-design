@@ -15,7 +15,7 @@ unrelated (no shared governance, no cross-repo ADRs).
 
 | where | what |
 |---|---|
-| `studies/<topic>/` | a bounded concept area — dated notes (distilled, point-first) + a `code/` subfolder for that topic's hands-on experiments |
+| `studies/<topic>/` | a bounded concept area. `_index.md` (the topic's front door — navigation only, stays outside `docs/`) + `docs/` (dated, distilled, point-first notes) + `code/` (that topic's hands-on experiments) |
 | `mockups/` | interactive HTML artifacts (diagrams / renders) used to converge a design question, one dated subfolder per artifact (`/shape:mockup` convention) |
 
 **Code stays inside its topic's `code/` folder by default (N+1 rule).** Only extract a shared
