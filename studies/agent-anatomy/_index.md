@@ -8,7 +8,7 @@ tags:
 # agent-anatomy — 導覽
 
 > 一套「怎麼把任何 agent 系統拆開來看」的五層框架(Pattern → Computation Model → Runtime →
-> Harness → Environment),以及對它做的獨立性(orthogonal)/根本定義(first-principles)分析。
+> Tool → Environment),以及對它做的獨立性(orthogonal)/根本定義(first-principles)分析。
 > 起於跟 Paul 的 Notion 筆記「Agent 解剖學」同一條線,但這裡是通用框架本身,不綁定任何一篇論文。
 
 ## 文件

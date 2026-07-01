@@ -16,7 +16,7 @@ artifact type across parallel trees:
 
 ```
 studies/
-  agent-anatomy/       ← e.g. the 5-layer Pattern/Computation-Model/Runtime/Harness/Environment split
+  agent-anatomy/       ← e.g. the 5-layer Pattern/Computation-Model/Runtime/Tool/Environment split
     _index.md          ← the topic's front door (navigation only)
     docs/               ← dated, distilled, point-first notes
     code/                ← hands-on experiments testing this topic's ideas
@@ -40,7 +40,7 @@ cross-repo ADRs — the resemblance is borrowed habit, not coupling.
 ## Current studies
 
 - [`agent-anatomy`](studies/agent-anatomy/_index.md) — a 5-layer framework for reading any agent
-  system apart (Pattern → Computation Model → Runtime → Harness → Environment), plus an
+  system apart (Pattern → Computation Model → Runtime → Tool → Environment), plus an
   orthogonal-independence check and a first-principles dig into what "Computation Model" really is.
 
 ---

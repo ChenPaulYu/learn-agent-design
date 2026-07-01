@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   MOCKUP — Agent 解剖學:五層框架 + 藏著的第六維度(conditioning edge)。
-  What it is: 互動式圖解。五個節點(Pattern → Computation Model → Runtime → Harness →
+  What it is: 互動式圖解。五個節點(Pattern → Computation Model → Runtime → Tool →
     Environment)照原本的單向流程排開;額外畫一條連接 Pattern↔Runtime 的虛線邊,代表這次
     orthogonal 分析發現、但框架目前完全沒有格子裝的「state → primitive conditioning edge」。
   Candidates: N/A — 單一結構圖,不是選項比較,用途是讓這條邊「看得見」,幫下一步 /shape:elicit
@@ -121,9 +121,9 @@
         <div class="q">Agent 如何活著?</div>
       </div>
       <div class="arrow">→</div>
-      <div class="node" data-key="harness">
-        <div class="idx">04 · HARNESS</div>
-        <h3>Harness</h3>
+      <div class="node" data-key="tool">
+        <div class="idx">04 · TOOL</div>
+        <h3>Tool</h3>
         <div class="q">Agent 如何接觸世界?</div>
       </div>
       <div class="arrow">→</div>
@@ -162,11 +162,11 @@
       def: '執行迴圈 + 維護 Agent State：loop/scheduler、state schema、context builder、tool dispatch、caching。',
       example: 'Reflexion 的 Reflection Memory、Voyager 的 Skill Library + Experience Store。'
     },
-    harness: {
-      title: 'Harness',
+    tool: {
+      title: 'Tool',
       question: 'Agent 如何接觸世界？',
       def: '與世界溝通的抽象介面——把一組工具包裝成一致的互動方式，含權限/安全邊界。',
-      example: 'Coding Harness 的 read_file() / run_bash()。'
+      example: 'Coding Tool 的 read_file() / run_bash()。'
     },
     environment: {
       title: 'Environment',

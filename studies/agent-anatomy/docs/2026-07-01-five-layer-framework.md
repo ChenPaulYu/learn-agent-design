@@ -4,7 +4,7 @@ tags:
   - agent-anatomy
 ---
 
-# 五層框架:Pattern → Computation Model → Runtime → Harness → Environment
+# 五層框架:Pattern → Computation Model → Runtime → Tool → Environment
 
 > TL;DR — 拆解任何 agent 系統的五個維度,各自回答一個問題、產出一個 deliverable。已驗過五層本身
 > 互相獨立(見 [orthogonal-analysis](2026-07-01-orthogonal-analysis.md)),但其中一層
@@ -19,7 +19,7 @@ tags:
 | **Computation Model** | 一個「計算預算怎麼分配去探索候選延續」的政策——見
 [computation-model-first-principles](2026-07-01-computation-model-first-principles.md) | Agent 如何展開思考? | 分岔幾條/什麼結構/怎麼比較/何時收斂 | Linear、Self-Consistency、Beam Search、ToT、MCTS/LATS、Graph of Thoughts |
 | **Runtime** | 執行迴圈 + 維護 Agent State | Agent 如何活著? | Loop/scheduler + state schema + context builder + tool dispatch + caching | Reflexion 的 Reflection Memory、Voyager 的 Skill Library |
-| **Harness** | 與世界溝通的抽象介面(工具集合 + 權限邊界) | Agent 如何接觸世界? | 介面規格 + 工具抽象 + 權限邊界 | Coding Harness 的 read_file()/run_bash() |
+| **Tool** | 與世界溝通的抽象介面(工具集合 + 權限邊界) | Agent 如何接觸世界? | 介面規格 + 工具抽象 + 權限邊界 | Coding Tool 層的 read_file()/run_bash() |
 | **Environment** | Agent 真正作用的世界 | Agent 在哪裡? | 資源清單 + 觀測/行動限制 + 世界動態 | Coding Agent 的 Git Repository + Filesystem |
 
 明確排除:**Prompt 不是一層**——它是 primitive 的 instantiation(具體內容),不是 primitive 本身。
@@ -27,6 +27,15 @@ tags:
 跟「一個決策者怎麼探索候選延續」不同,見
 [computation-model-first-principles](2026-07-01-computation-model-first-principles.md) 的
 Divergence 第 1 點。
+
+## 命名:這一層原本叫 Harness,改叫 Tool
+
+原本用「Harness」這個字,但 OpenAI 2026 年的「harness engineering」把這個詞的意思泛用成「模型以外
+的整套軟體(memory/execution/tools/guardrails/observability)」,範圍比我們這裡窄很多的定義
+(只管工具集合+權限邊界)寬得多——同一個詞、範圍對不上,容易誤導讀者。討論過 World Interface、
+Affordance、Action Space 等候補,最後選 **Tool**:業界(Anthropic/OpenAI API)本來就用這個字
+指同一件事,最直覺、不用另外造詞;單數是配合其他四層(Pattern/Computation Model/Runtime/
+Environment)都是類別詞的命名習慣。
 
 ## 待決定:五句「回答的問題」太像,容易混淆
 
@@ -39,7 +48,7 @@ vs「展開思考」),讀者容易靠語感腦補,而不是靠這句話真的分
 | Pattern | 有哪些思考的「動作單位」,誰能接誰? |
 | Computation Model | 這些動作展開成什麼形狀? |
 | Runtime | 狀態怎麼被存住、跨步驟續住? |
-| Harness | 對外能做哪些具體動作? |
+| Tool | 對外能做哪些具體動作? |
 | Environment | 外面的世界本身長怎樣、有什麼限制? |
 
 ## 出處

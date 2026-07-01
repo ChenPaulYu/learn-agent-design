@@ -17,8 +17,8 @@ tags:
 |---|---|---|---|
 | Pattern vs Computation Model | 同一套 ReAct 文法,單一 trace(Linear)換成 ToT 的樹狀展開 | Reflexion 在文法裡加 Reflection primitive,整體仍是單一序列 | 通過,但措辭上「哪些可以接哪些」容易被讀成「序列/循環」而跟 topology 混在一起,要講清楚是「局部文法」vs「全域遍歷」 |
 | Runtime(context builder)vs Environment(資源清單) | 同一套 load 政策接到兩個不同 repo/知識庫,結果因資源不同而不同 | 同一個環境,換一套 context builder 政策,行為大不同 | 通過,是「菜單」vs「今天點什麼」的關係 |
-| Runtime(tool dispatch)vs Harness(介面設計) | 同一套 routing/retry 機制掛在不同 Harness 底下都能用 | 同一個 Harness,換一套 dispatch 策略(重試次數) | 通過,是「合約」vs「怎麼打這通電話」的介面/實作分離 |
-| Harness vs Environment | 同一套 Harness 指向不同環境(本機/沙箱容器) | 同一個環境,換不同權限等級的 Harness | 通過,全框架最乾淨的一對 |
+| Runtime(tool dispatch)vs Tool(介面設計) | 同一套 routing/retry 機制掛在不同 Tool 底下都能用 | 同一個 Tool,換一套 dispatch 策略(重試次數) | 通過,是「合約」vs「怎麼打這通電話」的介面/實作分離 |
+| Tool vs Environment | 同一套 Tool 指向不同環境(本機/沙箱容器) | 同一個環境,換不同權限等級的 Tool | 通過,全框架最乾淨的一對 |
 | Pattern vs Runtime(state schema) | 換一套 state 壓縮策略,primitive 完全不動 | (見下——這對藏了訊號) | 表面通過,但有隱藏耦合 |
 
 ## 真正的發現:Pattern-Runtime 之間藏著一條沒被畫出來的邊
