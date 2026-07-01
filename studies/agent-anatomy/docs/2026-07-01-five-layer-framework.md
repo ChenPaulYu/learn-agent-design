@@ -15,12 +15,12 @@ tags:
 
 | 層 | 定義 | 回答的問題 | Deliverable | 例子 |
 |---|---|---|---|---|
-| **Pattern** | 認知原語(Cognitive Primitive)+ 局部文法(哪個 primitive 可以接哪個) | Agent 怎麼思考? | Primitive 列表 + 接續關係 | ReAct 的 Thought/Action/Observation |
+| **Pattern** | 認知原語(Cognitive Primitive)+ 局部文法(哪個 primitive 可以接哪個) | 有哪些思考的「動作單位」,誰能接誰? | Primitive 列表 + 接續關係 | ReAct 的 Thought/Action/Observation |
 | **Computation Model** | 一個「計算預算怎麼分配去探索候選延續」的政策——見
-[computation-model-first-principles](2026-07-01-computation-model-first-principles.md) | Agent 如何展開思考? | 分岔幾條/什麼結構/怎麼比較/何時收斂 | Linear、Self-Consistency、Beam Search、ToT、MCTS/LATS、Graph of Thoughts |
-| **Runtime** | 執行迴圈 + 維護 Agent State | Agent 如何活著? | Loop/scheduler + state schema + context builder + tool dispatch + caching | Reflexion 的 Reflection Memory、Voyager 的 Skill Library |
-| **Tool** | 與世界溝通的抽象介面(工具集合 + 權限邊界) | Agent 如何接觸世界? | 介面規格 + 工具抽象 + 權限邊界 | Coding Tool 層的 read_file()/run_bash() |
-| **Environment** | Agent 真正作用的世界 | Agent 在哪裡? | 資源清單 + 觀測/行動限制 + 世界動態 | Coding Agent 的 Git Repository + Filesystem |
+[computation-model-first-principles](2026-07-01-computation-model-first-principles.md) | 這些動作展開成什麼形狀? | 分岔幾條/什麼結構/怎麼比較/何時收斂 | Linear、Self-Consistency、Beam Search、ToT、MCTS/LATS、Graph of Thoughts |
+| **Runtime** | 執行迴圈 + 維護 Agent State | 狀態怎麼被存住、跨步驟續住? | Loop/scheduler + state schema + context builder + tool dispatch + caching | Reflexion 的 Reflection Memory、Voyager 的 Skill Library |
+| **Tool** | 與世界溝通的抽象介面(工具集合 + 權限邊界) | 對外能做哪些具體動作? | 介面規格 + 工具抽象 + 權限邊界 | Coding Tool 層的 read_file()/run_bash() |
+| **Environment** | Agent 真正作用的世界 | 外面的世界本身長怎樣、有什麼限制? | 資源清單 + 觀測/行動限制 + 世界動態 | Coding Agent 的 Git Repository + Filesystem |
 
 明確排除:**Prompt 不是一層**——它是 primitive 的 instantiation(具體內容),不是 primitive 本身。
 **Multi-Agent 不是 Computation Model 的一個取值**——它是好幾個各自完整的 agent 堆疊怎麼組合,單位
@@ -37,19 +37,11 @@ Affordance、Action Space 等候補,最後選 **Tool**:業界(Anthropic/OpenAI A
 指同一件事,最直覺、不用另外造詞;單數是配合其他四層(Pattern/Computation Model/Runtime/
 Environment)都是類別詞的命名習慣。
 
-## 待決定:五句「回答的問題」太像,容易混淆
+## 已定案:五句「回答的問題」原本太像,已換掉
 
-上面那五句(怎麼思考/如何展開思考/如何活著/如何接觸世界/在哪裡)對仗工整但語感重疊(尤其「思考」
-vs「展開思考」),讀者容易靠語感腦補,而不是靠這句話真的分辨出五層的界線。討論中提過的替代版本
-(未拍板,列在這裡當候補):
-
-| 層 | 候補問法 |
-|---|---|
-| Pattern | 有哪些思考的「動作單位」,誰能接誰? |
-| Computation Model | 這些動作展開成什麼形狀? |
-| Runtime | 狀態怎麼被存住、跨步驟續住? |
-| Tool | 對外能做哪些具體動作? |
-| Environment | 外面的世界本身長怎樣、有什麼限制? |
+原本五句(怎麼思考/如何展開思考/如何活著/如何接觸世界/在哪裡)對仗工整但語感重疊(尤其「思考」
+vs「展開思考」),讀者容易靠語感腦補,而不是靠這句話真的分辨出五層的界線。已改成上表這五句更
+點名機制的問法,兩份 Notion 頁面(hub 完整版 + 獨立教學版)也同步套用。
 
 ## 出處
 
