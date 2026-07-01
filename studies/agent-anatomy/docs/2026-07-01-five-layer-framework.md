@@ -16,12 +16,17 @@ tags:
 | 層 | 定義 | 回答的問題 | Deliverable | 例子 |
 |---|---|---|---|---|
 | **Pattern** | 認知原語(Cognitive Primitive)+ 局部文法(哪個 primitive 可以接哪個) | Agent 怎麼思考? | Primitive 列表 + 接續關係 | ReAct 的 Thought/Action/Observation |
-| **Computation Model** | primitive 如何形成計算(展開/遍歷方式)——見下方「還在挖」 | Agent 如何展開思考? | Execution topology + 遍歷/停止規則 | Linear、Tree(ToT)、Graph、Multi-Agent |
+| **Computation Model** | 一個「計算預算怎麼分配去探索候選延續」的政策——見
+[computation-model-first-principles](2026-07-01-computation-model-first-principles.md) | Agent 如何展開思考? | 分岔幾條/什麼結構/怎麼比較/何時收斂 | Linear、Self-Consistency、Beam Search、ToT、MCTS/LATS、Graph of Thoughts |
 | **Runtime** | 執行迴圈 + 維護 Agent State | Agent 如何活著? | Loop/scheduler + state schema + context builder + tool dispatch + caching | Reflexion 的 Reflection Memory、Voyager 的 Skill Library |
 | **Harness** | 與世界溝通的抽象介面(工具集合 + 權限邊界) | Agent 如何接觸世界? | 介面規格 + 工具抽象 + 權限邊界 | Coding Harness 的 read_file()/run_bash() |
 | **Environment** | Agent 真正作用的世界 | Agent 在哪裡? | 資源清單 + 觀測/行動限制 + 世界動態 | Coding Agent 的 Git Repository + Filesystem |
 
 明確排除:**Prompt 不是一層**——它是 primitive 的 instantiation(具體內容),不是 primitive 本身。
+**Multi-Agent 不是 Computation Model 的一個取值**——它是好幾個各自完整的 agent 堆疊怎麼組合,單位
+跟「一個決策者怎麼探索候選延續」不同,見
+[computation-model-first-principles](2026-07-01-computation-model-first-principles.md) 的
+Divergence 第 1 點。
 
 ## 待決定:五句「回答的問題」太像,容易混淆
 
