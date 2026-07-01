@@ -15,13 +15,16 @@ unrelated (no shared governance, no cross-repo ADRs).
 
 | where | what |
 |---|---|
-| `studies/<topic>/` | a bounded concept area. `_index.md` (the topic's front door — navigation only, stays outside `docs/`) + `docs/` (dated, distilled, point-first notes) + `code/` (that topic's hands-on experiments) |
-| `mockups/` | interactive HTML artifacts (diagrams / renders) used to converge a design question, one dated subfolder per artifact (`/shape:mockup` convention) |
+| `studies/<topic>/` | a bounded concept area. `_index.md` (the topic's front door — navigation only, stays outside `docs/`) + `docs/` (dated, distilled, point-first notes) + `code/` (that topic's hands-on experiments) + `mockups/` (that topic's disposable interactive artifacts, dated subfolder per decision — `/shape:mockup` convention) |
 
 **Code stays inside its topic's `code/` folder by default (N+1 rule).** Only extract a shared
 `toolkit/` at the root once a *second* study genuinely reuses the same code — don't pre-split by
 type (notes vs. code) before that happens; that's a temporal/type decomposition, not a knowledge
 one.
+
+**Mockups always stay inside their topic's `mockups/` folder — no N+1 exception.** A mockup
+converges one decision and is disposable by design (per `/shape:mockup`); there's no realistic
+case of two topics sharing one, so there's no shared-tool exception to wait for like `code/` has.
 
 ## Writing a study note
 
