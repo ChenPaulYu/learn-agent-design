@@ -42,6 +42,34 @@ tags:
 [computation-model-first-principles](2026-07-01-computation-model-first-principles.md) 的
 Divergence 第 1 點。
 
+## 兩軸 + 五層:更高一層的分組
+
+五層可以再分成兩個正交的軸——五層本身不變,只是多一層更粗的分組:
+
+```
+Decision 軸(決定「做什麼」)
+├── Pattern
+└── Computation Model
+
+Execution 軸(決定「怎麼做」)
+├── Runtime
+├── Tool
+└── Environment
+```
+
+兩軸之間靠 **Runtime 持續回頭問 Computation Model「下一步呢」形成一個迴圈**:Runtime 執行完一步、
+更新 state,拿新 state 問 Computation Model 要不要繼續、怎麼繼續(`while not done: op =
+policy.choose(state); result = execute(op); state = update(state, result)`)。
+
+**這件事不會推翻五層**,因為要分清楚兩件不同的事:
+- **設計時的可分離性**——五層各自能不能獨立換掉,已經用 orthogonal 分析驗過(見
+  [orthogonal-analysis](2026-07-01-orthogonal-analysis.md))。
+- **執行時的呼叫關係**——誰跑起來的時候呼叫誰、資料怎麼流動,是上面那個迴圈在講的事。
+
+兩個模組執行時互相呼叫、形成迴圈,是完全正常的架構現象,不代表它們不是獨立模組(就像 scheduler
+跟 policy 常常互相呼叫成迴圈,沒有人因此說它們是同一層)。Decision 軸 vs Execution 軸,是五層之上
+再加的一層粗分組,兩種描述可以同時成立:先看兩軸抓大方向,再往下鑽進五層抓細節。
+
 ## 命名:這一層原本叫 Harness,改叫 Tool
 
 原本用「Harness」這個字,但 OpenAI 2026 年的「harness engineering」把這個詞的意思泛用成「模型以外
