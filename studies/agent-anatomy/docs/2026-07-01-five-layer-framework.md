@@ -15,12 +15,12 @@ tags:
 
 | 層 | 定義 | 回答的問題 | Deliverable | 例子 |
 |---|---|---|---|---|
-| **Pattern** | 認知原語(Cognitive Primitive)+ 局部文法(哪個 primitive 可以接哪個) | 有哪些思考的「動作單位」,誰能接誰? | Primitive 列表 + 接續關係 | ReAct 的 Thought/Action/Observation |
+| **Pattern** | 認知原語(Cognitive Primitive)+ 局部文法(哪個 primitive 可以接哪個) | 腦中的念頭,哪些自然接著哪些? | Primitive 列表 + 接續關係 | ReAct 的 Thought/Action/Observation |
 | **Computation Model** | 一個「計算預算怎麼分配去探索候選延續」的政策——見
-[computation-model-first-principles](2026-07-01-computation-model-first-principles.md) | 這些動作展開成什麼形狀? | 分岔幾條/什麼結構/怎麼比較/何時收斂 | Linear、Self-Consistency、Beam Search、ToT、MCTS/LATS、Graph of Thoughts |
-| **Runtime** | 執行迴圈 + 維護 Agent State | 狀態怎麼被存住、跨步驟續住? | Loop/scheduler + state schema + context builder + tool dispatch + caching | Reflexion 的 Reflection Memory、Voyager 的 Skill Library |
-| **Tool** | 與世界溝通的抽象介面(工具集合 + 權限邊界) | 對外能做哪些具體動作? | 介面規格 + 工具抽象 + 權限邊界 | Coding Tool 層的 read_file()/run_bash() |
-| **Environment** | Agent 真正作用的世界 | 外面的世界本身長怎樣、有什麼限制? | 資源清單 + 觀測/行動限制 + 世界動態 | Coding Agent 的 Git Repository + Filesystem |
+[computation-model-first-principles](2026-07-01-computation-model-first-principles.md) | 面對決定,是直覺反應,還是要多想幾種、比較後才選? | 分岔幾條/什麼結構/怎麼比較/何時收斂 | Linear、Self-Consistency、Beam Search、ToT、MCTS/LATS、Graph of Thoughts |
+| **Runtime** | 執行迴圈 + 維護 Agent State | 身體怎麼讓你維持是你、又怎麼確實把決定做出來? | Loop/scheduler + state schema + context builder + tool dispatch + caching | Reflexion 的 Reflection Memory、Voyager 的 Skill Library |
+| **Tool** | 與世界溝通的抽象介面(工具集合 + 權限邊界) | 能拿起哪些外部工具去擴充原本做不到的事,哪些被允許用、哪些不行? | 介面規格 + 工具抽象 + 權限邊界 | Coding Tool 層的 read_file()/run_bash()、MCP |
+| **Environment** | Agent 真正作用的世界 | 所在的這個世界長什麼樣,有什麼是控制不了的? | 資源清單 + 觀測/行動限制 + 世界動態 | Coding Agent 的 Git Repository + Filesystem |
 
 明確排除:**Prompt 不是一層**——它是 primitive 的 instantiation(具體內容),不是 primitive 本身。
 **Multi-Agent 不是 Computation Model 的一個取值**——它是好幾個各自完整的 agent 堆疊怎麼組合,單位
@@ -40,8 +40,12 @@ Environment)都是類別詞的命名習慣。
 ## 已定案:五句「回答的問題」原本太像,已換掉
 
 原本五句(怎麼思考/如何展開思考/如何活著/如何接觸世界/在哪裡)對仗工整但語感重疊(尤其「思考」
-vs「展開思考」),讀者容易靠語感腦補,而不是靠這句話真的分辨出五層的界線。已改成上表這五句更
-點名機制的問法,兩份 Notion 頁面(hub 完整版 + 獨立教學版)也同步套用。
+vs「展開思考」),讀者容易靠語感腦補,而不是靠這句話真的分辨出五層的界線。第一輪改成工程術語
+(動作單位)、第二輪改成臨時比喻(思考步驟、遇到岔路),都還是覺得彆扭;第三輪改成直接從人類
+經驗重建(如果 agent 是一個人,這句話問的是人的哪個面向),才真正定案——過程 + 三個額外發現
+(身體=Runtime、Tool 層名重新確認不用換、Enact P1 證明 Tool 是真正獨立的第五層)見
+[human-analogy-elicit](2026-07-01-human-analogy-elicit.md)。兩份 Notion 頁面(hub 完整版 +
+獨立教學版)已同步套用。
 
 ## 出處
 

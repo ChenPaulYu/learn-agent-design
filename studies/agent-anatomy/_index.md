@@ -21,6 +21,9 @@ tags:
   Runtime 這一層,從第一原理重新挖出來的定義 + Runtime state 的具體拆法
 - [harness-engineering-reference](docs/2026-07-01-harness-engineering-reference.md) —
   OpenAI「harness engineering」查證記錄,解釋為什麼 Harness 這一層改名叫 Tool
+- [human-analogy-elicit](docs/2026-07-01-human-analogy-elicit.md) —
+  五句「回答的問題」從人類經驗重建的 elicit 收斂記錄(身體=Runtime、Tool 層名確認不用換、
+  Enact P1 證明 Tool 是獨立第五層)
 - [mockups/2026-07-01-agent-anatomy-layers](mockups/2026-07-01-agent-anatomy-layers/index.html) —
   互動圖解:五層 + 那條沒名字的 conditioning edge
 
