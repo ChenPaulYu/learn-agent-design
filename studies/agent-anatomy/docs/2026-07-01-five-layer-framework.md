@@ -22,6 +22,20 @@ tags:
 | **Tool** | 與世界溝通的抽象介面(工具集合 + 權限邊界) | 能拿起哪些外部工具去擴充原本做不到的事,哪些被允許用、哪些不行? | 介面規格 + 工具抽象 + 權限邊界 | Coding Tool 層的 read_file()/run_bash()、MCP |
 | **Environment** | Agent 真正作用的世界 | 所在的這個世界長什麼樣,有什麼是控制不了的? | 資源清單 + 觀測/行動限制 + 世界動態 | Coding Agent 的 Git Repository + Filesystem |
 
+## 對應人類的什麼
+
+| 層 | 對應人類的什麼 |
+|---|---|
+| Pattern | 長期學會的能力(skills / cognitive repertoire) |
+| Computation Model | 當下採用的思考策略 |
+| Runtime | 當下整個人(身體狀態 + 工作記憶 + 注意力 + 目標) |
+| Tool | 身體以外借用的東西(手機、筆、電腦、扳手) |
+| Environment | 世界 |
+
+身體被 Runtime 吸收(狀態 + 記憶 + 注意力 + 目標,全部是「當下這個人」的一部分),Tool 因此
+重新變回單純的「外部工具」,不用再糾結身體器官算不算 Tool——這樣分反而更自然。詳細推導過程見
+[human-analogy-elicit](2026-07-01-human-analogy-elicit.md)。
+
 明確排除:**Prompt 不是一層**——它是 primitive 的 instantiation(具體內容),不是 primitive 本身。
 **Multi-Agent 不是 Computation Model 的一個取值**——它是好幾個各自完整的 agent 堆疊怎麼組合,單位
 跟「一個決策者怎麼探索候選延續」不同,見
