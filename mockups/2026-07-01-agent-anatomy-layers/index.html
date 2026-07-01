@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<!--
+  MOCKUP — Agent 解剖學:五層框架 + 藏著的第六維度(conditioning edge)。
+  What it is: 互動式圖解。五個節點(Pattern → Computation Model → Runtime → Harness →
+    Environment)照原本的單向流程排開;額外畫一條連接 Pattern↔Runtime 的虛線邊,代表這次
+    orthogonal 分析發現、但框架目前完全沒有格子裝的「state → primitive conditioning edge」。
+  Candidates: N/A — 單一結構圖,不是選項比較,用途是讓這條邊「看得見」,幫下一步 /shape:elicit
+    收斂它該怎麼命名、該不該畫進框架、怎麼寫進 Paper 1 的 Gap section。
+  Pick: — (待 elicit 討論後回填)
+  Disposable · grounds: research/raws/2026-06-12-layer-taxonomy-and-gap-framing.md +
+    2026-07-01 對話中的 orthogonal 獨立性分析 + Notion「Agent 解剖學」筆記。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 解剖學 — 五層 + 那條沒名字的邊</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:70ch}
+  .hint{margin-top:14px;display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+  .hint span{display:inline-flex;align-items:center;gap:7px}
+  .swatch{width:22px;height:0;border-top:2px solid var(--faint);display:inline-block}
+  .swatch.dashed{border-top:2px dashed var(--rose)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+
+  .diagram{position:relative;margin-top:38px;padding:70px 6px 46px}
+  .row{display:flex;align-items:stretch;gap:10px;position:relative;z-index:2}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}
+  path.edge{fill:none;stroke:var(--rose);stroke-width:2;stroke-dasharray:6 6;
+    animation:dash 22s linear infinite}
+  @keyframes dash{to{stroke-dashoffset:-300}}
+  .edge-hit{fill:none;stroke:transparent;stroke-width:22;pointer-events:stroke;cursor:pointer}
+  .edge-badge{position:absolute;z-index:3;transform:translate(-50%,-50%);cursor:pointer}
+  .edge-badge .pill{display:inline-flex;align-items:center;gap:6px;background:var(--panel);
+    border:1.5px dashed var(--rose);color:var(--rose);border-radius:999px;padding:5px 12px;
+    font-size:12px;font-weight:650;box-shadow:var(--shadow);white-space:nowrap}
+  .edge-badge .pill:hover{background:#fff5f7}
+  .edge-badge .qmark{width:17px;height:17px;border-radius:50%;background:var(--rose);color:#fff;
+    display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex:0 0 auto}
+
+  .panel{margin-top:34px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:118px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel.edge-mode{border-color:var(--rose)}
+  .panel.edge-mode .ex{border-left-color:var(--rose)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:6px;
+    margin-left:8px;vertical-align:middle}
+  .tag.unnamed{background:rgba(176,74,106,.12);color:var(--rose)}
+
+  footer{margin-top:30px;color:var(--faint);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Mockup · 2026-07-01 · 待 elicit 收斂</div>
+    <h1>Agent 解剖學 — 五層框架,以及那條還沒名字的邊</h1>
+    <p class="tagline">
+      點下面任一層,看它的一句話定義。點那條<b>虛線</b>——這是這次 orthogonal 分析發現、框架裡原本沒有的第六個東西。
+    </p>
+    <div class="hint">
+      <span><span class="swatch"></span> 標準五層流程(已定案)</span>
+      <span><span class="swatch dashed"></span> conditioning edge(剛發現,待命名)</span>
+    </div>
+  </header>
+
+  <div class="diagram" id="diagram">
+    <svg class="edges" id="edgeSvg">
+      <path class="edge" id="edgePath" d=""></path>
+      <path class="edge-hit" id="edgeHit" d=""></path>
+    </svg>
+    <div class="edge-badge" id="edgeBadge" style="left:0;top:0">
+      <span class="pill"><span class="qmark">?</span> conditioning edge</span>
+    </div>
+    <div class="row" id="row">
+      <div class="node" data-key="pattern">
+        <div class="idx">01 · PATTERN</div>
+        <h3>Agent Pattern</h3>
+        <div class="q">Agent 怎麼思考?</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="compute">
+        <div class="idx">02 · COMPUTATION MODEL</div>
+        <h3>Computation Model</h3>
+        <div class="q">Agent 如何展開思考?</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="runtime">
+        <div class="idx">03 · RUNTIME</div>
+        <h3>Runtime</h3>
+        <div class="q">Agent 如何活著?</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="harness">
+        <div class="idx">04 · HARNESS</div>
+        <h3>Harness</h3>
+        <div class="q">Agent 如何接觸世界?</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="environment">
+        <div class="idx">05 · ENVIRONMENT</div>
+        <h3>Environment</h3>
+        <div class="q">Agent 在哪裡?</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <p class="placeholder">↑ 點一層看定義,或點虛線看那條被漏掉的邊是什麼。</p>
+  </div>
+
+  <footer>Disposable mockup · 不是論文定稿圖 · grounds: 2026-06-12 layer-taxonomy-and-gap-framing.md + 本次對話 orthogonal 分析</footer>
+</div>
+
+<script>
+  const DATA = {
+    pattern: {
+      title: 'Agent Pattern',
+      question: 'Agent 怎麼思考？',
+      def: '定義認知原語(Cognitive Primitive)，以及局部文法——哪個 primitive 可以接哪個。',
+      example: 'ReAct 的 Thought → Action → Observation。'
+    },
+    compute: {
+      title: 'Computation Model',
+      question: 'Agent 如何展開思考？',
+      def: '定義 primitive 怎麼展開成計算——全域的遍歷/展開策略(Linear / Tree / Graph / Multi-Agent)。',
+      example: '同一套 Thought/Action/Observation 文法，可以跑成單一 trace(Linear)，也可以跑成 Tree-of-Thought(Tree)。'
+    },
+    runtime: {
+      title: 'Runtime',
+      question: 'Agent 如何活著？',
+      def: '執行迴圈 + 維護 Agent State：loop/scheduler、state schema、context builder、tool dispatch、caching。',
+      example: 'Reflexion 的 Reflection Memory、Voyager 的 Skill Library + Experience Store。'
+    },
+    harness: {
+      title: 'Harness',
+      question: 'Agent 如何接觸世界？',
+      def: '與世界溝通的抽象介面——把一組工具包裝成一致的互動方式，含權限/安全邊界。',
+      example: 'Coding Harness 的 read_file() / run_bash()。'
+    },
+    environment: {
+      title: 'Environment',
+      question: 'Agent 在哪裡？',
+      def: 'Agent 真正作用的世界：資源清單、觀測/行動限制(可見性/延遲/成本)、世界的動態。',
+      example: 'Coding Agent 的 Git Repository + Filesystem。'
+    }
+  };
+
+  const EDGE = {
+    title: 'conditioning edge',
+    question: '這條邊回答的不是「哪一層」，是「層跟層之間，誰餵誰」。',
+    def: '哪個 Runtime state，餵給哪個 Pattern primitive、在什麼時間點餵——這條邊目前的五層框架完全沒有畫出來。',
+    example: 'Orthogonal 分析證實五層本身乾淨獨立(每一對都能找到「動一個、另一個沒動」的反例)。但 Reflexion 每次多一種 Runtime state(Reflection Memory)，Pattern 幾乎同時多一個 primitive(Reflection)去讀寫它；Voyager 也一樣(Skill Library ↔ verify-and-store)。這條隱藏的邊，才是這些系統真正創新發生的位置——也是 Enact 在 Paper 1 宣稱創新的地方。'
+  };
+
+  const panel = document.getElementById('panel');
+  const nodes = document.querySelectorAll('.node');
+  const edgeBadge = document.getElementById('edgeBadge');
+
+  function renderNode(key){
+    const d = DATA[key];
+    nodes.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panel.classList.remove('edge-mode');
+    panel.innerHTML = `
+      <div class="ph">Layer · ${d.title}</div>
+      <h2>${d.title}</h2>
+      <div class="meta">
+        <b>回答問題</b><span>${d.question}</span>
+        <b>一句話定義</b><span>${d.def}</span>
+      </div>
+      <div class="ex">${d.example}</div>
+    `;
+  }
+
+  function renderEdge(){
+    nodes.forEach(n => n.classList.remove('active'));
+    panel.classList.add('edge-mode');
+    panel.innerHTML = `
+      <div class="ph">Unnamed · 第六維度</div>
+      <h2>${EDGE.title}<span class="tag unnamed">待命名</span></h2>
+      <div class="meta">
+        <b>是什麼</b><span>${EDGE.question}</span>
+        <b>一句話定義</b><span>${EDGE.def}</span>
+      </div>
+      <div class="ex">${EDGE.example}</div>
+    `;
+  }
+
+  nodes.forEach(n => n.addEventListener('click', () => renderNode(n.dataset.key)));
+  document.getElementById('edgeHit').addEventListener('click', renderEdge);
+  edgeBadge.addEventListener('click', renderEdge);
+
+  function layoutEdge(){
+    const diagram = document.getElementById('diagram');
+    const patternEl = document.querySelector('.node[data-key="pattern"]');
+    const runtimeEl = document.querySelector('.node[data-key="runtime"]');
+    const dRect = diagram.getBoundingClientRect();
+    const pRect = patternEl.getBoundingClientRect();
+    const rRect = runtimeEl.getBoundingClientRect();
+
+    const x1 = pRect.left + pRect.width / 2 - dRect.left;
+    const y1 = pRect.top - dRect.top;
+    const x2 = rRect.left + rRect.width / 2 - dRect.left;
+    const y2 = rRect.top - dRect.top;
+    const midX = (x1 + x2) / 2;
+    const arcY = Math.min(y1, y2) - 46;
+
+    const path = `M ${x1} ${y1} Q ${midX} ${arcY} ${x2} ${y2}`;
+    document.getElementById('edgePath').setAttribute('d', path);
+    document.getElementById('edgeHit').setAttribute('d', path);
+
+    const badge = document.getElementById('edgeBadge');
+    badge.style.left = midX + 'px';
+    badge.style.top = arcY + 'px';
+  }
+
+  window.addEventListener('resize', layoutEdge);
+  layoutEdge();
+  renderNode('pattern');
+</script>
+</body>
+</html>
