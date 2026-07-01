@@ -19,6 +19,8 @@ tags:
   Computation Model 這一層,從第一原理重新挖出來的定義
 - [runtime-first-principles](docs/2026-07-01-runtime-first-principles.md) —
   Runtime 這一層,從第一原理重新挖出來的定義 + Runtime state 的具體拆法
+- [harness-engineering-reference](docs/2026-07-01-harness-engineering-reference.md) —
+  OpenAI「harness engineering」查證記錄,解釋為什麼 Harness 這一層改名叫 Tool
 - [mockups/2026-07-01-agent-anatomy-layers](mockups/2026-07-01-agent-anatomy-layers/index.html) —
   互動圖解:五層 + 那條沒名字的 conditioning edge
 
