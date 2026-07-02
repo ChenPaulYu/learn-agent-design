@@ -1,6 +1,6 @@
 ---
 title: MCP 生態現況 — 互動圖解
-summary: 四張互動圖:採用時間線(OpenAI 到捐給基金會)、Platinum 會員名單(競爭對手同桌)、三個 registry 數字互相打架、registry 收錄門檻 vs 大家以為的信任缺口。
+summary: 四張互動圖:採用時間線(OpenAI 到捐給基金會)、Platinum 會員名單(競爭對手同桌)、三個 registry 是誰在營運跟收書規則、registry 收錄門檻 vs 大家以為的信任缺口。
 date: 2026-07-02
 tags:
   - mcp
@@ -21,7 +21,8 @@ render_with_liquid: false
     圖 A(採用時間線)— OpenAI 2025-03 官方採用 → 2025-09 ChatGPT apps → 2025-12 捐給
       Agentic AI Foundation,點每個節點看細節。
     圖 B(Platinum 會員)— 基金會會員 chip 網格,點看誰在裡面,特別點出競爭對手同桌。
-    圖 C(Registry 數字打架)— 三個來源的長條圖對照,差兩倍以上。
+    圖 C(Registry 是什麼)— 長條圖對照三個來源的數字,點每一條看那座「圖書館」是誰在營運、
+      收書規則是什麼——數字不一樣不是算錯,是收書規則本來就不一樣。
     圖 D(信任缺口)— 切換「你以為 registry 做了什麼」跟「實際只做了什麼」。
 -->
 <html lang="zh-Hant">
@@ -95,6 +96,10 @@ render_with_liquid: false
   .bar-fill.b{background:var(--accent)}
   .bar-fill.c{background:var(--rose)}
   .bar-note{font-size:12.5px;color:var(--muted)}
+  .reg-row{cursor:pointer;border-radius:8px;padding:4px 6px;margin:-4px -6px;transition:background .15s ease}
+  .reg-row:hover{background:var(--line-soft)}
+  .reg-row.active{background:rgba(154,107,46,.08)}
+  .reg-row.active .bar-label{color:var(--accent);font-weight:700}
 
   .toggle-row{display:flex;gap:10px;margin-top:22px}
   .toggle-btn{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;
@@ -192,29 +197,34 @@ render_with_liquid: false
     </div>
   </section>
 
-  <!-- ============ SECTION C: Registry 數字打架 ============ -->
+  <!-- ============ SECTION C: Registry 是什麼 + 數字為什麼不一樣 ============ -->
   <section>
-    <div class="sec-kicker">圖 C · 找 server 變容易了,但數字自己打架</div>
-    <div class="sec-title">三個 registry,三個不一樣的數字</div>
+    <div class="sec-kicker">圖 C · 三座圖書館,收書規則不一樣</div>
+    <div class="sec-title">Registry 是什麼,三個又分別是誰在營運</div>
     <p class="sec-sub">
-      差兩倍以上——不是誰在造假,是每個 registry 算法不同(算不算歷史版本、算不算重複提交、
-      收錄門檻不同)。
+      MCP 本身沒有內建搜尋引擎——registry 就是一個把「有哪些 server、做什麼、怎麼裝」整理成
+      可搜尋名單的網站,像電話簿或 App Store 目錄。點下面任一條長條,看那座「圖書館」是誰開的、
+      收書規則是什麼。
     </p>
 
     <div class="bar-box">
-      <div class="bar-row">
+      <div class="bar-row reg-row" data-key="official">
         <div class="bar-label">官方 MCP Registry</div>
-        <div class="bar-track"><div class="bar-fill a" style="width:33%">9,652</div></div>
+        <div class="bar-track"><div class="bar-fill a" style="width:19%">9,652</div></div>
       </div>
-      <div class="bar-row">
+      <div class="bar-row reg-row" data-key="glama">
         <div class="bar-label">Glama registry</div>
-        <div class="bar-track"><div class="bar-fill b" style="width:68%">19,831+</div></div>
+        <div class="bar-track"><div class="bar-fill b" style="width:98%">50,777</div></div>
       </div>
-      <div class="bar-row">
+      <div class="bar-row reg-row" data-key="mcpso">
         <div class="bar-label">MCP.so</div>
-        <div class="bar-track"><div class="bar-fill c" style="width:55%">16,000+</div></div>
+        <div class="bar-track"><div class="bar-fill c" style="width:31%">16,000+</div></div>
       </div>
-      <div class="bar-note">官方數字是「9,652 個最新版 server 記錄」;算上歷史版本則是 28,959 筆 server/版本記錄——連官方自己的兩種算法都差三倍。</div>
+      <div class="bar-note">數字不是同一天查的(官方 2026-05-24、Glama 現在直接查是 2026-07-02),但差距本身就是重點:光是 Glama 自己的數字,從另一份分析引用的「19,831+」到今天直接查官網的「50,777」,同一份資料**幾天內就翻了一倍多**。</div>
+    </div>
+
+    <div class="panel" id="panelC">
+      <p class="placeholder">↑ 點上面任一條長條,看那座圖書館是誰開的、收書規則是什麼。</p>
     </div>
   </section>
 
@@ -249,6 +259,9 @@ render_with_liquid: false
         <a href="https://safedep.io/the-state-of-mcp-registries/">The State of MCP Registries — 收錄門檻不含安全審查</a>
         <a href="https://workos.com/blog/mcp-registry-architecture-technical-overview">MCP Registry Architecture — 官方 registry 的建立動機</a>
         <a href="https://www.digitalapplied.com/blog/mcp-adoption-statistics-2026-model-context-protocol">MCP Adoption Statistics 2026 — 三個來源數字對照</a>
+        <a href="https://blog.modelcontextprotocol.io/posts/2025-09-08-mcp-registry-preview/">Introducing the MCP Registry — 官方 registry 的跨公司起源</a>
+        <a href="https://glama.ai/mcp">Glama — 創辦人、上線日期、自稱 superset 的定位</a>
+        <a href="https://github.com/chatmcp/mcpso">MCP.so(chatmcp/mcpso)— 社群開源目錄專案</a>
       </div>
     </div>
   </section>
@@ -289,6 +302,31 @@ render_with_liquid: false
     chipsB.forEach(x => x.classList.toggle('active', x === n));
     const d = MEMBER[n.dataset.key];
     panelB.innerHTML = `<h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+  }));
+
+  const REGISTRY = {
+    official: {
+      title: '官方 MCP Registry', tag: 'registry.modelcontextprotocol.io',
+      def: '收書規則:只收「有人正式送書來登記」的書——2025 年 2 月由 MCP 原創者發起,找 PulseMCP 跟 Block(Goose 團隊)幫忙建,後續 GitHub、Anthropic 的人也加入當維護者。連「官方」這個詞背後也是跨公司協作,不是 Anthropic 自己關起門做的。',
+      example: '同一份資料自己就有兩種算法:「9,652 個最新版 server 記錄」vs 算上歷史版本的「28,959 筆 server/版本記錄」——一本書出過幾版,算 1 本還是算幾冊,差三倍。'
+    },
+    glama: {
+      title: 'Glama', tag: 'glama.ai · 獨立公司',
+      def: '收書規則:主動派人到處掃、收書範圍故意比官方寬。創辦人 Frank Fiegel 一個人做的產品,2024 年 11 月 25 日上線——就在 Anthropic 剛發布 MCP 沒幾天,自稱是官方 registry 的「superset」。',
+      example: '另一份分析引用的數字是「19,831+」,但直接查 glama.ai 官網,現在寫的是「50,777」——同一份資料幾天內就翻了一倍多。'
+    },
+    mcpso: {
+      title: 'MCP.so', tag: 'github.com/chatmcp/mcpso · 社群專案',
+      def: '收書規則:社群自己挑的精選清單,不是來者不拒。ChatMCP 團隊做的開源專案,不是公司產品,也不是官方的一部分。',
+      example: '三座圖書館的書架本來就不會放一樣的書——「世界上到底有多少個 MCP server」沒有唯一正確答案,取決於你問的是哪座圖書館。'
+    }
+  };
+  const panelC = document.getElementById('panelC');
+  const regRows = document.querySelectorAll('.reg-row');
+  regRows.forEach(n => n.addEventListener('click', () => {
+    regRows.forEach(x => x.classList.toggle('active', x === n));
+    const d = REGISTRY[n.dataset.key];
+    panelC.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div><div class="ex" style="margin-top:8px;background:var(--line-soft);border-left-color:var(--muted)">${d.example}</div>`;
   }));
 
   const trustBox = document.getElementById('trustBox');

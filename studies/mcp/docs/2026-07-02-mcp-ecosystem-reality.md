@@ -45,23 +45,50 @@ agent 框架),OpenAI 捐了 `AGENTS.md`(給 agent 讀的專案說明檔案格式
 unchanged: the project's maintainers continue to prioritize community input and transparent
 decision-making」——換的是**掛在哪個組織底下**,不是換一套新的決策流程。
 
-## Registry:解決了「找 server」的問題,但數字本身就在打架
+## Registry 是什麼——先講最基本的
 
-一份社群分析直接點出動機:「Fragmented approaches led to duplicated effort, inconsistent
+MCP 這個協定本身,沒有內建一個「幫你找 server」的搜尋引擎——你想用一個 server,得自己先知道
+它在哪、怎麼裝。**Registry 就是一個網站,把「有哪些人做了什麼 MCP server、這些 server 是做
+什麼的、怎麼裝」整理成一份可以搜尋的名單**,概念上很像電話簿,或 App Store 的目錄。一份社群
+分析直接點出這件事存在的動機:「Fragmented approaches led to duplicated effort, inconsistent
 metadata views, and discovery friction, which motivated the creation of a centralized MCP
-registry to serve as a single source of truth」——這就是官方 registry 存在的理由。但實際規模
-數字,三個來源講的完全不一樣:
+registry to serve as a single source of truth」(見
+[safedep.io](https://safedep.io/the-state-of-mcp-registries/))。
+
+## 三個 registry,分別是誰在營運
+
+- **官方 MCP Registry**(`registry.modelcontextprotocol.io`)——連「官方」這個詞背後也是跨
+  公司協作:2025 年 2 月由 MCP 原創者發起,找 **PulseMCP** 跟 **Block(Goose 團隊)**幫忙建,
+  後續 **GitHub**、**Anthropic** 的人也加入當維護者(見
+  [`blog.modelcontextprotocol.io` 公告](https://blog.modelcontextprotocol.io/posts/2025-09-08-mcp-registry-preview/))。
+- **Glama**(`glama.ai`)——**一間獨立公司/產品**,創辦人 Frank Fiegel 一個人做的,2024 年
+  11 月 25 日上線,就在 Anthropic 剛發布 MCP 沒幾天。自稱是官方 registry 的「superset」——
+  自己主動去多方掃描、收錄範圍故意比官方寬。
+- **MCP.so**——**社群維護的目錄專案**,由 ChatMCP 團隊做的開源專案(`github.com/chatmcp/mcpso`),
+  比較像一份「精選清單」,不是公司產品,也不是官方的一部分。
+
+## 為什麼數字打架——不是算錯,是「圖書館的收書規則不一樣」
+
+三邊實際規模數字完全不一樣:
 
 | 來源 | 數字 | 查證時間 |
 |---|---|---|
 | 官方 MCP Registry API | 9,652 個最新版 server 記錄、28,959 個 server/版本記錄 | 2026-05-24 |
-| Glama registry | 19,831+ | 2026-03 |
+| Glama registry | 19,831+(同一天直接查 glama.ai 首頁,數字已經是 **50,777**) | 2026-03 / 2026-07-02 |
 | MCP.so | 16,000+ | 未標明具體日期 |
 
-**三個數字差兩倍以上**,原因是每個 registry 的「計算方式」不一樣(算不算歷史版本、算不算
-重複提交、收錄門檻不同)——這正是「M×N 問題有沒有真的解決」這個問題的一半答案:找 server
-這件事確實比以前容易(不用每個 AI 應用各自維護一份清單),但「哪個 registry 的數字才是真的」
-本身變成一個新的小 M×N。
+用圖書館比喻更準確:**不是同一批書、三個館員數出不同答案,是三座圖書館的「收書規則」本來就
+不一樣,書架上放的書不完全相同**。官方那座只收「有人正式送書來登記」的書(靠上面那四方
+maintainer 一起審核);Glama 那座主動派人到處掃、收書範圍故意比官方寬;MCP.so 那座是社群自己
+挑的精選書單,不是來者不拒。三座圖書館的書架本來就不會放一樣的書,所以**「世界上到底有多少個
+MCP server」沒有一個唯一正確答案,取決於你問的是哪座圖書館、那座圖書館的收書規則是什麼**。
+
+這也順便給了「容易過期」這件事一個更具體的例子:上面表格裡 Glama 的「19,831+」是查證當時
+(2026-03)另一份分析引用的數字,但**同一天**直接去 glama.ai 首頁查,寫的已經是「50,777」——
+不是幾個月後才舊,是**幾天內就已經舊了**。
+
+這正是「M×N 問題有沒有真的解決」這個問題的一半答案:找 server 這件事確實比以前容易(不用每個
+AI 應用各自維護一份清單),但「哪個 registry 的數字才是真的」本身變成一個新的小 M×N。
 
 ## 換來的新問題:能收錄,不代表被審查過
 
@@ -107,6 +134,13 @@ Sources:
   ——分散式做法造成的重複/metadata 不一致/發現困難,官方 registry 的動機。
 - [MCP Adoption Statistics 2026 — Digital Applied](https://www.digitalapplied.com/blog/mcp-adoption-statistics-2026-model-context-protocol)
   ——官方 registry API、Glama、MCP.so 三個來源的數字對照。
+- [Introducing the MCP Registry — MCP 官方部落格](https://blog.modelcontextprotocol.io/posts/2025-09-08-mcp-registry-preview/)
+  ——官方 registry 的起源(PulseMCP、Block、GitHub、Anthropic 跨公司協作)。
+- [`glama.ai/mcp`](https://glama.ai/mcp)、[`glama.ai/mcp/servers`](https://glama.ai/mcp/servers)
+  ——Glama 自己的定位(創辦人 Frank Fiegel、2024-11-25 上線、自稱是官方 registry 的 superset)、
+  即時查到的最新收錄數字(50,777,查證時間跟官方數字不同天,差距本身就是重點)。
+- [`github.com/chatmcp/mcpso`](https://github.com/chatmcp/mcpso)
+  ——MCP.so 的營運方(ChatMCP 團隊的開源社群目錄專案)。
 
 **誠實聲明**:這篇的數字全部是這次對話用 WebSearch 查的當下(2026-07-02)結果,不是查證過長期
 穩定的規格文字——採用數字、生態規模這類東西會持續變動,過一段時間回來看這篇筆記,數字部分
