@@ -25,6 +25,10 @@ tags:
   進階主題(101 之外):誰該防誰的責任分工、遠端授權怎麼跑(OAuth 2.1、PKCE、resource
   indicator)、本機 server 淪陷風險、Confused Deputy Problem、Session Hijacking 兩種變體、
   Lethal Trifecta(私密資料 + 不信任內容 + 對外通訊三者疊加)、tool description 本身是攻擊面
+- [mcp-sep-governance](docs/2026-07-02-mcp-sep-governance.md) —
+  進階主題:SEP 提案機制(抄 Python PEP/Rust RFC)、狀態機(Draft→In-Review→Accepted→Final,
+  這是為什麼 Tasks 機制標「未定案」的判斷依據)、四層治理結構(Contributors→Maintainers→
+  Core Maintainers→Lead Maintainers)、Anthropic 跟社群共用治理層級、Working/Interest Group
 - [mcp-tool-scaling-problem](docs/2026-07-02-mcp-tool-scaling-problem.md) —
   進階主題:一個 host 接多個 server 之後,工具清單塞爆 context 怎麼辦——Progressive Tool
   Discovery(先搜尋、後載入)、Programmatic Tool Calling / Code Mode(模型寫程式碼在沙箱裡
