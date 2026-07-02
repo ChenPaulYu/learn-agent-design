@@ -102,6 +102,17 @@ render_with_liquid: false
   .fan-col.new .ftag{color:var(--rose)}
   .fan-col p{margin-top:6px;line-height:1.55}
 
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
   footer{margin-top:40px;color:var(--faint);font-size:12px}
 </style>
 </head>
@@ -258,6 +269,47 @@ render_with_liquid: false
 
     <div class="panel" id="panelC">
       <p class="placeholder">↑ 點一個節點看細節跟官方原句引用。</p>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">
+      以下全部是實際查過的來源(經 context7 於 2026-07-02 抓取),可以照連結回去對。
+      注意:M×N 整合問題的比喻、以及圖 B 的 Fit/Adapt/New 三欄拆法,是學習過程的推導整理,
+      官方文件沒有逐字這樣分類;「MCP takes inspiration from LSP」這句本身則是官方原文。
+    </p>
+
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">MCP 官方(架構 / primitive / lifecycle)</div>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/learn/architecture.mdx">architecture.mdx — Host/Client/Server、六個 primitive 的官方分類</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/lifecycle.mdx">lifecycle.mdx — initialize 握手、capability 協商</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/learn/client-concepts.mdx">client-concepts.mdx — Sampling 的多層人工審核鏈</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/client/sampling.mdx">sampling.mdx — sampling/createMessage 請求格式</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/client/elicitation.mdx">elicitation.mdx — 表單 / URL 兩種模式</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/client/roots.mdx">roots.mdx — roots/list 查詢</a>
+        <a href="https://modelcontextprotocol.io/specification/2025-11-25">Spec Overview — 「MCP takes inspiration from the Language Server Protocol」官方原句</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">MCP 官方(transport / SEP)</div>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/transports.mdx">transports.mdx — stdio 換行分幀、Streamable HTTP</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/seps/1319-decouple-request-payload-from-rpc-methods-definiti.mdx">SEP-1319 — 拆開 payload 與 RPC 包裝,為 gRPC binding 鋪路</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/seps/2243-http-standardization.mdx">SEP-2243 — HTTP header 標準化,中間設備免 deep packet inspection</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/seps/2575-stateless-mcp.mdx">SEP-2575 — stateful handshake 的爭議與無狀態化提案</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2567-sessionless-mcp.md">SEP-2567 — request id「per-sender、回應前不可重複」規則</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/blog/content/posts/2025-12-19-mcp-transport-future.md">Transport Future(官方部落格)— sticky session 問題、無狀態路線圖</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">脈絡對照(LSP / JSON-RPC / gRPC / FastAPI)</div>
+        <a href="https://github.com/microsoft/language-server-protocol/blob/gh-pages/_specifications/lsp/3.17/specification.md">LSP 3.17 spec — server lifecycle 由 client 管理、Content-Length 分幀</a>
+        <a href="https://www.jsonrpc.org/specification">JSON-RPC 2.0 spec — Overview 定位句、Notification、id 配對規則</a>
+        <a href="https://github.com/grpc/grpc.io/blob/main/content/en/docs/what-is-grpc/core-concepts.md">gRPC core concepts — .proto 服務定義、四種 streaming</a>
+        <a href="https://github.com/fastapi/fastapi/blob/master/docs/en/docs/advanced/websockets.md">FastAPI websockets — 自己搭反向呼叫要換 @app.websocket 的對照</a>
+        <a href="https://github.com/modelcontextprotocol/python-sdk">MCP Python SDK — 本主題 hands-on code 用的官方套件</a>
+      </div>
     </div>
   </section>
 
