@@ -3,6 +3,11 @@
 A personal learning workspace for agent-design concepts: read/reason about a concept, distill it
 into a note, then try it hands-on in code. Not a product repo — no shipping, no users.
 
+`BACKLOG.md` (repo root) is a living list of candidate topics not yet started — not a history
+log (git log / the notes themselves cover that). When a tangent surfaces a topic worth studying
+later but out of scope for the current thread, add a line there instead of chasing it
+immediately. Delete an item's line once its own topic/note actually exists.
+
 ## Relationship to `../grains`
 
 Borrows `grains`' knowledge-organization pattern (a bounded topic = one folder, flat dated notes,
