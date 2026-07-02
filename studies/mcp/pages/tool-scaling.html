@@ -53,7 +53,7 @@ render_with_liquid: false
 
   .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
-    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;flex:1;min-width:180px}
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:180px}
   .chip:hover{transform:translateY(-2px)}
   .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
   .chip h4{font-size:13.5px;font-weight:660}
@@ -114,6 +114,9 @@ render_with_liquid: false
   .ref-group a:hover::before{color:var(--accent)}
 
   footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -216,6 +219,8 @@ render_with_liquid: false
 </div>
 
 <script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
   const PROBLEM = {
     tokens: { title: '浪費 Token', def: '每個工具的 name/description/input schema 都要塞進 context,工具一多,還沒開始做事,prompt 就先被工具定義吃掉一大塊。' },
     latency: { title: '延遲增加', def: 'context 變大,單次生成的時間跟著變長——不是模型變慢,是它每次都要先讀完一堆工具定義才能開始想。' },
@@ -227,6 +232,7 @@ render_with_liquid: false
     chipsA.forEach(c => c.classList.toggle('active', c === n));
     const d = PROBLEM[n.dataset.key];
     panelA.innerHTML = `<h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelA);
   }));
 
   const ctxBar = document.getElementById('ctxBar');
@@ -245,14 +251,18 @@ render_with_liquid: false
         <div class="ctx-seg tool" style="flex-basis:11%">tool 7</div>
         <div class="ctx-seg room" style="flex-basis:23%">推理空間</div>
       `;
+    fadeIn(ctxBar);
       ctxNote.innerHTML = '10 個 server、每個平均 7 個工具的完整 schema,一次性全部塞進 context——留給模型真正推理的空間只剩不到四分之一。';
+    fadeIn(ctxNote);
     } else {
       ctxBar.innerHTML = `
         <div class="ctx-seg search" style="flex-basis:6%">search_tools</div>
         <div class="ctx-seg tool" style="flex-basis:9%">載入 2 個</div>
         <div class="ctx-seg room" style="flex-basis:85%">推理空間</div>
       `;
+    fadeIn(ctxBar);
       ctxNote.innerHTML = '模型先呼叫輕量的 search_tools 描述需求,host 只載入符合的一兩個工具的完整 schema——推理空間留下來的比例天差地遠。';
+    fadeIn(ctxNote);
     }
   }
   ctxBtns.forEach(b => b.addEventListener('click', () => renderCtx(b.dataset.mode)));
@@ -276,6 +286,7 @@ render_with_liquid: false
         </div>
         <div class="ctx-fill-note">每一輪的中間結果都要完整送回模型的 context——工具鏈越長,來回越多次。</div>
       `;
+    fadeIn(flowBox);
     } else {
       flowBox.innerHTML = `
         <div class="ctx-label">Code Mode — 3 個工具 = 1 次來回</div>
@@ -288,6 +299,7 @@ render_with_liquid: false
         </div>
         <div class="ctx-fill-note">中間三個工具的執行過程跟資料完全不會進到模型的 context——代價是 client 端要自己實作一個沙箱環境來跑這段程式碼。</div>
       `;
+    fadeIn(flowBox);
     }
   }
   flowBtns.forEach(b => b.addEventListener('click', () => renderFlow(b.dataset.mode)));

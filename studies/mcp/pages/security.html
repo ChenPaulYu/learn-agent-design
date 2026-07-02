@@ -57,7 +57,7 @@ render_with_liquid: false
   .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
   .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
   .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
-    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
     text-align:left}
   .node:hover{transform:translateY(-3px);border-color:var(--accent)}
   .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
@@ -83,7 +83,7 @@ render_with_liquid: false
   .rgroup.client .glabel{background:rgba(47,111,158,.1);color:var(--blue)}
   .rgroup .chips{display:flex;flex-direction:column;gap:9px;margin-top:12px}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
-    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease}
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
   .chip:hover{transform:translateY(-2px)}
   .rgroup.server .chip.active{border-color:var(--green);box-shadow:0 0 0 2px rgba(12,122,89,.16),var(--shadow)}
   .rgroup.client .chip.active{border-color:var(--blue);box-shadow:0 0 0 2px rgba(47,111,158,.16),var(--shadow)}
@@ -122,6 +122,9 @@ render_with_liquid: false
   .ref-group a:hover::before{color:var(--accent)}
 
   footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -449,6 +452,8 @@ render_with_liquid: false
 </div>
 
 <script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
   const RESP = {
     validate: { title: '驗證所有工具輸入', tag: 'Server MUST', def: '不能假設輸入乾淨——每個工具呼叫的參數都要驗證型別、範圍、格式,擋掉不合法的輸入。' },
     access: { title: '實作存取控制', tag: 'Server MUST', def: '誰能呼叫這個工具、能存取哪些資源,要有明確的權限邊界,不能靠「反正只有內部人在用」這種假設。' },
@@ -469,6 +474,7 @@ render_with_liquid: false
       <h2>${d.title}</h2>
       <div class="ex">${d.def}</div>
     `;
+    fadeIn(panelA);
   }
   chipsA.forEach(n => n.addEventListener('click', () => renderResp(n.dataset.key)));
 
@@ -507,6 +513,7 @@ render_with_liquid: false
       <div class="ex">${d.def}</div>
       <div class="ex" style="margin-top:8px;background:var(--line-soft);border-left-color:var(--muted)">${d.example}</div>
     `;
+    fadeIn(panelB);
   }
   function renderTrifecta(){
     circles.forEach(c => c.classList.remove('active'));
@@ -517,6 +524,7 @@ render_with_liquid: false
       <div class="ex" style="border-left-color:var(--rose)">${TRIFECTA.def}</div>
       <div class="ex" style="margin-top:8px;background:var(--line-soft);border-left-color:var(--muted)">${TRIFECTA.example}</div>
     `;
+    fadeIn(panelB);
   }
   circles.forEach(c => c.addEventListener('click', () => renderVenn(c.dataset.key)));
   vennBadge.addEventListener('click', renderTrifecta);
@@ -559,6 +567,7 @@ render_with_liquid: false
       <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
       <div class="ex">${d.example}</div>
     `;
+    fadeIn(panelOAuth);
   }
   allOAuth.forEach(n => n.addEventListener('click', () => renderOAuth(n.dataset.key)));
 
@@ -595,6 +604,7 @@ render_with_liquid: false
       <div class="meta"><b>攻擊手法</b><span>${d.attack}</span></div>
       <div class="ex">${d.mitigation}</div>
     `;
+    fadeIn(panelC);
   }
   nodesC.forEach(n => n.addEventListener('click', () => renderAttack(n.dataset.key)));
 </script>

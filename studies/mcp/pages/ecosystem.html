@@ -59,7 +59,7 @@ render_with_liquid: false
   .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
   .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
   .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
-    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
     text-align:left}
   .node:hover{transform:translateY(-3px);border-color:var(--accent)}
   .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
@@ -77,7 +77,7 @@ render_with_liquid: false
 
   .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
-    padding:11px 15px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;flex:1;min-width:130px;
+    padding:11px 15px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:130px;
     text-align:center}
   .chip:hover{transform:translateY(-2px)}
   .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
@@ -127,6 +127,9 @@ render_with_liquid: false
   .ref-group a:hover::before{color:var(--accent)}
 
   footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -273,6 +276,8 @@ render_with_liquid: false
 </div>
 
 <script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
   const TIMELINE = {
     'openai-adopt': { title: 'OpenAI 官方採用 MCP', tag: '2025-03', def: '整合進 ChatGPT desktop app——這是最直接的「競爭對手都在用」訊號,不是小廠商跟風,是同量級的公司official 採用。' },
     'chatgpt-apps': { title: 'ChatGPT apps 支援 MCP', tag: '2025-09', def: '從 desktop app 擴大到 ChatGPT apps 生態,採用範圍持續擴大。同一時期 Google、Microsoft、GitHub、Vercel、VS Code、Cursor 全部都有官方文件或公告顯示支援 MCP。' },
@@ -284,6 +289,7 @@ render_with_liquid: false
     nodesA.forEach(x => x.classList.toggle('active', x === n));
     const d = TIMELINE[n.dataset.key];
     panelA.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelA);
   }));
 
   const MEMBER = {
@@ -302,6 +308,7 @@ render_with_liquid: false
     chipsB.forEach(x => x.classList.toggle('active', x === n));
     const d = MEMBER[n.dataset.key];
     panelB.innerHTML = `<h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelB);
   }));
 
   const REGISTRY = {
@@ -327,6 +334,7 @@ render_with_liquid: false
     regRows.forEach(x => x.classList.toggle('active', x === n));
     const d = REGISTRY[n.dataset.key];
     panelC.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div><div class="ex" style="margin-top:8px;background:var(--line-soft);border-left-color:var(--muted)">${d.example}</div>`;
+    fadeIn(panelC);
   }));
 
   const trustBox = document.getElementById('trustBox');
@@ -343,6 +351,7 @@ render_with_liquid: false
         </div>
         <div class="ctx-fill-note">這些假設全部不成立——registry 存在的目的是解決「找不到」的問題,不是解決「信不信任」的問題。</div>
       `;
+    fadeIn(trustBox);
     } else {
       trustBox.innerHTML = `
         <div class="ctx-label">registry 實際檢查的事</div>
@@ -354,6 +363,7 @@ render_with_liquid: false
         </div>
         <div class="ctx-fill-note">攻擊者可以把惡意 server 包裝成大公司的 icon/品牌上傳——收錄門檻擋不住這件事。目前的應對是開源 + 社群共管:使用者舉報,maintainer 事後拉黑,是事後機制,不是事前審查。這正是安全模型筆記裡 Lethal Trifecta 需要 client 端自己把關的原因。</div>
       `;
+    fadeIn(trustBox);
     }
   }
   trustBtns.forEach(b => b.addEventListener('click', () => renderTrust(b.dataset.mode)));

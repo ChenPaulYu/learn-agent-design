@@ -59,7 +59,7 @@ render_with_liquid: false
   .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
   .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
   .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
-    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
     text-align:left}
   .node:hover{transform:translateY(-3px);border-color:var(--accent)}
   .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
@@ -75,7 +75,7 @@ render_with_liquid: false
   .pgroup.client .glabel{background:rgba(176,74,106,.1);color:var(--rose)}
   .pgroup .chips{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
-    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;flex:1;min-width:120px}
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:120px}
   .chip:hover{transform:translateY(-2px)}
   .pgroup.server .chip.active{border-color:var(--green);box-shadow:0 0 0 2px rgba(12,122,89,.16),var(--shadow)}
   .pgroup.client .chip.active{border-color:var(--rose);box-shadow:0 0 0 2px rgba(176,74,106,.16),var(--shadow)}
@@ -123,6 +123,9 @@ render_with_liquid: false
   .zone.cord:hover,.zone.cord.active{opacity:1}
 
   footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -474,6 +477,7 @@ render_with_liquid: false
 </div>
 
 <script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
   const ROLE = {
     host: {
       title: 'Host', tag: 'Role · Host · 你的秘書',
@@ -582,6 +586,7 @@ render_with_liquid: false
       ${data.note ? `<div class="ex" style="margin-top:8px;border-left-color:var(--rose)">🔒 ${data.note}</div>` : ''}
       ${data.snippet ? `<div class="ex" style="margin-top:8px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;background:var(--line-soft);border-left-color:var(--muted)">${data.snippet}</div>` : ''}
     `;
+    fadeIn(panelA);
   }
   function activeForKey(key){
     return [...document.querySelectorAll(`#roleRow .node[data-key="${key}"]`),
@@ -639,6 +644,7 @@ render_with_liquid: false
       ${d.example ? `<div class="ex">${d.example}</div>` : ''}
       ${fanHtml}
     `;
+    fadeIn(panelB);
   }
   nodesB.forEach(n => n.addEventListener('click', () => renderB(n.dataset.key)));
 
@@ -665,6 +671,7 @@ render_with_liquid: false
       <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
       <div class="ex">${d.example}</div>
     `;
+    fadeIn(panelA2A);
   }
   nodesA2A.forEach(n => n.addEventListener('click', () => renderA2A(n.dataset.key)));
 
@@ -707,6 +714,7 @@ render_with_liquid: false
       <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
       <div class="ex">${d.example}</div>
     `;
+    fadeIn(panelC);
   }
   nodesC.forEach(n => n.addEventListener('click', () => renderC(n.dataset.key)));
 
@@ -740,6 +748,7 @@ render_with_liquid: false
       <div class="ex">${d.example}</div>
       ${d.note ? `<div class="ex" style="margin-top:8px;border-left-color:var(--rose)">⚠ ${d.note}</div>` : ''}
     `;
+    fadeIn(panelD);
   }
   nodesD.forEach(n => n.addEventListener('click', () => renderD(n.dataset.key)));
 </script>

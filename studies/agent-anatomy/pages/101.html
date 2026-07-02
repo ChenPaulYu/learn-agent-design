@@ -67,7 +67,7 @@ render_with_liquid: false
   .row{display:flex;align-items:stretch;gap:10px;margin-top:8px;flex-wrap:nowrap}
   .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
   .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
-    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
     text-align:left}
   .node:hover{transform:translateY(-3px);border-color:var(--accent)}
   .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
@@ -107,7 +107,7 @@ render_with_liquid: false
 
   .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
-    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;flex:1;min-width:150px}
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:150px}
   .chip:hover{transform:translateY(-2px)}
   .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
   .chip h4{font-size:13.5px;font-weight:660}
@@ -137,6 +137,9 @@ render_with_liquid: false
   .zone.active text{fill:currentColor}
 
   footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -394,6 +397,8 @@ render_with_liquid: false
 </div>
 
 <script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
   const LAYERS = {
     pattern: {
       title: 'Pattern', tag: '01 · Decision 軸',
@@ -453,6 +458,7 @@ render_with_liquid: false
       </div>
       <div class="ex">${d.example}</div>
     `;
+    fadeIn(panelA);
   }
   nodesA.forEach(n => n.addEventListener('click', () => renderA(n.dataset.key)));
 
@@ -468,6 +474,7 @@ render_with_liquid: false
       </div>
       <div class="ex">Runtime state 依「誰讀」分兩種:<b>(A) 記憶型</b>——目的是變成某個 primitive 的內容(記憶庫、對話歷史),memory+retrieve 系統(Generative Agents、MemGPT)的創新幾乎全部集中在這種,而這正是走 conditioning edge 的 state;<b>(B) 機制型</b>——只給 Runtime/Computation Model 內部記帳用(重試次數、快取、預算),永遠不進 prompt,模型看不到它,也就不走這條邊。</div>
     `;
+    fadeIn(panelB);
   }
   document.getElementById('edgeHit').addEventListener('click', renderEdge);
   document.getElementById('edgeBadge').addEventListener('click', renderEdge);
@@ -530,6 +537,7 @@ render_with_liquid: false
       </div>
       <div class="ex">${d.note}</div>
     `;
+    fadeIn(panelC);
   }
   chipsC.forEach(n => n.addEventListener('click', () => renderC(n.dataset.key)));
 
@@ -572,6 +580,7 @@ render_with_liquid: false
       </div>
       <div class="ex" style="border-left-color:${d.color}">${d.ex}</div>
     `;
+    fadeIn(panelHuman);
   }
   zones.forEach(z => z.addEventListener('click', () => renderHuman(z.dataset.key)));
   humanChips.forEach(c => c.addEventListener('click', () => renderHuman(c.dataset.key)));
