@@ -1,0 +1,297 @@
+---
+title: MCP 太多工具問題 — 互動圖解
+summary: 三張互動圖:接多個 server 之後的三個壞處、Progressive Tool Discovery 讓 context window 少被吃掉多少、Programmatic Tool Calling(Code Mode)怎麼把多輪來回壓成一次。
+date: 2026-07-02
+tags:
+  - mcp
+  - scaling
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — MCP 太多工具問題:三張互動圖解。可長期回看的教學頁(pages/ genre,發布於
+  /mcp/tool-scaling/),不是 disposable mockup。101 之外的「進階」主題。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-02-mcp-tool-scaling-problem.md
+  Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(問題本身)— 三個壞處(浪費 token / 延遲增加 / 模型表現變差),點卡片看細節。
+    圖 B(Progressive Tool Discovery)— 一個「context window 填多滿」的長條圖,點兩個按鈕
+      切換「笨拙做法」跟「Progressive Discovery」,親眼看填滿的比例差多少。
+    圖 C(Programmatic Tool Calling / Code Mode)— 切換「一般呼叫」跟「Code Mode」兩種流程
+      示意,看多輪來回怎麼被壓成一次。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP 太多工具問題 — 互動圖解</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;flex:1;min-width:180px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:100px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .toggle-row{display:flex;gap:10px;margin-top:22px}
+  .toggle-btn{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    padding:12px 16px;cursor:pointer;font-size:13.5px;font-weight:650;color:var(--muted);
+    transition:all .16s ease;text-align:center}
+  .toggle-btn.active{border-color:var(--rose);color:var(--rose);background:rgba(176,74,106,.06)}
+  .toggle-btn.active.good{border-color:var(--green);color:var(--green);background:rgba(12,122,89,.06)}
+
+  .ctx-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px}
+  .ctx-label{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:8px}
+  .ctx-bar{display:flex;height:44px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+  .ctx-seg{display:flex;align-items:center;justify-content:center;font-size:10.5px;color:#fff;
+    font-family:var(--mono);overflow:hidden;white-space:nowrap;transition:flex-basis .3s ease}
+  .ctx-seg.tool{background:var(--rose)}
+  .ctx-seg.search{background:var(--accent)}
+  .ctx-seg.room{background:var(--green);color:#fff}
+  .ctx-fill-note{margin-top:10px;font-size:12.5px;color:var(--muted)}
+
+  .flow-row{display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .flow-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 13px;
+    font-size:12.5px;font-weight:600;box-shadow:var(--shadow)}
+  .flow-box.model{border-color:var(--blue);color:var(--blue)}
+  .flow-box.tool{border-color:var(--rose);color:var(--rose)}
+  .flow-box.sandbox{border-color:var(--green);color:var(--green)}
+  .flow-arrow{color:var(--faint);font-size:13px}
+  .flow-round{margin-top:10px;padding:10px 12px;background:var(--line-soft);border-radius:8px}
+  .flow-round .rlabel{font-family:var(--mono);font-size:10px;color:var(--faint);margin-bottom:6px}
+
+  .compare2{display:flex;gap:14px;margin-top:22px;flex-wrap:wrap}
+  .compare2 > div{flex:1;min-width:280px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--shadow);padding:16px 18px}
+  .compare2 h4{font-size:13px;font-weight:660;color:var(--accent)}
+  .compare2 p{margin-top:8px;font-size:12.5px;color:var(--muted);line-height:1.6}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Interactive · MCP 太多工具問題</div>
+    <h1>太多工具問題 — 一個 host 接多個 server 之後</h1>
+    <p class="tagline">
+      101 之外的進階主題。圖 A 是三個獨立的壞處,圖 B 是整篇最直觀的一張圖——親眼看 context
+      window 被工具定義吃掉多少,圖 C 是把多輪來回壓成一次的做法。點任何卡片看細節。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 問題本身 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 笨拙做法的三個壞處</div>
+    <div class="sec-title">不是同一件事的三種說法</div>
+    <p class="sec-sub">
+      每個工具的 name/description/input schema 都要塞進 context——工具一多,還沒開始做事,
+      prompt 就先被吃掉一大塊。三個壞處各自獨立,點卡片看細節。
+    </p>
+
+    <div class="chips" id="problemChips">
+      <div class="chip" data-key="tokens"><h4>浪費 Token</h4><div class="sub">工具定義佔掉一大塊 context</div></div>
+      <div class="chip" data-key="latency"><h4>延遲增加</h4><div class="sub">context 變大,生成變慢</div></div>
+      <div class="chip" data-key="degraded"><h4>模型表現變差</h4><div class="sub">選項太多,容易選錯工具</div></div>
+    </div>
+
+    <div class="panel" id="panelA">
+      <p class="placeholder">↑ 點上面任一張卡片看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: Progressive Tool Discovery ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · Progressive Tool Discovery</div>
+    <div class="sec-title">先給搜尋工具,不要一次全塞</div>
+    <p class="sec-sub">
+      這個長條代表模型的 context window。點下面兩個按鈕切換「笨拙做法」跟「Progressive
+      Discovery」,看填滿的比例差多少——差的那塊,就是省下來給模型真正拿去推理的空間。
+    </p>
+
+    <div class="toggle-row" id="ctxToggle">
+      <div class="toggle-btn active" data-mode="naive">笨拙做法 — 全部塞進去</div>
+      <div class="toggle-btn good" data-mode="progressive">Progressive Discovery</div>
+    </div>
+
+    <div class="ctx-box">
+      <div class="ctx-label">Context Window</div>
+      <div class="ctx-bar" id="ctxBar"></div>
+      <div class="ctx-fill-note" id="ctxNote"></div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: Programmatic Tool Calling ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · Programmatic Tool Calling(Code Mode)</div>
+    <div class="sec-title">多輪來回,壓成一次</div>
+    <p class="sec-sub">
+      切換下面兩個按鈕,看同樣要呼叫三個工具的任務,「一般呼叫」跟「Code Mode」的流程差在哪裡。
+    </p>
+
+    <div class="toggle-row" id="flowToggle">
+      <div class="toggle-btn active" data-mode="direct">一般呼叫 — 每次都要回來問模型</div>
+      <div class="toggle-btn good" data-mode="code">Code Mode — 寫一次程式碼,沙箱裡跑完</div>
+    </div>
+
+    <div class="ctx-box" id="flowBox"></div>
+
+    <div class="compare2">
+      <div>
+        <h4>跟 tools/list 的 pagination 不是同一件事</h4>
+        <p><code>cursor</code>/<code>nextCursor</code> 是單一 server 工具清單太長時,線路層的分頁——防的是「一次傳輸塞爆」,清單最終還是全部到 client 手上。</p>
+      </div>
+      <div>
+        <h4>Progressive Discovery 管的是另一層</h4>
+        <p>管的是「host 決定要不要把某個工具的完整定義塞進<b>模型的 context</b>」——這是模型能看到多少的問題,跟「傳輸怎麼分批」是兩層不同的關注點,容易被搞混。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">全部經 context7 於 2026-07-02 抓取查證。</p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">MCP 官方文件</div>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/develop/clients/client-best-practices.mdx">client-best-practices.mdx — 問題描述、Progressive Discovery、Programmatic Tool Calling、兩者疊加</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/tools.mdx">tools.mdx — tools/list 的 cursor/nextCursor 分頁機制</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/2026-07-02-mcp-tool-scaling-problem.md 為真相來源(經 context7 查證)·
+    最後同步 2026-07-02
+  </footer>
+</div>
+
+<script>
+  const PROBLEM = {
+    tokens: { title: '浪費 Token', def: '每個工具的 name/description/input schema 都要塞進 context,工具一多,還沒開始做事,prompt 就先被工具定義吃掉一大塊。' },
+    latency: { title: '延遲增加', def: 'context 變大,單次生成的時間跟著變長——不是模型變慢,是它每次都要先讀完一堆工具定義才能開始想。' },
+    degraded: { title: '模型表現變差', def: '選項太多,LLM 從一堆長得差不多的工具裡挑錯的機率上升——不是「模型變笨」,是攤在它面前的選擇太雜。' }
+  };
+  const panelA = document.getElementById('panelA');
+  const chipsA = document.querySelectorAll('#problemChips .chip');
+  chipsA.forEach(n => n.addEventListener('click', () => {
+    chipsA.forEach(c => c.classList.toggle('active', c === n));
+    const d = PROBLEM[n.dataset.key];
+    panelA.innerHTML = `<h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+  }));
+
+  const ctxBar = document.getElementById('ctxBar');
+  const ctxNote = document.getElementById('ctxNote');
+  const ctxBtns = document.querySelectorAll('#ctxToggle .toggle-btn');
+  function renderCtx(mode){
+    ctxBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    if (mode === 'naive') {
+      ctxBar.innerHTML = `
+        <div class="ctx-seg tool" style="flex-basis:11%">tool 1</div>
+        <div class="ctx-seg tool" style="flex-basis:11%">tool 2</div>
+        <div class="ctx-seg tool" style="flex-basis:11%">tool 3</div>
+        <div class="ctx-seg tool" style="flex-basis:11%">tool 4</div>
+        <div class="ctx-seg tool" style="flex-basis:11%">tool 5</div>
+        <div class="ctx-seg tool" style="flex-basis:11%">tool 6</div>
+        <div class="ctx-seg tool" style="flex-basis:11%">tool 7</div>
+        <div class="ctx-seg room" style="flex-basis:23%">推理空間</div>
+      `;
+      ctxNote.innerHTML = '10 個 server、每個平均 7 個工具的完整 schema,一次性全部塞進 context——留給模型真正推理的空間只剩不到四分之一。';
+    } else {
+      ctxBar.innerHTML = `
+        <div class="ctx-seg search" style="flex-basis:6%">search_tools</div>
+        <div class="ctx-seg tool" style="flex-basis:9%">載入 2 個</div>
+        <div class="ctx-seg room" style="flex-basis:85%">推理空間</div>
+      `;
+      ctxNote.innerHTML = '模型先呼叫輕量的 search_tools 描述需求,host 只載入符合的一兩個工具的完整 schema——推理空間留下來的比例天差地遠。';
+    }
+  }
+  ctxBtns.forEach(b => b.addEventListener('click', () => renderCtx(b.dataset.mode)));
+  renderCtx('naive');
+
+  const flowBox = document.getElementById('flowBox');
+  const flowBtns = document.querySelectorAll('#flowToggle .toggle-btn');
+  function renderFlow(mode){
+    flowBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    if (mode === 'direct') {
+      flowBox.innerHTML = `
+        <div class="ctx-label">一般呼叫 — 3 個工具 = 3 輪完整來回</div>
+        <div class="flow-round"><div class="rlabel">ROUND 1</div>
+          <div class="flow-row"><span class="flow-box model">Model 生成呼叫</span><span class="flow-arrow">→</span><span class="flow-box tool">Tool A 執行</span><span class="flow-arrow">→</span><span class="flow-box model">結果回到 Model</span></div>
+        </div>
+        <div class="flow-round"><div class="rlabel">ROUND 2</div>
+          <div class="flow-row"><span class="flow-box model">Model 生成呼叫</span><span class="flow-arrow">→</span><span class="flow-box tool">Tool B 執行</span><span class="flow-arrow">→</span><span class="flow-box model">結果回到 Model</span></div>
+        </div>
+        <div class="flow-round"><div class="rlabel">ROUND 3</div>
+          <div class="flow-row"><span class="flow-box model">Model 生成呼叫</span><span class="flow-arrow">→</span><span class="flow-box tool">Tool C 執行</span><span class="flow-arrow">→</span><span class="flow-box model">結果回到 Model</span></div>
+        </div>
+        <div class="ctx-fill-note">每一輪的中間結果都要完整送回模型的 context——工具鏈越長,來回越多次。</div>
+      `;
+    } else {
+      flowBox.innerHTML = `
+        <div class="ctx-label">Code Mode — 3 個工具 = 1 次來回</div>
+        <div class="flow-round"><div class="rlabel">ONE PASS</div>
+          <div class="flow-row">
+            <span class="flow-box model">Model 寫一段程式碼</span><span class="flow-arrow">→</span>
+            <span class="flow-box sandbox">Sandbox:依序執行 Tool A → Tool B → Tool C</span><span class="flow-arrow">→</span>
+            <span class="flow-box model">只把最終結果送回 Model</span>
+          </div>
+        </div>
+        <div class="ctx-fill-note">中間三個工具的執行過程跟資料完全不會進到模型的 context——代價是 client 端要自己實作一個沙箱環境來跑這段程式碼。</div>
+      `;
+    }
+  }
+  flowBtns.forEach(b => b.addEventListener('click', () => renderFlow(b.dataset.mode)));
+  renderFlow('direct');
+</script>
+</body>
+</html>

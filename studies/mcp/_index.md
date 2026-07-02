@@ -35,6 +35,9 @@ tags:
 - [pages/security](pages/security.html) —
   互動版安全模型:圖 A 責任分工、圖 B Lethal Trifecta(Venn 圖)、圖 C OAuth 2.1 流程、
   圖 D 四個具體攻擊
+- [pages/tool-scaling](pages/tool-scaling.html) —
+  互動版太多工具問題:圖 A 三個壞處、圖 B context window 填滿比例(笨拙 vs Progressive
+  Discovery 切換)、圖 C 多輪來回 vs Code Mode 一次跑完
 - [code/](code/) — 官方 Python SDK 寫的最小 server(一個 tool + 一個 resource + 一個 prompt)
   + 一個 client 跑過一輪 `list_tools` / `call_tool` / `read_resource` / `get_prompt`
 
