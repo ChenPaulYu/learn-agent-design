@@ -4,6 +4,11 @@ description: >-
   a note, then turn it into an interactive teaching page.
 lang: zh-Hant
 
+# Published at the GitHub Pages project URL. Local serve overrides the
+# subpath with `-b ""` (see the run command above).
+url: "https://chenpaulyu.github.io"
+baseurl: "/learn-agent-design"
+
 markdown: kramdown
 theme: null
 
