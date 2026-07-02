@@ -42,6 +42,9 @@ tags:
 - [pages/tool-scaling](pages/tool-scaling.html) —
   互動版太多工具問題:圖 A 三個壞處、圖 B context window 填滿比例(笨拙 vs Progressive
   Discovery 切換)、圖 C 多輪來回 vs Code Mode 一次跑完
+- [pages/ecosystem](pages/ecosystem.html) —
+  互動版生態現況:圖 A 採用時間線、圖 B Platinum 會員(競爭對手同桌)、圖 C 三個 registry
+  數字打架、圖 D 信任缺口切換
 - [code/](code/) — 官方 Python SDK 寫的最小 server(一個 tool + 一個 resource + 一個 prompt)
   + 一個 client 跑過一輪 `list_tools` / `call_tool` / `read_resource` / `get_prompt`
 

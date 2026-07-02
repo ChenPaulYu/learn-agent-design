@@ -1,0 +1,325 @@
+---
+title: MCP 生態現況 — 互動圖解
+summary: 四張互動圖:採用時間線(OpenAI 到捐給基金會)、Platinum 會員名單(競爭對手同桌)、三個 registry 數字互相打架、registry 收錄門檻 vs 大家以為的信任缺口。
+date: 2026-07-02
+tags:
+  - mcp
+  - ecosystem
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — MCP 生態現況:四張互動圖解。可長期回看的教學頁(pages/ genre,發布於
+  /mcp/ecosystem/),不是 disposable mockup。101 之外的「進階」主題,查證方式是新聞/公告
+  (WebSearch),不是規格文件——內容比其他 MCP 頁面更容易過期,頁面上有特別標注。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-02-mcp-ecosystem-reality.md
+  Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(採用時間線)— OpenAI 2025-03 官方採用 → 2025-09 ChatGPT apps → 2025-12 捐給
+      Agentic AI Foundation,點每個節點看細節。
+    圖 B(Platinum 會員)— 基金會會員 chip 網格,點看誰在裡面,特別點出競爭對手同桌。
+    圖 C(Registry 數字打架)— 三個來源的長條圖對照,差兩倍以上。
+    圖 D(信任缺口)— 切換「你以為 registry 做了什麼」跟「實際只做了什麼」。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP 生態現況 — 互動圖解</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  .stale{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:6px 12px;
+    background:rgba(176,74,106,.08);border:1px dashed var(--rose);border-radius:999px;
+    font-size:12px;color:var(--rose);font-weight:600}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:100px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 15px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;flex:1;min-width:130px;
+    text-align:center}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip.competitor{border-color:var(--rose)}
+  .chip h4{font-size:13px;font-weight:660}
+  .chip .sub{font-size:10.5px;color:var(--muted);margin-top:3px}
+
+  .bar-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+  .bar-row{display:flex;align-items:center;gap:12px}
+  .bar-label{flex:0 0 150px;font-size:12.5px;font-weight:600}
+  .bar-track{flex:1;background:var(--line-soft);border-radius:6px;height:22px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;
+    padding-right:8px;color:#fff;font-family:var(--mono);font-size:10.5px;transition:width .4s ease}
+  .bar-fill.a{background:var(--blue)}
+  .bar-fill.b{background:var(--accent)}
+  .bar-fill.c{background:var(--rose)}
+  .bar-note{font-size:12.5px;color:var(--muted)}
+
+  .toggle-row{display:flex;gap:10px;margin-top:22px}
+  .toggle-btn{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    padding:12px 16px;cursor:pointer;font-size:13.5px;font-weight:650;color:var(--muted);
+    transition:all .16s ease;text-align:center}
+  .toggle-btn.active{border-color:var(--rose);color:var(--rose);background:rgba(176,74,106,.06)}
+  .toggle-btn.active.good{border-color:var(--green);color:var(--green);background:rgba(12,122,89,.06)}
+  .ctx-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px}
+  .ctx-fill-note{margin-top:10px;font-size:12.5px;color:var(--muted)}
+  .checklist{margin-top:6px;display:flex;flex-direction:column;gap:6px}
+  .checklist div{font-size:13px;padding:6px 10px;border-radius:7px}
+  .checklist div.yes{background:rgba(12,122,89,.08);color:var(--green)}
+  .checklist div.no{background:rgba(176,74,106,.08);color:var(--rose)}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Interactive · MCP 生態現況</div>
+    <h1>MCP 生態現況 — M×N 問題解決了一半</h1>
+    <p class="tagline">
+      101 之外的進階主題。查證方式是新聞/公告,不是規格文件。圖 A 是採用時間線,圖 B 是誰跟
+      MCP 坐在同一張桌子上,圖 C/D 是「找 server 變容易了」換來的新問題。
+    </p>
+    <div class="stale">⚠ 這頁的數字查證於 2026-07-02,採用規模這類東西會持續變動,過一段時間回來看請假設數字已經過期</div>
+  </header>
+
+  <!-- ============ SECTION A: 採用時間線 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 一年內從內部實驗到產業標準</div>
+    <div class="sec-title">採用時間線</div>
+    <p class="sec-sub">點每個節點看細節跟官方原句引用。</p>
+
+    <div class="row" id="timelineRow">
+      <div class="node" data-key="openai-adopt">
+        <div class="idx">2025-03</div>
+        <h3>OpenAI 官方採用</h3>
+        <div class="q">整合進 ChatGPT desktop app</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="chatgpt-apps">
+        <div class="idx">2025-09</div>
+        <h3>ChatGPT apps 支援 MCP</h3>
+        <div class="q">不只 desktop,擴大到 apps 生態</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="donation">
+        <div class="idx">2025-12</div>
+        <h3>捐給 Agentic AI Foundation</h3>
+        <div class="q">不再是「Anthropic 的協定」</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelA">
+      <p class="placeholder">↑ 點一個節點看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: Platinum 會員 ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 誰跟 MCP 坐在同一張桌子上</div>
+    <div class="sec-title">Agentic AI Foundation Platinum 會員</div>
+    <p class="sec-sub">
+      同一輪還有 Block 捐 <code>goose</code>、OpenAI 捐 <code>AGENTS.md</code>——三家公司同時
+      把各自的東西捐進同一個中立基金會。點紅框那個看為什麼特別。
+    </p>
+
+    <div class="chips" id="memberChips">
+      <div class="chip" data-key="anthropic"><h4>Anthropic</h4><div class="sub">共同創辦</div></div>
+      <div class="chip" data-key="block"><h4>Block</h4><div class="sub">共同創辦 · 捐 goose</div></div>
+      <div class="chip competitor" data-key="openai"><h4>OpenAI</h4><div class="sub">共同創辦 · 捐 AGENTS.md</div></div>
+      <div class="chip competitor" data-key="google"><h4>Google</h4><div class="sub">支持會員</div></div>
+      <div class="chip competitor" data-key="microsoft"><h4>Microsoft</h4><div class="sub">支持會員</div></div>
+      <div class="chip" data-key="aws"><h4>AWS</h4><div class="sub">支持會員</div></div>
+      <div class="chip" data-key="cloudflare"><h4>Cloudflare</h4><div class="sub">支持會員</div></div>
+      <div class="chip" data-key="bloomberg"><h4>Bloomberg</h4><div class="sub">支持會員</div></div>
+    </div>
+
+    <div class="panel" id="panelB">
+      <p class="placeholder">↑ 點任一家看細節。紅框三家是 Anthropic 最直接的競爭對手。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: Registry 數字打架 ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 找 server 變容易了,但數字自己打架</div>
+    <div class="sec-title">三個 registry,三個不一樣的數字</div>
+    <p class="sec-sub">
+      差兩倍以上——不是誰在造假,是每個 registry 算法不同(算不算歷史版本、算不算重複提交、
+      收錄門檻不同)。
+    </p>
+
+    <div class="bar-box">
+      <div class="bar-row">
+        <div class="bar-label">官方 MCP Registry</div>
+        <div class="bar-track"><div class="bar-fill a" style="width:33%">9,652</div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Glama registry</div>
+        <div class="bar-track"><div class="bar-fill b" style="width:68%">19,831+</div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">MCP.so</div>
+        <div class="bar-track"><div class="bar-fill c" style="width:55%">16,000+</div></div>
+      </div>
+      <div class="bar-note">官方數字是「9,652 個最新版 server 記錄」;算上歷史版本則是 28,959 筆 server/版本記錄——連官方自己的兩種算法都差三倍。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION D: 信任缺口 ============ -->
+  <section>
+    <div class="sec-kicker">圖 D · 換來的新問題</div>
+    <div class="sec-title">收錄,不代表被審查過</div>
+    <p class="sec-sub">切換兩邊,看「大家以為 registry 做了什麼」跟「registry 實際只做了什麼」的落差。</p>
+
+    <div class="toggle-row" id="trustToggle">
+      <div class="toggle-btn active" data-mode="assume">你以為 registry 做了什麼</div>
+      <div class="toggle-btn good" data-mode="actual">registry 實際只做了什麼</div>
+    </div>
+
+    <div class="ctx-box" id="trustBox"></div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">全部經 WebSearch 於 2026-07-02 查證(不是規格文件,是新聞/公告/社群分析)。</p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">基金會 / 捐贈</div>
+        <a href="https://www.linuxfoundation.org/press/linux-foundation-announces-the-formation-of-the-agentic-ai-foundation">Linux Foundation 公告 — AAIF 成立、platinum 會員名單、97M/10,000 數字</a>
+        <a href="https://www.anthropic.com/news/donating-the-model-context-protocol-and-establishing-of-the-agentic-ai-foundation">Anthropic 官方公告</a>
+        <a href="https://blog.modelcontextprotocol.io/posts/2025-12-09-mcp-joins-agentic-ai-foundation/">MCP 官方部落格 — 同一則新聞的官方視角</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">Registry 現況</div>
+        <a href="https://safedep.io/the-state-of-mcp-registries/">The State of MCP Registries — 收錄門檻不含安全審查</a>
+        <a href="https://workos.com/blog/mcp-registry-architecture-technical-overview">MCP Registry Architecture — 官方 registry 的建立動機</a>
+        <a href="https://www.digitalapplied.com/blog/mcp-adoption-statistics-2026-model-context-protocol">MCP Adoption Statistics 2026 — 三個來源數字對照</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/2026-07-02-mcp-ecosystem-reality.md 為真相來源(經 WebSearch 查證,
+    非規格文件,容易過期)· 最後同步 2026-07-02
+  </footer>
+</div>
+
+<script>
+  const TIMELINE = {
+    'openai-adopt': { title: 'OpenAI 官方採用 MCP', tag: '2025-03', def: '整合進 ChatGPT desktop app——這是最直接的「競爭對手都在用」訊號,不是小廠商跟風,是同量級的公司official 採用。' },
+    'chatgpt-apps': { title: 'ChatGPT apps 支援 MCP', tag: '2025-09', def: '從 desktop app 擴大到 ChatGPT apps 生態,採用範圍持續擴大。同一時期 Google、Microsoft、GitHub、Vercel、VS Code、Cursor 全部都有官方文件或公告顯示支援 MCP。' },
+    donation: { title: '捐給 Agentic AI Foundation', tag: '2025-12', def: '「Anthropic donated the Model Context Protocol (MCP) to the Agentic AI Foundation (AAIF), a directed fund under the Linux Foundation, with the foundation co-founded by Anthropic, Block and OpenAI」——MCP 正式停止是「Anthropic 的協定」,治理機制本身官方說沒大改,換的是掛在哪個組織底下。' }
+  };
+  const panelA = document.getElementById('panelA');
+  const nodesA = document.querySelectorAll('#timelineRow .node');
+  nodesA.forEach(n => n.addEventListener('click', () => {
+    nodesA.forEach(x => x.classList.toggle('active', x === n));
+    const d = TIMELINE[n.dataset.key];
+    panelA.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+  }));
+
+  const MEMBER = {
+    anthropic: { title: 'Anthropic', def: 'MCP 的原創者,這次捐贈的發起方,同時是 AAIF 的共同創辦成員之一——把自己的協定捐出去,不是被動加入別人的基金會。' },
+    block: { title: 'Block', def: '共同創辦成員,同一輪捐了自己的 agent 框架 `goose` 進 AAIF——跟 MCP、AGENTS.md 三個項目一起成為基金會的創始專案。' },
+    openai: { title: 'OpenAI', def: 'Anthropic 最直接的競爭對手,卻是 AAIF 的共同創辦成員,同一輪捐了 `AGENTS.md`(給 agent 讀的專案說明檔案格式標準)。競爭對手一起把各自的東西捐進中立基金會,比單純「使用」MCP 更進一步——是共同治理,不只是採用。' },
+    google: { title: 'Google', def: 'Platinum 支持會員——同時也是 Gemini 的開發商,MCP 已經是 Gemini 生態的一部分。' },
+    microsoft: { title: 'Microsoft', def: 'Platinum 支持會員——VS Code、Microsoft Copilot 都已支援 MCP,跟 GitHub(同屬 Microsoft)一起是最早跟進的平台之一。' },
+    aws: { title: 'Amazon Web Services', def: 'Platinum 支持會員——雲端基礎設施的角色,對 MCP server 的部署/託管生態有直接利益。' },
+    cloudflare: { title: 'Cloudflare', def: 'Platinum 支持會員——對「怎麼安全地部署遠端 MCP server」這件事有直接利益(邊緣網路/安全服務商的角色)。' },
+    bloomberg: { title: 'Bloomberg', def: 'Platinum 支持會員——企業用戶角度的代表,不是基礎設施/平台商,反映 MCP 在企業內部工具整合場景的採用。' }
+  };
+  const panelB = document.getElementById('panelB');
+  const chipsB = document.querySelectorAll('#memberChips .chip');
+  chipsB.forEach(n => n.addEventListener('click', () => {
+    chipsB.forEach(x => x.classList.toggle('active', x === n));
+    const d = MEMBER[n.dataset.key];
+    panelB.innerHTML = `<h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+  }));
+
+  const trustBox = document.getElementById('trustBox');
+  const trustBtns = document.querySelectorAll('#trustToggle .toggle-btn');
+  function renderTrust(mode){
+    trustBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    if (mode === 'assume') {
+      trustBox.innerHTML = `
+        <div class="ctx-label">大家常見的假設</div>
+        <div class="checklist">
+          <div class="yes">✓ 「在官方 registry 上,應該是安全的」</div>
+          <div class="yes">✓ 「有 icon 跟品牌,應該是那家公司真的做的」</div>
+          <div class="yes">✓ 「能搜到、能裝,代表有人審核過」</div>
+        </div>
+        <div class="ctx-fill-note">這些假設全部不成立——registry 存在的目的是解決「找不到」的問題,不是解決「信不信任」的問題。</div>
+      `;
+    } else {
+      trustBox.innerHTML = `
+        <div class="ctx-label">registry 實際檢查的事</div>
+        <div class="checklist">
+          <div class="no">✕ 不做程式碼審查(code review)</div>
+          <div class="no">✕ 不做安全稽核(security audit)</div>
+          <div class="no">✕ 不做惡意程式掃描(malware scanning)</div>
+          <div class="yes">✓ 只要求證明擁有這個 GitHub repo 或網域</div>
+        </div>
+        <div class="ctx-fill-note">攻擊者可以把惡意 server 包裝成大公司的 icon/品牌上傳——收錄門檻擋不住這件事。目前的應對是開源 + 社群共管:使用者舉報,maintainer 事後拉黑,是事後機制,不是事前審查。這正是安全模型筆記裡 Lethal Trifecta 需要 client 端自己把關的原因。</div>
+      `;
+    }
+  }
+  trustBtns.forEach(b => b.addEventListener('click', () => renderTrust(b.dataset.mode)));
+  renderTrust('assume');
+</script>
+</body>
+</html>
