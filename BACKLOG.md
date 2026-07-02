@@ -6,9 +6,6 @@ out (and delete its line here) once its own topic/note exists.
 
 ## `mcp`
 
-- **生態現況** — MCP 有沒有真的解決 M×N 問題,還是又長出新的 registry/分發問題;OpenAI 後來
-  跟進採用這件事本身說明了什麼。查證方式跟其他 MCP 筆記不同——要查部落格/新聞/採用公告,不是
-  規格文件。
 - **多 server 疊加(Gateway 架構)** — 一個 MCP server 自己可不可以當另一個 server 的
   client(proxy/aggregate 多個下游 server)。跟安全模型那篇的 Confused Deputy 有重疊(那篇談
   的就是「MCP server 當代理」的情境),這篇是從架構模式角度重新看,不是安全視角。MCP 規格本身
