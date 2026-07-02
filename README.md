@@ -54,9 +54,6 @@ cross-repo ADRs — the resemblance is borrowed habit, not coupling.
   orthogonal-independence check and a first-principles dig into what "Computation Model" really is.
 - [`mcp`](studies/mcp/_index.md) — the Model Context Protocol: architecture, the six primitives,
   wire-protocol internals, the security model, and the tool-scaling problem.
-- [`advanced-tool-use`](studies/advanced-tool-use/_index.md) — Claude Developer Platform's own
-  beta answer to tool-scaling (Tool Search Tool, Programmatic Tool Calling, Tool Use Examples) —
-  an API-level capability, not MCP-specific, hence its own topic.
 
 ---
 

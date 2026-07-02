@@ -14,13 +14,14 @@ out (and delete its line here) once its own topic/note exists.
   的就是「MCP server 當代理」的情境),這篇是從架構模式角度重新看,不是安全視角。MCP 規格本身
   沒定義這個模式,查證對象是社群實作範例。
 
-## `advanced-tool-use`
+## 還沒開的新主題(候選)
 
-- **Tool Search Tool 的三種實作對照** — regex / BM25 / custom,各自適合什麼場景,目前筆記只
-  提過名字沒展開。
-
-## 還沒開主題的候選
-
-- **Claude Agent Skills 獨立成一篇** — 目前只在 advanced-tool-use 筆記裡當「同一個
-  progressive disclosure 原理,不同粒度」的對照提了一句,沒有展開講 Skills 自己的完整設計
-  (三層載入、怎麼寫一個 skill、跟 slash command/subagent 的邊界)。
+- **advanced-tool-use** — Claude Developer Platform 自己的三個 beta 功能:Tool Search Tool
+  (`defer_loading`,最多省 95% context)、Programmatic Tool Calling(`allowed_callers`,官方
+  實例把一個任務從 43,588 token 壓到 27,297)、Tool Use Examples(`input_examples`,跟省
+  context 無關,解的是參數填錯的準確度問題)。跟 mcp 的太多工具問題是「同一個模式,Claude API
+  做成產品」的關係,但這是 API 能力不是 MCP 協定,不屬於 mcp 這個主題——獨立開一個新主題,還沒
+  真的動筆。查證來源已知:`anthropic.com/engineering/advanced-tool-use`。
+- **Claude Agent Skills** — 三層載入設計(metadata 永遠在、指令觸發才載入)跟上面 Tool
+  Search Tool 是同一個 progressive disclosure 原理、不同粒度,值得展開講 Skills 自己的完整
+  設計(怎麼寫一個 skill、跟 slash command/subagent 的邊界)。
