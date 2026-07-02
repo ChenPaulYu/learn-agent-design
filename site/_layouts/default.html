@@ -44,6 +44,21 @@
     a.card .date{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
     a.card .summary{margin-top:8px;font-size:13px;color:var(--muted);line-height:1.6;max-width:66ch}
 
+    /* Curated reading path (page.groups): a thread runs through sequential groups;
+       a group marked parallel: true forks into a dashed row instead of a single line. */
+    .thread-wrap{position:relative;margin-top:36px}
+    .thread-line{position:absolute;left:19px;top:6px;bottom:6px;width:2px;background:var(--line);z-index:0}
+    .thread-group{position:relative;padding-left:48px;margin-top:32px}
+    .thread-group:first-child{margin-top:0}
+    .thread-dot{position:absolute;left:13px;top:2px;width:14px;height:14px;border-radius:50%;
+      background:var(--panel);border:2.5px solid var(--accent);z-index:1}
+    .thread-fork{position:relative;padding-left:48px;margin-top:10px}
+    .thread-fork-row{display:flex;gap:12px;flex-wrap:wrap;position:relative}
+    .thread-fork-row::before{content:"";position:absolute;left:-35px;top:0;bottom:0;width:2px;
+      background:repeating-linear-gradient(to bottom,var(--line) 0 4px,transparent 4px 8px)}
+    .thread-fork .card-mini{flex:1;min-width:200px}
+    .thread-fork .card-mini .card-title{font-size:14.5px}
+
     footer{margin-top:64px;color:var(--faint);font-size:12px;display:flex;gap:16px;flex-wrap:wrap}
     footer a{color:var(--muted)}
   </style>
@@ -65,30 +80,45 @@
       {% assign scoped_pages = site.pages | where_exp: "p", "p.path contains topic_path and p.path != page.path" %}
 
       {% if page.groups %}
-        <!-- Curated reading order, defined in this page's frontmatter (groups: [{label, note, pages}]). -->
-        {% for group in page.groups %}
-          <section class="topic">
-            <div class="topic-name">{{ group.label }}</div>
-            {% if group.note %}<div class="group-note">{{ group.note }}</div>{% endif %}
-            <div class="cards">
-              {% for basename in group.pages %}
-                {% assign p = nil %}
-                {% for sp in scoped_pages %}
-                  {% assign sp_basename = sp.name | remove: '.html' | remove: '.md' %}
-                  {% if sp_basename == basename %}{% assign p = sp %}{% endif %}
+        <!-- Curated reading order, defined in this page's frontmatter
+             (groups: [{label, note, pages, parallel}]). A thread runs through groups in
+             order; a group marked parallel: true (with 2+ pages) forks into a dashed row
+             instead of a single line, to show "these have no order between them" without
+             hand-authoring bespoke markup per topic. -->
+        <div class="thread-wrap">
+          <div class="thread-line"></div>
+          {% for group in page.groups %}
+            {% assign is_fork = false %}
+            {% if group.parallel and group.pages.size > 1 %}{% assign is_fork = true %}{% endif %}
+            <div class="thread-group">
+              <div class="thread-dot"></div>
+              <div class="topic-name">{{ group.label }}</div>
+              {% if group.note %}<div class="group-note">{{ group.note }}</div>{% endif %}
+              {% capture card_list %}
+                {% for basename in group.pages %}
+                  {% assign p = nil %}
+                  {% for sp in scoped_pages %}
+                    {% assign sp_basename = sp.name | remove: '.html' | remove: '.md' %}
+                    {% if sp_basename == basename %}{% assign p = sp %}{% endif %}
+                  {% endfor %}
+                  {% if p %}
+                    <a class="card{% if is_fork %} card-mini{% endif %}" href="{{ p.url | relative_url }}">
+                      <div class="card-title">{{ p.title | default: p.name }}
+                        <span class="date">{{ p.date | date: "%Y-%m-%d" }}</span>
+                      </div>
+                      {% if p.summary %}<div class="summary">{{ p.summary }}</div>{% endif %}
+                    </a>
+                  {% endif %}
                 {% endfor %}
-                {% if p %}
-                  <a class="card" href="{{ p.url | relative_url }}">
-                    <div class="card-title">{{ p.title | default: p.name }}
-                      <span class="date">{{ p.date | date: "%Y-%m-%d" }}</span>
-                    </div>
-                    {% if p.summary %}<div class="summary">{{ p.summary }}</div>{% endif %}
-                  </a>
-                {% endif %}
-              {% endfor %}
+              {% endcapture %}
+              {% if is_fork %}
+                <div class="thread-fork"><div class="thread-fork-row">{{ card_list }}</div></div>
+              {% else %}
+                <div class="cards">{{ card_list }}</div>
+              {% endif %}
             </div>
-          </section>
-        {% endfor %}
+          {% endfor %}
+        </div>
       {% else %}
         <!-- No curated order defined yet — fall back to a flat, date-sorted list. -->
         <section class="topic">

@@ -10,6 +10,7 @@ groups:
     pages: ["101"]
   - label: 進階主題(任意順序)
     note: 各自獨立,讀完 101 之後想先看哪個都可以。
+    parallel: true
     pages: [security, tool-scaling, ecosystem]
   - label: 工具
     note: 官方的除錯/測試工具——讀完 101 的 Tools/Resources/Prompts 後這篇會更有感覺。
