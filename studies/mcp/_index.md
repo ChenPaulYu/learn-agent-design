@@ -21,6 +21,10 @@ tags:
   往下一層的線路細節:LSP 具體怎麼實作(1:1 server、`Content-Length` 分幀)、為什麼選
   JSON-RPC、JSON-RPC 跟 gRPC 的關係、JSON-RPC 不等於 WebSocket(為什麼遠端 transport 不選
   WebSocket)、request/response 的 id 配對機制
+- [mcp-security-model](docs/2026-07-02-mcp-security-model.md) —
+  進階主題(101 之外):誰該防誰的責任分工、本機 server 淪陷風險、Confused Deputy Problem、
+  Session Hijacking 兩種變體、Lethal Trifecta(私密資料 + 不信任內容 + 對外通訊三者疊加)、
+  tool description 本身是攻擊面
 - [pages/101](pages/101.html) —
   互動版 MCP 101(可長期回看的教學頁,內容以 docs/ 為真相來源):圖 A 架構、圖 B 脈絡、
   圖 C 傳輸協定怎麼選,點卡片看細節
