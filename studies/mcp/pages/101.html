@@ -1,0 +1,439 @@
+---
+title: MCP 101 — 互動圖解
+date: 2026-07-02
+tags:
+  - mcp
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — MCP 101:三張互動圖解。可長期回看的教學頁,不是 disposable mockup;
+  它本身就是 Jekyll 站裡的一個頁面(有 frontmatter → 自動進導覽;layout: none → 保持
+  自帶的完整 HTML,不被外層 layout 再包一層)。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-02-mcp-architecture-and-primitives.md
+    ../docs/2026-07-02-mcp-wire-protocol-deep-dive.md
+  Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(架構)— Host/Client/Server 三個角色 + 六個 primitive(server 端 3 個、client 端 3 個),
+      點了看一句話定義、例子、人工審核鏈跟一段最小 JSON。
+    圖 B(脈絡)— MCP 往前推的血緣線:M×N 整合問題 → Language Server Protocol →
+      Tool Use / Function Calling API → MCP 本身,點 MCP 節點看「借了什麼 / 改了什麼 / 全新的
+      是什麼」的整理表。
+    圖 C(線路)— 為什麼選 JSON-RPC、LSP 具體怎麼實作、JSON-RPC 跟 gRPC 的關係、為什麼遠端
+      transport 不選 WebSocket、request/response 的 id 怎麼配對。
+  註:M×N 問題、fit/adapt/new 三欄拆法是對話推導,非官方逐字引述——docs 裡有標註哪些是官方
+    原句、哪些是推導。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP 101 — 怎麼設計、怎麼用、從哪裡來、線路怎麼選</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .primitive-groups{display:flex;gap:22px;margin-top:22px;flex-wrap:wrap}
+  .pgroup{flex:1;min-width:280px}
+  .pgroup .glabel{font-family:var(--mono);font-size:11px;letter-spacing:.03em;padding:4px 10px;
+    border-radius:999px;display:inline-flex;align-items:center;gap:6px}
+  .pgroup.server .glabel{background:rgba(12,122,89,.1);color:var(--green)}
+  .pgroup.client .glabel{background:rgba(176,74,106,.1);color:var(--rose)}
+  .pgroup .chips{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;flex:1;min-width:120px}
+  .chip:hover{transform:translateY(-2px)}
+  .pgroup.server .chip.active{border-color:var(--green);box-shadow:0 0 0 2px rgba(12,122,89,.16),var(--shadow)}
+  .pgroup.client .chip.active{border-color:var(--rose);box-shadow:0 0 0 2px rgba(176,74,106,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+  .panel .fan{margin-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .fan-col{border-radius:10px;padding:11px 12px;font-size:12.5px}
+  .fan-col.fit{background:rgba(47,111,158,.08)}
+  .fan-col.adapt{background:rgba(154,107,46,.1)}
+  .fan-col.new{background:rgba(176,74,106,.1)}
+  .fan-col .ftag{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+  .fan-col.fit .ftag{color:var(--blue)}
+  .fan-col.adapt .ftag{color:var(--accent)}
+  .fan-col.new .ftag{color:var(--rose)}
+  .fan-col p{margin-top:6px;line-height:1.55}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Mockup · 2026-07-02 · MCP 101</div>
+    <h1>MCP 101 — 怎麼設計、怎麼用、從哪裡來、線路怎麼選</h1>
+    <p class="tagline">
+      三張圖。圖 A 是 MCP 這條線怎麼接、六個 primitive 怎麼分兩邊。圖 B 是往前推——
+      MCP 不是憑空出現的協定,是站在幾個已有的東西上長出來的。圖 C 是再往下一層的線路細節:
+      為什麼選 JSON-RPC、跟 gRPC/WebSocket 的關係。點任何卡片看細節。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 架構 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 設計與使用</div>
+    <div class="sec-title">三個角色,一條專屬線</div>
+    <p class="sec-sub">
+      把它想成「插座」:Host 是你的房子,每個 Server 是一個電器,Client 是那條專屬的電源線——
+      一個電器一條線,不是所有電器共用一條延長線。
+    </p>
+
+    <div class="row" id="roleRow">
+      <div class="node" data-key="host">
+        <div class="idx">01 · HOST</div>
+        <h3>Host</h3>
+        <div class="q">使用者實際在用的 AI 應用</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="client">
+        <div class="idx">02 · CLIENT</div>
+        <h3>Client</h3>
+        <div class="q">Host 內,每個 Server 配一個的連線物件</div>
+      </div>
+      <div class="arrow">↔</div>
+      <div class="node" data-key="server">
+        <div class="idx">03 · SERVER</div>
+        <h3>Server</h3>
+        <div class="q">真正擁有能力的一端</div>
+      </div>
+    </div>
+
+    <div class="sec-sub" style="margin-top:30px">
+      六個 primitive,清楚分兩邊——這條線就是「誰對什麼有權威」的邊界。多數人以為 MCP 是單向
+      (server 給,client 拿),右邊三個其實是反過來:server 也能敲 client 的門。
+    </div>
+
+    <div class="primitive-groups">
+      <div class="pgroup server">
+        <span class="glabel">● Server 擁有</span>
+        <div class="chips" id="serverChips">
+          <div class="chip" data-key="tools"><h4>Tools</h4><div class="sub">可執行的函式</div></div>
+          <div class="chip" data-key="resources"><h4>Resources</h4><div class="sub">可讀的資料源</div></div>
+          <div class="chip" data-key="prompts"><h4>Prompts</h4><div class="sub">可重用的模板</div></div>
+        </div>
+      </div>
+      <div class="pgroup client">
+        <span class="glabel">● Client 擁有</span>
+        <div class="chips" id="clientChips">
+          <div class="chip" data-key="sampling"><h4>Sampling</h4><div class="sub">反過來借用 LLM · 人工審核</div></div>
+          <div class="chip" data-key="elicitation"><h4>Elicitation</h4><div class="sub">反過來問使用者 · 不經模型</div></div>
+          <div class="chip" data-key="roots"><h4>Roots</h4><div class="sub">告訴 server 能碰的範圍</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelA">
+      <p class="placeholder">↑ 點上面任一張卡片,看它的一句話定義、例子,跟一段最小 JSON。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: 脈絡 ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 從哪裡來</div>
+    <div class="sec-title">MCP 站在誰的肩膀上</div>
+    <p class="sec-sub">
+      往左推四步:先有問題,再有兩個「這問題早就被解過一次」的舊協定,
+      最後 MCP 把它們接在一起、再補上舊協定沒有的東西。
+    </p>
+
+    <div class="row" id="lineageRow">
+      <div class="node" data-key="problem">
+        <div class="idx">00 · 問題</div>
+        <h3>M × N 整合問題</h3>
+        <div class="q">在 MCP 之前,遇到的困境</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="lsp">
+        <div class="idx">01 · 2016</div>
+        <h3>Language Server Protocol</h3>
+        <div class="q">同一個問題,IDE 世界先解過一次</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="toolcall">
+        <div class="idx">02 · 2023</div>
+        <h3>Tool Use / Function Calling</h3>
+        <div class="q">LLM 這邊已經先有的能力</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="mcp">
+        <div class="idx">03 · 2024</div>
+        <h3>MCP</h3>
+        <div class="q">Anthropic 把前面幾個接起來</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelB">
+      <p class="placeholder">↑ 點一個節點看細節。點「MCP」看它從左邊各拿了什麼、改了什麼、又補了什麼新的。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: 線路 ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 線路怎麼選</div>
+    <div class="sec-title">再往下一層:訊息長什麼樣,管道用哪條</div>
+    <p class="sec-sub">
+      JSON-RPC 是「說什麼語言」,WebSocket/gRPC 是「用什麼管道講話」——常被誤會成互斥選項,
+      其實是不同層。點卡片看 MCP 在每個維度上真正選了什麼、為什麼。
+    </p>
+
+    <div class="row" id="wireRow">
+      <div class="node" data-key="jsonrpc">
+        <div class="idx">語言</div>
+        <h3>為什麼選 JSON-RPC</h3>
+        <div class="q">訊息本身長什麼樣</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="lspimpl">
+        <div class="idx">先例</div>
+        <h3>LSP 怎麼實作</h3>
+        <div class="q">MCP 抄的底,細節長怎樣</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="grpc">
+        <div class="idx">對照</div>
+        <h3>JSON-RPC vs gRPC</h3>
+        <div class="q">同是 RPC,選了不同設計點</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="websocket">
+        <div class="idx">管道</div>
+        <h3>為什麼不選 WebSocket</h3>
+        <div class="q">遠端 transport 選了 Streamable HTTP</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="idcorrelation">
+        <div class="idx">配對</div>
+        <h3>Request/Response 怎麼配對</h3>
+        <div class="q">誰的 id、誰來記、誰查表</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelC">
+      <p class="placeholder">↑ 點一個節點看細節跟官方原句引用。</p>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/ 兩篇筆記為真相來源(architecture-and-primitives + wire-protocol-deep-dive,
+    經 context7 查證)· 最後同步 2026-07-02
+  </footer>
+</div>
+
+<script>
+  const ROLE = {
+    host: {
+      title: 'Host', tag: 'Role · Host',
+      def: '使用者實際在用的 AI 應用本體——聊天介面、IDE 助手、CLI 工具。它裡面可以同時開好幾個 Client。',
+      example: 'Claude Desktop、Claude Code 本身就是一個 Host。'
+    },
+    client: {
+      title: 'Client', tag: 'Role · Client',
+      def: 'Host 內部,每接一個 Server 就配一個的連線物件——負責跟「那一個」Server 講 MCP 的語言。',
+      example: 'Host 接了檔案系統跟資料庫兩個 Server,裡面就會有兩個各自獨立的 Client。'
+    },
+    server: {
+      title: 'Server', tag: 'Role · Server',
+      def: '真正擁有能力的一端,可以是本機程序(用 stdio 傳訊息),也可以是遠端服務(用 Streamable HTTP)。',
+      example: '一個包了公司內部 API 的 MCP server,讓任何裝了對應 Client 的 Host 都能用。'
+    }
+  };
+
+  const PRIMITIVE = {
+    tools: {
+      title: 'Tools', tag: 'Server 擁有 · Tools',
+      def: '可執行的函式,帶 input schema——LLM 看得懂「這個工具要餵什麼參數」,決定要不要呼叫它。',
+      example: 'get_weather(city) 這種:LLM 決定呼叫,server 執行,回結果。',
+      snippet: `{"name": "get_weather",\n "inputSchema": {"type": "object",\n   "properties": {"city": {"type": "string"}}}}`
+    },
+    resources: {
+      title: 'Resources', tag: 'Server 擁有 · Resources',
+      def: '可讀的資料源,唯讀的情境資料,不是用來「做事」,是用來「知道」。',
+      example: '一個檔案的內容、一筆資料庫記錄、一份設定檔——讀取但不會有副作用。',
+      snippet: `{"uri": "studies://topics",\n "mimeType": "text/plain"}`
+    },
+    prompts: {
+      title: 'Prompts', tag: 'Server 擁有 · Prompts',
+      def: '可重用的 prompt 模板,server 定義好「這種情境該怎麼問」,讓不同 Host 都能套用同一套問法。',
+      example: '一個 summarize(text) 模板,任何接上這個 server 的 Host 都能直接套用,不用自己重寫措辭。',
+      snippet: `{"name": "summarize",\n "arguments": {"text": "string"}}`
+    },
+    sampling: {
+      title: 'Sampling', tag: 'Client 擁有 · Sampling',
+      def: '反過來:server 請 client 幫它跑一次 LLM 生成。Server 自己沒有 LLM,借 client 手上那個用。',
+      example: '一個「幫我把這段資料整理成摘要」的 server,自己不接 LLM API,而是丟一句 sampling 請求給 client 代跑。',
+      note: 'LLM 不需要知道這是「sampling」——它收到的就是一段普通 messages。真正把關的是多層人工審核:server 發請求 → client 給人審核 → 才轉給模型 → 模型的回應再給人看一次 → 才回給 server。這條「server 反過來敲 client 的門」的機制也不是 MCP 發明的,LSP 的 window/showMessageRequest、workspace/configuration 早就是這樣做。自己拿 FastAPI 搭一樣的事做得到,但要換成 WebSocket,而且要自己重新發明三件事:id 怎麼配對、client 支不支援這能力的協商、審核是規範還是自己記得寫。',
+      snippet: `{"method": "sampling/createMessage",\n "params": {"messages": [...]}}`
+    },
+    elicitation: {
+      title: 'Elicitation', tag: 'Client 擁有 · Elicitation',
+      def: '反過來:server 向使用者要資訊——一個表單、一次確認,而不是直接假設或猜。',
+      example: '執行一個有風險的操作前,server 先發一個 elicitation 請求,跳出「確定要刪除嗎?」讓使用者按。',
+      note: '甚至不一定經過 LLM——server 發請求,client 直接跳表單(或轉 URL)給使用者填,填完直接回給 server。模型可能完全插不上手。',
+      snippet: `{"method": "elicitation/create",\n "params": {"message": "確定要刪除嗎？"}}`
+    },
+    roots: {
+      title: 'Roots', tag: 'Client 擁有 · Roots',
+      def: 'Client 告訴 server「你能碰的檔案系統範圍就這些」,是權限邊界,不是能力。',
+      example: 'Host 只把一個專案資料夾設成 root,檔案系統 server 就只能在這個資料夾裡讀寫。',
+      note: '最單純的一個:純粹是 client 端的靜態設定查詢,跟 LLM 完全沒關係。',
+      snippet: `{"uri": "file:///Users/paul/project",\n "name": "project-root"}`
+    }
+  };
+
+  const panelA = document.getElementById('panelA');
+  const allA = [...document.querySelectorAll('#roleRow .node'), ...document.querySelectorAll('.chip')];
+  function renderA(key, data, activeEls){
+    allA.forEach(n => n.classList.toggle('active', activeEls.includes(n)));
+    panelA.innerHTML = `
+      <div class="ph">${data.tag}</div>
+      <h2>${data.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${data.def}</span></div>
+      <div class="ex">${data.example}</div>
+      ${data.note ? `<div class="ex" style="margin-top:8px;border-left-color:var(--rose)">🔒 ${data.note}</div>` : ''}
+      ${data.snippet ? `<div class="ex" style="margin-top:8px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;background:var(--line-soft);border-left-color:var(--muted)">${data.snippet}</div>` : ''}
+    `;
+  }
+  document.querySelectorAll('#roleRow .node').forEach(n =>
+    n.addEventListener('click', () => renderA(n.dataset.key, ROLE[n.dataset.key], [n])));
+  document.querySelectorAll('.chip').forEach(n =>
+    n.addEventListener('click', () => renderA(n.dataset.key, PRIMITIVE[n.dataset.key], [n])));
+
+  const LINEAGE = {
+    problem: {
+      title: 'M × N 整合問題', tag: '00 · 問題(MCP 之前)',
+      def: '如果每個 AI 應用都要各自客製「怎麼接檔案系統、怎麼接資料庫、怎麼接這個那個 API」,M 個應用 × N 個工具,就要寫 M×N 條各自不同的線。',
+      example: '換一個 AI 應用,前面所有工具整合等於要重寫一遍——沒有一種大家共用的插座規格。'
+    },
+    lsp: {
+      title: 'Language Server Protocol', tag: '01 · 2016 · Microsoft',
+      def: 'IDE 世界先遇過同一種形狀的問題:M 個編輯器 × N 種程式語言。LSP 讓每種語言只要寫「一個」language server,任何編輯器裝上對應的 client 就能用——把 M×N 條線,變成 M+N 條。MCP 官方規格明文寫「取材自 LSP」。',
+      example: 'VS Code、Vim、Emacs 都能用同一個 TypeScript language server,不用各自重寫一套語言支援。'
+    },
+    toolcall: {
+      title: 'Tool Use / Function Calling', tag: '02 · 2023 · LLM API 生態',
+      def: 'LLM 這邊已經先有「模型自己決定要呼叫哪個函式、帶什麼參數」的能力(OpenAI function calling、Anthropic tool use)。這解決的是另一半問題:讓模型知道「有工具可以叫」跟「怎麼叫」。',
+      example: '一個帶 JSON schema 的函式定義,丟進模型的請求裡,模型回「我要呼叫這個,參數是這些」。'
+    },
+    mcp: {
+      title: 'MCP', tag: '03 · 2024 · Anthropic',
+      def: 'MCP 把左邊三塊接在一起:借 LSP 的「一個 server 服務所有 host」的架構跟 JSON-RPC 2.0 線路,套進「LLM 已經會呼叫工具」這個既有能力上,再補一塊 LSP 沒有的東西——server 反過來呼叫 client(Sampling / Elicitation)。',
+      fan: [
+        { cls: 'fit', ftag: 'Fit · 原樣借用', text: 'JSON-RPC 2.0 當線路格式,還有「client/server 一對一專屬連線」這個接法——LSP 怎麼接,MCP 幾乎照抄。' },
+        { cls: 'adapt', ftag: 'Adapt · 借了但改形狀', text: 'LSP 標準化的是「語言功能」(補全、跳轉定義);MCP 把這個概念放大成「情境 primitive」——不只工具,還有可讀資料(Resources)跟模板(Prompts)。' },
+        { cls: 'new', ftag: 'New · LSP 沒有的', text: 'Server 反過來呼叫 client 的三個 primitive(Sampling / Elicitation / Roots)。LSP 的溝通基本上單向;MCP 因為要服務「會自主決策」的 LLM,才需要這條反向的門。' }
+      ]
+    }
+  };
+
+  const panelB = document.getElementById('panelB');
+  const nodesB = document.querySelectorAll('#lineageRow .node');
+  function renderB(key){
+    const d = LINEAGE[key];
+    nodesB.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    let fanHtml = '';
+    if (d.fan) {
+      fanHtml = `<div class="fan">${d.fan.map(f => `
+        <div class="fan-col ${f.cls}"><div class="ftag">${f.ftag}</div><p>${f.text}</p></div>
+      `).join('')}</div>`;
+    }
+    panelB.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      ${d.example ? `<div class="ex">${d.example}</div>` : ''}
+      ${fanHtml}
+    `;
+  }
+  nodesB.forEach(n => n.addEventListener('click', () => renderB(n.dataset.key)));
+
+  const WIRE = {
+    jsonrpc: {
+      title: '為什麼選 JSON-RPC', tag: '語言 · 訊息格式',
+      def: '官方 JSON-RPC 規格自己講的定位:「stateless、light-weight、transport agnostic、designed to be simple」。三個特性剛好都用得到:跟傳輸脫鉤(可以走 stdio/socket/HTTP)、支援 Notification(不用回應的單向推送,不用每次都來回一輪)、格式簡單人可讀。',
+      example: 'Request 帶 id 等回應;Notification 不帶 id,天生不用等——這也是 request/response 怎麼配對的起點:發送方自己挑 id、自己記一張「還在等誰回應」的表,收到回應時拿 id 查表配對。'
+    },
+    lspimpl: {
+      title: 'LSP 具體怎麼實作', tag: '先例 · MCP 抄的底',
+      def: '不是「一個 background server 服務所有編輯器」——官方規格寫的是反過來:「the client... is responsible for initiating the server process and determining when to shut it down」。每個編輯器自己養一個專屬 server process,不共用。',
+      example: '線路格式像 HTTP:先一段 Content-Length header,再接 JSON-RPC 內容。MCP 沿用同一套 JSON-RPC 內容,但 stdio transport 改用換行分隔,不是 Content-Length header——內容語言一樣,分句子的標點規則不同。'
+    },
+    grpc: {
+      title: 'JSON-RPC vs gRPC', tag: '對照 · 不是新舊版本',
+      def: '都是 RPC 家族,但選了不同設計點:JSON-RPC 用 JSON 文字、跟傳輸脫鉤、鬆散型別;gRPC 預設用 Protocol Buffers 二進位、綁在 HTTP/2 上、`.proto` 強型別定義,還原生支援四種 streaming(unary / server-stream / client-stream / bidirectional)。',
+      example: 'MCP 現在跟 gRPC 的關係是「鋪路,還沒真的做」——SEP-1319 把資料定義跟 JSON-RPC 包裝拆成兩層,動機明講是社群在要 gRPC binding,不是要把 JSON-RPC 換掉。'
+    },
+    websocket: {
+      title: '為什麼不選 WebSocket', tag: '管道 · 遠端 transport',
+      def: 'JSON-RPC 跟 WebSocket 不是同一層,不衝突——只是 MCP 遠端選的是 Streamable HTTP(普通 POST 送、GET+SSE 選擇性收),不是 WebSocket。',
+      example: '兩個理由:(1) MCP 正往「協定本身無狀態」走,WebSocket 那種持續佔用管道的連線會把 client 綁死在一台 server 機器上,逼你搞 sticky session;(2) 留在普通 HTTP 語意上,現有的 load balancer/proxy/防火牆不用改就看得懂,不用像 WebSocket 那樣先做協定升級的握手。'
+    },
+    idcorrelation: {
+      title: 'Request/Response 怎麼配對', tag: '配對 · JSON-RPC 內建機制',
+      def: '每個 Request 帶一個 `id`(字串或數字,發送方自己挑),Response 必須原封不動帶回同一個 id。發送方自己維護一張「還在等誰回應」的表,收到回應時拿 id 查表配對——這張表怎麼存不是協定規定的,是每個實作自己該做的事。',
+      example: 'id 只要求「同一個發送方,回應前別重複用」,不是全域唯一。因為 MCP 雙向,client 跟 server 各自維護自己的 id 序列——server 發 sampling 請求時是自己挑 id、自己等,跟 client 平常用的序列互不相關。Notification 沒有 id,天生跳過這整套配對。'
+    }
+  };
+
+  const panelC = document.getElementById('panelC');
+  const nodesC = document.querySelectorAll('#wireRow .node');
+  function renderC(key){
+    const d = WIRE[key];
+    nodesC.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelC.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      <div class="ex">${d.example}</div>
+    `;
+  }
+  nodesC.forEach(n => n.addEventListener('click', () => renderC(n.dataset.key)));
+</script>
+</body>
+</html>

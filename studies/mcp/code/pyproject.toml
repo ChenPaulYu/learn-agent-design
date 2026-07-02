@@ -1,0 +1,8 @@
+[project]
+name = "mcp-hands-on"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "mcp[cli]>=1.28.1",
+]
