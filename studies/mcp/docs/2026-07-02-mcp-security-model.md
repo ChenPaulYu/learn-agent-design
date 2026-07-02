@@ -90,6 +90,35 @@ RFC 7591(動態 client 註冊)、RFC 9728(受保護資源 metadata)、RFC 8707(r
   Deputy**——Confused Deputy 的病根是「proxy 對不同 client 共用同一份同意狀態」,resource
   參數管不到這件事,得靠下面那節講的逐個 client 檢查同意。
 
+## 拿到 token 之後——Server 每次請求都要重新驗一次,不是驗一次就算了
+
+前面的流程講到「拿到 token,打 MCP server,這次通過」就停了——**沒講完的是,之後每一次
+MCP 請求都要重新帶著這個 token,server 也要每次都重新驗**,不是登入一次就一路信任下去。
+官方規格把 server 這邊的責任講得很直接:
+
+> "MCP servers function as OAuth 2.1 resource servers and are responsible for validating access
+> tokens according to established standards. This includes verifying that tokens were issued
+> specifically for the server as the intended audience. If validation fails due to expired or
+> invalid tokens, the server must respond with an HTTP 401 status code."
+> — [`basic/authorization.mdx` § Access Token Usage](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/authorization.mdx)
+
+具體驗證方式,官方範例展示了兩種:
+
+- **自己驗簽(JWT Bearer)**——token 本身是一個 JWT,server 用授權伺服器公開的驗證方式(拿
+  issuer 的 public key)在本機直接驗簽章,再檢查 `aud`(audience)claim 是不是自己——**全程
+  不用再打一次網路請求**,官方 ASP.NET Core 範例就是這樣接 Keycloak。
+- **Token Introspection(RFC 7662)**——server 不自己驗,而是把 token 送去授權伺服器的
+  introspection endpoint 問:「這個 token 現在有效嗎?」,對方回 `active: true/false` +
+  `aud`/`scope`/`exp`;官方 Python(`IntrospectionTokenVerifier`)、TypeScript
+  (`tokenVerifier.verifyAccessToken`)範例都是這條路——**每次驗證都是一次額外的網路來回**,
+  但 server 不用自己管簽章驗證的機制跟金鑰輪替。
+
+兩種做法**都要做同一個檢查**:確認 token 的 `aud` 跟自己(這台 server 的 canonical URI)相符,
+不符就直接拒絕。這正是前面 Token Passthrough 防禦(`resource` 參數綁死 token 只能用在這台
+server)在請求進來時真正被執行的地方——`resource` 參數負責「申請時綁定」,這裡的 `aud` 檢查
+負責「每次用的時候真的去查這個綁定有沒有兌現」,兩件事合起來才是完整的防線,少了任何一邊都
+不算數。
+
 ## Confused Deputy Problem——你信任的中間人被騙去做壞事
 
 當 MCP server 本身是一個代理(proxy),中間串接一個第三方的 OAuth 授權伺服器,而且對所有
@@ -176,10 +205,11 @@ untrusted content」的其中一種樣子——只是這次不信任的內容不
   Session Hijacking、本機 server 淪陷的風險與惡意指令範例。
 - [`specification/2025-11-25/basic/authorization.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/authorization.mdx)
   ——Confused Deputy Problem 的正式定義、完整 OAuth 2.1 授權流程的 sequence diagram、PKCE
-  跟 resource 參數(RFC 8707)的官方原句。
+  跟 resource 參數(RFC 8707)的官方原句、Access Token Usage(server 驗證責任、401 規則)。
 - [`docs/tutorials/security/authorization.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/tutorials/security/authorization.mdx)
   ——錯誤訊息不外洩細節、內部用 correlation ID 記錄的做法、五份底層標準(OAuth 2.1 + RFC
-  8414/7591/9728/8707)的清單。
+  8414/7591/9728/8707)的清單、JWT Bearer(ASP.NET Core/Keycloak)跟 Token Introspection
+  (Python/TypeScript)兩種 server 端驗證方式的官方範例程式碼。
 - [`blog/2026-03-16-tool-annotations.md`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/blog/content/posts/2026-03-16-tool-annotations.md)
   ——Lethal Trifecta 的官方引用(概念本身出處是 Simon Willison,MCP 官方部落格拿來論證 tool
   annotation SEP 的動機)、真實示範案例(日曆事件 + MCP calendar server + 本機執行工具)。
