@@ -1,6 +1,6 @@
 ---
 title: MCP 安全模型 — 互動圖解
-summary: 四張互動圖:誰該防誰的責任分工、Lethal Trifecta(三個能力疊在一起才危險)、OAuth 2.1 遠端授權怎麼跑(音樂節戴手環互動場景,含 server 怎麼驗 token)、四個具體攻擊(Confused Deputy、兩種 Session Hijacking、本機淪陷)。
+summary: 四張互動圖:誰該防誰的責任分工(Client 大樓/Server 工廠互動場景)、Lethal Trifecta(三個能力疊在一起才危險)、OAuth 2.1 遠端授權怎麼跑(音樂節戴手環互動場景,含 server 怎麼驗 token)、四個具體攻擊(Confused Deputy、兩種 Session Hijacking、本機淪陷)。
 date: 2026-07-02
 tags:
   - mcp
@@ -142,8 +142,78 @@ render_with_liquid: false
     <div class="sec-title">責任分兩邊,少了任何一邊都補不回來</div>
     <p class="sec-sub">
       Server 負責不要輸出髒東西,Client 負責不要盲目相信輸入的東西——這是官方規格對 Tools
-      寫的安全考量,雙邊各有一份清單。
+      寫的安全考量,雙邊各有一份清單。想成兩棟樓,中間跑著一次工具呼叫的往返:點場景裡任一個
+      房間,或下面任一張卡片,兩邊會同步高亮。
     </p>
+
+    <div class="scene-box">
+      <svg id="respScene" viewBox="0 0 820 280" style="width:100%;height:auto;display:block">
+        <!-- Client 大樓(左) -->
+        <rect x="20" y="20" width="330" height="240" rx="14" fill="none" stroke="#d8d0c0" stroke-width="2" stroke-dasharray="6 5"/>
+        <text x="38" y="44" font-size="12" fill="#8a7d6e" style="font-family:var(--mono)">CLIENT 大樓</text>
+        <g class="zone" data-key="display" style="color:#2f6f9e">
+          <rect x="38" y="60" width="140" height="86" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <circle cx="70" cy="90" r="10" class="st" fill="none" stroke="#b9ad9c" stroke-width="2"/>
+          <circle cx="70" cy="90" r="3.5" class="stf" fill="#b9ad9c"/>
+          <text x="56" y="122" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">顯示輸入內容</text>
+        </g>
+        <g class="zone" data-key="confirm" style="color:#2f6f9e">
+          <rect x="192" y="60" width="140" height="86" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <path d="M 216 92 L 224 100 L 240 82" fill="none" class="st" stroke="#b9ad9c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="210" y="122" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">敏感操作先確認</text>
+        </g>
+        <g class="zone" data-key="revalidate" style="color:#0c7a59">
+          <rect x="38" y="158" width="140" height="86" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <circle cx="66" cy="192" r="9" class="st" fill="none" stroke="#b9ad9c" stroke-width="2"/>
+          <line x1="73" y1="199" x2="80" y2="206" class="st" stroke="#b9ad9c" stroke-width="2.5" stroke-linecap="round"/>
+          <text x="56" y="222" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">結果進 LLM 前再驗</text>
+        </g>
+        <g class="zone" data-key="audit" style="color:#0c7a59">
+          <rect x="192" y="158" width="140" height="86" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <rect x="216" y="180" width="24" height="30" rx="3" class="st" fill="none" stroke="#b9ad9c" stroke-width="2"/>
+          <line x1="220" y1="188" x2="236" y2="188" class="st" stroke="#b9ad9c" stroke-width="1.5"/>
+          <line x1="220" y1="196" x2="236" y2="196" class="st" stroke="#b9ad9c" stroke-width="1.5"/>
+          <text x="210" y="222" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">逾時 + 留紀錄</text>
+        </g>
+
+        <!-- 往返箭頭 -->
+        <path d="M 352 140 L 466 140" class="st" stroke="#d8d0c0" stroke-width="2" marker-end="url(#arrow2)"/>
+        <path d="M 466 155 L 352 155" class="st" stroke="#d8d0c0" stroke-width="2" marker-end="url(#arrow2)"/>
+        <text x="366" y="120" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">工具呼叫 ⇄</text>
+
+        <!-- Server 工廠(右) -->
+        <rect x="470" y="20" width="330" height="240" rx="14" fill="none" stroke="#d8d0c0" stroke-width="2" stroke-dasharray="6 5"/>
+        <text x="488" y="44" font-size="12" fill="#8a7d6e" style="font-family:var(--mono)">SERVER 工廠</text>
+        <g class="zone" data-key="validate" style="color:#9a6b2e">
+          <rect x="488" y="60" width="140" height="86" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <circle cx="518" cy="90" r="9" class="st" fill="none" stroke="#b9ad9c" stroke-width="2"/>
+          <line x1="525" y1="97" x2="533" y2="105" class="st" stroke="#b9ad9c" stroke-width="2.5" stroke-linecap="round"/>
+          <text x="506" y="122" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">驗證所有輸入</text>
+        </g>
+        <g class="zone" data-key="access" style="color:#9a6b2e">
+          <rect x="642" y="60" width="140" height="86" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <circle cx="672" cy="88" r="9" class="st" fill="none" stroke="#b9ad9c" stroke-width="2"/>
+          <line x1="672" y1="97" x2="672" y2="108" class="st" stroke="#b9ad9c" stroke-width="3" stroke-linecap="round"/>
+          <text x="660" y="122" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">存取控制</text>
+        </g>
+        <g class="zone" data-key="ratelimit" style="color:#b04a6a">
+          <rect x="488" y="158" width="140" height="86" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <circle cx="518" cy="192" r="10" class="st" fill="none" stroke="#b9ad9c" stroke-width="2"/>
+          <line x1="518" y1="192" x2="524" y2="184" class="st" stroke="#b9ad9c" stroke-width="2" stroke-linecap="round"/>
+          <text x="506" y="222" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">限流</text>
+        </g>
+        <g class="zone" data-key="sanitize" style="color:#b04a6a">
+          <rect x="642" y="158" width="140" height="86" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <path d="M 660 184 L 684 184 L 674 200 L 674 210" fill="none" class="st" stroke="#b9ad9c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="656" y="222" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">清理輸出</text>
+        </g>
+        <defs>
+          <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6" fill="none" stroke="#d8d0c0" stroke-width="1.5"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
 
     <div class="resp-groups">
       <div class="rgroup server">
@@ -390,7 +460,7 @@ render_with_liquid: false
     audit: { title: '逾時 + 留稽核紀錄', tag: 'Client SHOULD', def: '設逾時避免卡死;留下呼叫紀錄,事後才查得出是哪一步出了問題。' }
   };
   const panelA = document.getElementById('panelA');
-  const chipsA = document.querySelectorAll('#serverResp .chip, #clientResp .chip');
+  const chipsA = [...document.querySelectorAll('#serverResp .chip, #clientResp .chip'), ...document.querySelectorAll('#respScene .zone')];
   function renderResp(key){
     const d = RESP[key];
     chipsA.forEach(n => n.classList.toggle('active', n.dataset.key === key));
