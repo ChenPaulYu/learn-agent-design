@@ -1,6 +1,6 @@
 ---
 title: MCP 101 — 互動圖解
-summary: 三張互動圖:Host/Client/Server 架構與六個 primitive、從 M×N 問題到 LSP 的血緣脈絡、線路層為什麼選 JSON-RPC。
+summary: 四張互動圖 + 參考資料:架構與六個 primitive(加上 Logging/Completion)、從 M×N 問題到 LSP 的血緣脈絡(加上跟 A2A 的邊界)、線路層為什麼選 JSON-RPC、長時間任務與斷線續傳。
 date: 2026-07-02
 tags:
   - mcp
@@ -10,7 +10,7 @@ render_with_liquid: false
 ---
 <!DOCTYPE html>
 <!--
-  INTERACTIVE — MCP 101:三張互動圖解。可長期回看的教學頁,不是 disposable mockup;
+  INTERACTIVE — MCP 101:四張互動圖解 + 參考資料。可長期回看的教學頁,不是 disposable mockup;
   它本身就是 Jekyll 站裡的一個頁面(有 frontmatter → 自動進導覽;layout: none → 保持
   自帶的完整 HTML,不被外層 layout 再包一層)。
   Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
@@ -181,6 +181,20 @@ render_with_liquid: false
       </div>
     </div>
 
+    <div class="sec-sub" style="margin-top:30px">
+      六個 primitive 之外,還有兩個一直沒提過的延伸能力——一樣是 server 宣告、server 主導,
+      只是不算「角色扮演」的核心六個。
+    </div>
+    <div class="primitive-groups">
+      <div class="pgroup server">
+        <span class="glabel">● 延伸能力</span>
+        <div class="chips" id="extChips">
+          <div class="chip" data-key="logging"><h4>Logging</h4><div class="sub">推結構化日誌給 client</div></div>
+          <div class="chip" data-key="completion"><h4>Completion</h4><div class="sub">幫輸入框自動完成</div></div>
+        </div>
+      </div>
+    </div>
+
     <div class="panel" id="panelA">
       <p class="placeholder">↑ 點上面任一張卡片,看它的一句話定義、例子,跟一段最小 JSON。</p>
     </div>
@@ -223,6 +237,27 @@ render_with_liquid: false
 
     <div class="panel" id="panelB">
       <p class="placeholder">↑ 點一個節點看細節。點「MCP」看它從左邊各拿了什麼、改了什麼、又補了什麼新的。</p>
+    </div>
+
+    <div class="sec-sub" style="margin-top:30px">
+      常被拿來跟 MCP 放一起比的還有 Google 的 A2A(Agent2Agent)——不是同一條血緣線,是「常被誤會
+      成競品,實際上範圍不同」的鄰居。
+    </div>
+    <div class="row" id="a2aRow">
+      <div class="node" data-key="mcp-side">
+        <div class="idx">MCP</div>
+        <h3>Agent 怎麼用工具</h3>
+        <div class="q">無狀態的單次呼叫</div>
+      </div>
+      <div class="arrow">↔</div>
+      <div class="node" data-key="a2a-side">
+        <div class="idx">A2A</div>
+        <h3>Agent 跟 Agent 怎麼溝通</h3>
+        <div class="q">有狀態的協作任務</div>
+      </div>
+    </div>
+    <div class="panel" id="panelA2A">
+      <p class="placeholder">↑ 點任一邊看範圍跟機制。</p>
     </div>
   </section>
 
@@ -272,6 +307,40 @@ render_with_liquid: false
     </div>
   </section>
 
+  <!-- ============ SECTION D: 進階機制 ============ -->
+  <section>
+    <div class="sec-kicker">圖 D · 一次呼叫跑很久,怎麼辦</div>
+    <div class="sec-title">Progress、Tasks、斷線續傳</div>
+    <p class="sec-sub">
+      一問一答的模型碰到「這個工具要跑五分鐘」就卡住。MCP 有機制處理這件事,也有機制處理
+      「處理這件事的管道自己斷線」——兩個是疊在一起的問題。
+    </p>
+
+    <div class="row" id="advRow">
+      <div class="node" data-key="progress">
+        <div class="idx">穩定 · 已在規格裡</div>
+        <h3>Progress Notifications</h3>
+        <div class="q">跑到一半,先推個進度</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="tasks">
+        <div class="idx">提案中 · 未定案</div>
+        <h3>Tasks</h3>
+        <div class="q">整個請求變成可以輪詢的物件</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="resume">
+        <div class="idx">穩定 · 已在規格裡</div>
+        <h3>斷線續傳 / Session</h3>
+        <div class="q">送進度的管道自己斷線怎麼辦</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelD">
+      <p class="placeholder">↑ 點一個節點看官方規則跟範例。</p>
+    </div>
+  </section>
+
   <!-- ============ REFERENCES ============ -->
   <section>
     <div class="sec-kicker">References · 參考資料</div>
@@ -292,10 +361,14 @@ render_with_liquid: false
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/client/elicitation.mdx">elicitation.mdx — 表單 / URL 兩種模式</a>
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/client/roots.mdx">roots.mdx — roots/list 查詢</a>
         <a href="https://modelcontextprotocol.io/specification/2025-11-25">Spec Overview — 「MCP takes inspiration from the Language Server Protocol」官方原句</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/utilities/logging.mdx">logging.mdx — Logging capability、8 級 syslog 嚴重度</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/utilities/completion.mdx">completion.mdx — completion/complete 請求/回應範例</a>
       </div>
       <div class="ref-group">
         <div class="ref-head">MCP 官方(transport / SEP)</div>
-        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/transports.mdx">transports.mdx — stdio 換行分幀、Streamable HTTP</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/transports.mdx">transports.mdx — stdio 換行分幀、Streamable HTTP、斷線續傳、Session 管理</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/utilities/progress.mdx">progress.mdx — progressToken、進度通知規則(穩定規格)</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/seps/2663-tasks-extension.mdx">SEP-2663 — Tasks 機制提案(未定案),tasks/get 輪詢範例</a>
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/seps/1319-decouple-request-payload-from-rpc-methods-definiti.mdx">SEP-1319 — 拆開 payload 與 RPC 包裝,為 gRPC binding 鋪路</a>
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/seps/2243-http-standardization.mdx">SEP-2243 — HTTP header 標準化,中間設備免 deep packet inspection</a>
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/seps/2575-stateless-mcp.mdx">SEP-2575 — stateful handshake 的爭議與無狀態化提案</a>
@@ -303,12 +376,14 @@ render_with_liquid: false
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/blog/content/posts/2025-12-19-mcp-transport-future.md">Transport Future(官方部落格)— sticky session 問題、無狀態路線圖</a>
       </div>
       <div class="ref-group">
-        <div class="ref-head">脈絡對照(LSP / JSON-RPC / gRPC / FastAPI)</div>
+        <div class="ref-head">脈絡對照(LSP / JSON-RPC / gRPC / FastAPI / A2A)</div>
         <a href="https://github.com/microsoft/language-server-protocol/blob/gh-pages/_specifications/lsp/3.17/specification.md">LSP 3.17 spec — server lifecycle 由 client 管理、Content-Length 分幀</a>
         <a href="https://www.jsonrpc.org/specification">JSON-RPC 2.0 spec — Overview 定位句、Notification、id 配對規則</a>
         <a href="https://github.com/grpc/grpc.io/blob/main/content/en/docs/what-is-grpc/core-concepts.md">gRPC core concepts — .proto 服務定義、四種 streaming</a>
         <a href="https://github.com/fastapi/fastapi/blob/master/docs/en/docs/advanced/websockets.md">FastAPI websockets — 自己搭反向呼叫要換 @app.websocket 的對照</a>
         <a href="https://github.com/modelcontextprotocol/python-sdk">MCP Python SDK — 本主題 hands-on code 用的官方套件</a>
+        <a href="https://a2a-protocol.org/latest/topics/a2a-and-mcp">A2A × MCP — 官方對兩者關係的定位頁(互補、不是競爭)</a>
+        <a href="https://a2a-protocol.org/latest/specification">A2A specification — Agent Card 範例、Appendix B 對 MCP 的說明</a>
       </div>
     </div>
   </section>
@@ -377,6 +452,18 @@ render_with_liquid: false
       example: 'Host 只把一個專案資料夾設成 root,檔案系統 server 就只能在這個資料夾裡讀寫。',
       note: '最單純的一個:純粹是 client 端的靜態設定查詢,跟 LLM 完全沒關係。',
       snippet: `{"uri": "file:///Users/paul/project",\n "name": "project-root"}`
+    },
+    logging: {
+      title: 'Logging', tag: 'Server 擁有 · 延伸能力',
+      def: 'Server 把結構化的日誌訊息推給 client——不是給 LLM 看的,是給人(開發者)debug 用的。8 級 syslog 嚴重度(RFC 5424):debug/info/notice/warning/error/critical/alert/emergency。',
+      example: 'client 可以用 logging/setLevel 告訴 server「低於這個等級的不用送」,篩掉太吵的訊息。',
+      snippet: `{"method": "notifications/message",\n "params": {"level": "error", "logger": "database",\n   "data": {"error": "Connection failed"}}}`
+    },
+    completion: {
+      title: 'Completion', tag: 'Server 擁有 · 延伸能力',
+      def: 'Server 幫 client 的輸入框做自動完成建議,用在 Prompts 的參數或 Resource URI template 上——打字打到一半就有建議。',
+      example: '使用者在 code_review 這個 prompt 的 language 參數打了 "py",server 建議 python / pytorch / pyside。',
+      snippet: `{"method": "completion/complete",\n "params": {"ref": {"type": "ref/prompt", "name": "code_review"},\n   "argument": {"name": "language", "value": "py"}}}`
     }
   };
 
@@ -446,6 +533,32 @@ render_with_liquid: false
   }
   nodesB.forEach(n => n.addEventListener('click', () => renderB(n.dataset.key)));
 
+  const A2A = {
+    'mcp-side': {
+      title: 'MCP · Agent 怎麼用工具', tag: '範圍 · Agent-to-Tool',
+      def: '解的是「一個 agent 怎麼用工具/資料」——Tools 呼叫是無狀態的單次動作,叫一次、回一次,沒有內建的「找 server」機制(host 自己設定要接哪個 server)。',
+      example: `官方對照句:「A2A emphasizes agents partnering on tasks, contrasting with MCP's focus on agents using capabilities.」`
+    },
+    'a2a-side': {
+      title: 'A2A · Agent 跟 Agent 怎麼溝通', tag: '範圍 · Agent-to-Agent',
+      def: '解的是「agent 跟 agent 之間怎麼溝通」——有 Agent Card(JSON metadata,描述身分/能力/skills/認證方式)當發現機制,Task 有自己的生命週期(submitted/working/input-required/completed/failed/canceled),更像協作一件要來回討論的長任務。',
+      example: '官方定位句:「An agentic application might primarily use A2A to communicate with other agents. Each individual agent then internally uses MCP to interact with its specific tools and resources.」——互補,不是競爭。'
+    }
+  };
+  const panelA2A = document.getElementById('panelA2A');
+  const nodesA2A = document.querySelectorAll('#a2aRow .node');
+  function renderA2A(key){
+    const d = A2A[key];
+    nodesA2A.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelA2A.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      <div class="ex">${d.example}</div>
+    `;
+  }
+  nodesA2A.forEach(n => n.addEventListener('click', () => renderA2A(n.dataset.key)));
+
   const WIRE = {
     jsonrpc: {
       title: '為什麼選 JSON-RPC', tag: '語言 · 訊息格式',
@@ -487,6 +600,39 @@ render_with_liquid: false
     `;
   }
   nodesC.forEach(n => n.addEventListener('click', () => renderC(n.dataset.key)));
+
+  const ADV = {
+    progress: {
+      title: 'Progress Notifications', tag: '穩定 · basic/utilities/progress.mdx',
+      def: '發請求時在 `_meta.progressToken` 帶一個自己選的 token,server 就能在結果送回來之前先推幾則進度通知。規則:progress 數值只能往上走,`total` 可以留空(代表不知道總量),收到終態後就不能再推。',
+      example: `{"method": "notifications/progress",\n "params": {"progressToken": "abc123", "progress": 50, "total": 100,\n   "message": "Reticulating splines..."}}`
+    },
+    tasks: {
+      title: 'Tasks', tag: '⚠ 提案中,未定案 · SEP-2663',
+      def: '比進度通知更進一步:整個請求變成有 id、有狀態機的物件,client 可以隨時 `tasks/get` 問「現在跑到哪」,不用一直掛著等。狀態機:working → completed / failed / cancelled / input_required。',
+      example: '官方文件裡兩個回應範例的 `resultType` 甚至互相不一致(一個寫 "task"、一個寫 "complete")——這正是提案階段的樣子,細節還在收斂,拿來當「MCP 現在的樣子」引用要小心。',
+      note: '這是唯一一個標成「未定案」的機制——跟本頁其他內容不一樣,它可能在正式定案前就長得不一樣了。'
+    },
+    resume: {
+      title: '斷線續傳 / Session', tag: '穩定 · basic/transports.mdx',
+      def: '兩個獨立機制:(1) 斷線續傳——server 可以幫每個 SSE 事件掛一個 id,client 斷線後用 Last-Event-ID header 重新連,server 從那個點之後重播,但絕不跨串流重播;(2) Session——server 在 initialize 時發一個 MCP-Session-Id,之後每個請求都要帶著它,session 被終止後帶舊 id 會收到 404,得重新 initialize。',
+      example: '斷線續傳解決「這條串流斷了,接得回來嗎」;Session 解決「這整段對話還算不算數」——兩個問題,不是同一件事。'
+    }
+  };
+  const panelD = document.getElementById('panelD');
+  const nodesD = document.querySelectorAll('#advRow .node');
+  function renderD(key){
+    const d = ADV[key];
+    nodesD.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelD.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      <div class="ex">${d.example}</div>
+      ${d.note ? `<div class="ex" style="margin-top:8px;border-left-color:var(--rose)">⚠ ${d.note}</div>` : ''}
+    `;
+  }
+  nodesD.forEach(n => n.addEventListener('click', () => renderD(n.dataset.key)));
 </script>
 </body>
 </html>

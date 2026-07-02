@@ -128,6 +128,29 @@ POST 送、可選的 GET+SSE 收)。
 Streamable HTTP 把它們合併成一個 endpoint 同時支援 POST/GET(見
 [`transports.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/transports.mdx))。
 
+## 斷線怎麼辦——Resumability 跟 Session
+
+選了 Streamable HTTP 不選 WebSocket,省了協定升級的麻煩,但代價是:那條 SSE 串流一樣可能斷
+(網路抖動、代理逾時)。MCP 用兩個獨立機制分別處理「斷線後怎麼接回來」跟「怎麼認得是同一次對話」。
+
+**斷線續傳**——server 可以幫每個 SSE 事件掛一個 `id`,斷線後 client 用 HTTP GET 重新連,帶著
+`Last-Event-ID` header,server 就從那個點之後重播:
+
+> "If the client wishes to resume after a disconnection, it SHOULD issue an HTTP GET to the MCP
+> endpoint and include the `Last-Event-ID` header. The server MAY use this header to replay
+> messages that would have been sent after the last event ID on the stream that was
+> disconnected... The server MUST NOT replay messages that would have been delivered on a
+> different stream."
+> — [`transports.mdx` § Resumability and Redelivery](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/transports.mdx)
+
+重點是最後一句:重播只認**同一條串流**,不會把 A 串流斷線的補償訊息塞進 B 串流——這條邊界是
+避免訊息送錯管道。
+
+**Session 管理**——跟斷線續傳是分開的另一層:server 在 `initialize` 回應時可以發一個
+`MCP-Session-Id`,之後 client 每個請求都要帶著它。Session 被 server 終止後,帶著舊 id 的請求
+會收到 404,client 必須重新 `initialize` 拿新的 session(見同一份 `transports.mdx`)。斷線續傳
+解決「這條串流斷了,接得回來嗎」;session 解決「這整段對話還算不算數」——兩個問題,不是同一件事。
+
 ## Request/Response 怎麼配對 id
 
 JSON-RPC 本身就定義好的機制,MCP 直接照用:
@@ -154,6 +177,44 @@ type RequestId = string | number;
 
 官方 Python/TypeScript SDK 都內建幫你管這張表——這也是為什麼
 [`../code/client.py`](../code/client.py) 完全沒出現手動比對 id 的程式碼。
+
+## 長時間任務怎麼處理——Progress 跟 Tasks
+
+一問一答的 request/response 模型,碰到「這個工具要跑五分鐘」就卡住——client 只能乾等,也不知道
+到底跑到哪了。MCP 有兩個機制處理這件事,一個穩定、一個還在提案階段。
+
+**Progress notifications(穩定,已在正式規格裡)**——發請求時在 `_meta.progressToken` 帶一個
+自己選的 token,server 就可以在結果送回來之前,先推幾則進度通知:
+
+```json
+// 請求時附上 token
+{"jsonrpc": "2.0", "id": 1, "method": "some_method", "params": {"_meta": {"progressToken": "abc123"}}}
+// server 跑到一半推進度(可以推多次)
+{"jsonrpc": "2.0", "method": "notifications/progress",
+ "params": {"progressToken": "abc123", "progress": 50, "total": 100, "message": "Reticulating splines..."}}
+```
+
+規則很直白:progress 數值只能往上走,`total` 可以留空(代表不知道總量,但至少讓 client 知道
+「還在動」),收到終態(完成/失敗/取消)之後就不能再推進度了(見
+[`progress.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/utilities/progress.mdx))。
+
+**Tasks(SEP,提案階段,還沒定案)**——比進度通知更進一步:整個請求變成一個有 id、有狀態機的
+物件,client 可以隨時 `tasks/get` 去問「現在跑到哪」,不用一直掛著等:
+
+```json
+// 問任務現在的狀態
+{"jsonrpc": "2.0", "method": "tasks/get", "params": {"taskId": "786512e2-..."}}
+// server 答:還在跑,建議 5 秒後再問一次
+{"jsonrpc": "2.0", "id": 1,
+ "result": {"resultType": "task", "taskId": "786512e2-...", "status": "working",
+            "createdAt": "2025-11-25T10:30:00Z", "pollIntervalMs": 5000}}
+```
+
+狀態機是 `working` → `completed`/`failed`/`cancelled`/`input_required`。這個機制目前是
+[SEP-2663](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/seps/2663-tasks-extension.mdx)
+的提案內容,**還沒進正式規格**,官方文件裡看到的兩個回應範例格式甚至互相有點不一致(`resultType`
+一個寫 `"task"`、一個寫 `"complete"`)——這正是提案階段常見的樣子,細節還在收斂,不是穩定
+API,拿來當「這是 MCP 現在的樣子」引用要小心。
 
 ## 出處
 
@@ -197,6 +258,10 @@ type RequestId = string | number;
   ——request id 唯一性從「per-session」重新定義為「per-sender、回應前不可重複」。
 - [`specification/2025-11-25/schema.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/schema.mdx)
   ——`RequestId` 型別定義。
+- [`specification/2025-11-25/basic/utilities/progress.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/utilities/progress.mdx)
+  ——progressToken、progress notification 的行為規則(穩定規格)。
+- [SEP-2663 `tasks-extension`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/seps/2663-tasks-extension.mdx)
+  ——Tasks 機制的提案內容(未定案),`tasks/get` 輪詢範例。
 
 **FastAPI(對照用)**
 - [`websockets.md`](https://github.com/fastapi/fastapi/blob/master/docs/en/docs/advanced/websockets.md)
