@@ -55,3 +55,7 @@ defaults:
       path: "studies/agent-anatomy"
     values:
       permalink: "/agent-anatomy/:basename/"
+  - scope:
+      path: "studies/agent-skills"
+    values:
+      permalink: "/agent-skills/:basename/"

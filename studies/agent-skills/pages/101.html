@@ -1,0 +1,430 @@
+---
+title: Agent Skills 101 — 互動圖解
+summary: 三張互動圖:三層 progressive disclosure 載入模型、血緣脈絡(1995 UX 原則 → system prompt 天花板 → 推出 → 開放成標準)、跟 Tool Search Tool / Subagent / Hook 的邊界。
+date: 2026-07-02
+tags:
+  - agent-skills
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Agent Skills 101:三張互動圖解 + 參考資料。可長期回看的教學頁(pages/ genre,
+  發布於 /agent-skills/101/),不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-02-agent-skills-overview.md
+  Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(三層載入)— Metadata(永遠載入)/ Instructions(觸發時載入)/ 更深參考資料(需要時
+      才載入),點卡片看每一層裝什麼、什麼時候讀。
+    圖 B(血緣)— 1995 UX 原則(Nielsen)→ system prompt 天花板(~10 個能力)→ 推出
+      (2025-10)→ 開放成標準(2025-12),點「推出」節點看借了什麼/解決了什麼/新開放了什麼。
+    圖 C(邊界)— 跟 Tool Search Tool(同原理、順序反直覺,Skills 反而先推出)、跟
+      Subagent/Hook(不同源,三條獨立判斷軸)兩組對照。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Agent Skills 101 — 互動圖解</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+  .panel .fan{margin-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .fan-col{border-radius:10px;padding:11px 12px;font-size:12.5px}
+  .fan-col.fit{background:rgba(47,111,158,.08)}
+  .fan-col.adapt{background:rgba(154,107,46,.1)}
+  .fan-col.new{background:rgba(176,74,106,.1)}
+  .fan-col .ftag{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+  .fan-col.fit .ftag{color:var(--blue)}
+  .fan-col.adapt .ftag{color:var(--accent)}
+  .fan-col.new .ftag{color:var(--rose)}
+  .fan-col p{margin-top:6px;line-height:1.55}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+    .fan{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← Agent Skills 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · Agent Skills 101</div>
+    <h1>Agent Skills 101 — 需要時才載入的操作程序</h1>
+    <p class="tagline">
+      三張圖。圖 A 是核心機制:三層載入,一層比一層晚讀。圖 B 是往前推——Skills 不是憑空出現的
+      功能,借了一條 30 年前的 UX 原則,解決一個查得到數字的天花板。圖 C 是邊界:跟看起來很像的
+      東西,具體差在哪。點任何卡片看細節。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 三層載入 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 核心機制</div>
+    <div class="sec-title">三層載入,一層比一層晚讀</div>
+    <p class="sec-sub">
+      一個 Skill 的內容分三層,分三個時間點載入——這是整個 Skills 設計裡最核心的機制。點卡片看
+      每一層裝什麼、什麼時候讀。
+    </p>
+
+    <div class="row" id="tierRow">
+      <div class="node" data-key="metadata">
+        <div class="idx">01 · 永遠載入</div>
+        <h3>Metadata</h3>
+        <div class="q">SKILL.md 的 YAML frontmatter</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="instructions">
+        <div class="idx">02 · 觸發時載入</div>
+        <h3>Instructions</h3>
+        <div class="q">SKILL.md 的主體內容</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="reference">
+        <div class="idx">03 · 需要時才載入</div>
+        <h3>更深的參考資料</h3>
+        <div class="q">附屬檔案、可執行腳本</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelA">
+      <p class="placeholder">↑ 點上面任一張卡片看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: 血緣 ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 從哪裡來</div>
+    <div class="sec-title">Skills 站在誰的肩膀上</div>
+    <p class="sec-sub">
+      往前推四步:先有一條 30 年前的 UX 原則,再有一個查得到數字的天花板,Skills 把兩者接起來,
+      兩個月後開放成跨平台標準。
+    </p>
+
+    <div class="row" id="lineageRow">
+      <div class="node" data-key="ux">
+        <div class="idx">00 · 1995</div>
+        <h3>Progressive Disclosure</h3>
+        <div class="q">Jakob Nielsen 的 UX 互動設計原則</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="ceiling">
+        <div class="idx">01 · Skills 之前</div>
+        <h3>System Prompt 天花板</h3>
+        <div class="q">塞得下大概 10 種能力左右</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="launch">
+        <div class="idx">02 · 2025-10-16</div>
+        <h3>Agent Skills 推出</h3>
+        <div class="q">Claude 自己的能力</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="standard">
+        <div class="idx">03 · 2025-12-18</div>
+        <h3>開放成跨平台標準</h3>
+        <div class="q">不再只是 Claude 專屬</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelB">
+      <p class="placeholder">↑ 點一個節點看細節。點「Agent Skills 推出」看它從左邊借了什麼、解決了什麼、又開放了什麼。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: 邊界 ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 邊界</div>
+    <div class="sec-title">跟看起來很像的東西,具體差在哪</div>
+    <p class="sec-sub">
+      兩組容易混在一起、但查證後發現不是同一件事的比較。
+    </p>
+
+    <div class="row" id="toolSearchRow">
+      <div class="node" data-key="skills-side">
+        <div class="idx">Skills · 2025-10-16</div>
+        <h3>延遲載入操作程序</h3>
+        <div class="q">先推出的那個</div>
+      </div>
+      <div class="arrow">↔</div>
+      <div class="node" data-key="toolsearch-side">
+        <div class="idx">Tool Search Tool · 2025-11-19/20</div>
+        <h3>延遲載入工具定義</h3>
+        <div class="q">晚了超過一個月才推出</div>
+      </div>
+    </div>
+    <div class="panel" id="panelToolSearch">
+      <p class="placeholder">↑ 點任一邊看細節——注意順序跟直覺相反。</p>
+    </div>
+
+    <div class="sec-sub" style="margin-top:30px">
+      另一組更容易誤會——三個都掛在 Claude Code 底下,但查證後發現不同源,是刻意設計成互斥的
+      三個答案。
+    </div>
+    <div class="row" id="steeringRow">
+      <div class="node" data-key="skill">
+        <div class="idx">2025-10</div>
+        <h3>Skill</h3>
+        <div class="q">主線程可見、可介入每一步</div>
+      </div>
+      <div class="arrow">≠</div>
+      <div class="node" data-key="subagent">
+        <div class="idx">2025-07</div>
+        <h3>Subagent</h3>
+        <div class="q">context 隔離、只回最後結果</div>
+      </div>
+      <div class="arrow">≠</div>
+      <div class="node" data-key="hook">
+        <div class="idx">2025-09</div>
+        <h3>Hook</h3>
+        <div class="q">不看 LLM 判斷、固定觸發</div>
+      </div>
+    </div>
+    <div class="panel" id="panelSteering">
+      <p class="placeholder">↑ 點任一個看它佔據哪條判斷軸。</p>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">
+      官方文檔經 context7 查證;歷史時間線、UX 原則出處經 WebSearch 交叉確認,查證時間 2026-07-02。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">Agent Skills 官方文檔</div>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview">overview — 三層載入模型、SKILL.md 結構、Security considerations</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices">best-practices — 「精簡是關鍵」、progressive disclosure 實務切法</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/agent-skills/enterprise">enterprise — 風險分級判準</a>
+        <a href="https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills">Equipping agents for the real world with Agent Skills — 官方推出動機原句</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">血緣與邊界</div>
+        <a href="https://www.nngroup.com/articles/progressive-disclosure/">NN/g, "Progressive Disclosure" — Jakob Nielsen 1995 年提出的原始出處</a>
+        <a href="https://www.anthropic.com/engineering/advanced-tool-use">advanced-tool-use — Tool Search Tool 的官方版本識別碼與 beta header,確認上線日期</a>
+        <a href="https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more">Steering Claude Code — Skill/Subagent/Hook 的官方分類與選用判準</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/2026-07-02-agent-skills-overview.md 為真相來源(經 context7 +
+    WebSearch 查證)· 最後同步 2026-07-02
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  const TIER = {
+    metadata: {
+      title: 'Metadata', tag: '01 · 永遠載入',
+      def: 'SKILL.md 的 YAML frontmatter(name + description),開機時就載進 system prompt。這一層極輕量,所以可以裝很多 Skills 而不吃 context。',
+      example: '`description` 這個欄位特別關鍵——它是 Claude 唯一用來判斷「這個 Skill 現在該不該用」的依據,因為這階段 instructions 主體還沒讀進來。'
+    },
+    instructions: {
+      title: 'Instructions', tag: '02 · 觸發時載入',
+      def: 'SKILL.md 的主體內容,只有當 Claude 判斷這個 Skill 跟目前任務相關時,才透過 bash 從檔案系統讀進來。',
+      example: '官方寫作準則:「Conciseness is essential because Skills share the context window with system prompts, conversation history, and other metadata」——這一層一旦被讀進來,還是要精簡,不能因為「觸發了才讀」就毫無節制。'
+    },
+    reference: {
+      title: '更深的參考資料', tag: '03 · 需要時才載入',
+      def: '如果 instructions 裡提到其他檔案或腳本,Claude 才進一步去讀或執行它們——`FORMS.md`、`reference.md`、`scripts/` 之類的附屬檔案,只有真的被提到、真的需要時才會被載入。',
+      example: '官方形容整個過程像「an onboarding guide」——資料夾裡有指示、可執行腳本、參考資料,結構上是一份新人手冊,翻到哪一頁才讀那一頁,不是一次性塞給你。'
+    }
+  };
+  const panelA = document.getElementById('panelA');
+  const nodesA = document.querySelectorAll('#tierRow .node');
+  function renderA(key){
+    const d = TIER[key];
+    nodesA.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelA.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      <div class="ex">${d.example}</div>
+    `;
+    fadeIn(panelA);
+  }
+  nodesA.forEach(n => n.addEventListener('click', () => renderA(n.dataset.key)));
+
+  const LINEAGE = {
+    ux: {
+      title: 'Progressive Disclosure(1995)', tag: '00 · Jakob Nielsen',
+      def: 'Nielsen Norman Group 共同創辦人 Jakob Nielsen 1995 年提出的互動設計原則,2006 年補上具體可用性準則:「defers advanced or rarely used features to a secondary screen, making applications easier to learn and less error-prone」。',
+      example: '原本解決的是人類使用者的認知負擔——介面不要一次塞滿所有選項,先給常用的,進階功能延後顯示。Anthropic 把「認知負擔」換成「LLM 的 context 預算」,原則沒變,對象換了。'
+    },
+    ceiling: {
+      title: 'System Prompt 天花板', tag: '01 · Skills 之前',
+      def: '可重用的操作指示只能全部塞進一個巨大的 system prompt——塞得下大概 10 種能力左右,prompt 就會長到不能再長,改一個功能要重寫整份 prompt,不同 agent 之間也無法共用。',
+      example: '這才是「為什麼被發明」真正的答案,不是取代了某個特定的舊工具——是解決一個具體、查得到數字的天花板。'
+    },
+    launch: {
+      title: 'Agent Skills 推出', tag: '02 · 2025-10-16',
+      def: '把 progressive disclosure 這條 UX 原則,套進「system prompt 塞不下」這個具體天花板上,包成 SKILL.md + 三層載入的具體機制。',
+      fan: [
+        { cls: 'fit', ftag: 'Fit · 原樣借用', text: '「延遲顯示、需要才展開」這個 UX 原則本身——Nielsen 1995 年怎麼講,Skills 的三層載入邏輯上就是同一件事,只是換了載入對象。' },
+        { cls: 'adapt', ftag: 'Adapt · 借了但改形狀', text: 'UX 原則原本管的是「使用者介面上顯示什麼」;Skills 把它套用到「檔案系統裡什麼時候被 bash 讀進來」——從畫面上的顯示層,搬到 agent 執行環境的檔案存取層。' },
+        { cls: 'new', ftag: 'New · Skills 沒有的先例', text: '把 SKILL.md 包裝成「可以被多個平台(claude.ai / API / Claude Code)重用的資料夾」這個具體格式——這是 1995 年的 UX 原則本身沒有規定的東西,是 Anthropic 自己設計的產品形狀。' }
+      ]
+    },
+    standard: {
+      title: '開放成跨平台標準', tag: '03 · 2025-12-18',
+      def: 'Anthropic 把 Agent Skills 開放成跨平台/跨產品可重用的開放標準——不再只是 Claude 自己的能力。',
+      example: '同一個月,Block 的 `goose`、OpenAI 的 `AGENTS.md` 也各自捐進新成立的 Agentic AI Foundation,時間點高度重疊,但這是另一條獨立的公開/標準化動作,不是同一次公告。跟 MCP 當初的路徑很像,只是 MCP 走了一年多才到那一步,Skills 兩個月就走到了。'
+    }
+  };
+  const panelB = document.getElementById('panelB');
+  const nodesB = document.querySelectorAll('#lineageRow .node');
+  function renderB(key){
+    const d = LINEAGE[key];
+    nodesB.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    let fanHtml = '';
+    if (d.fan) {
+      fanHtml = `<div class="fan">${d.fan.map(f => `
+        <div class="fan-col ${f.cls}"><div class="ftag">${f.ftag}</div><p>${f.text}</p></div>
+      `).join('')}</div>`;
+    }
+    panelB.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      ${d.example ? `<div class="ex">${d.example}</div>` : ''}
+      ${fanHtml}
+    `;
+    fadeIn(panelB);
+  }
+  nodesB.forEach(n => n.addEventListener('click', () => renderB(n.dataset.key)));
+
+  const TOOLSEARCH = {
+    'skills-side': {
+      title: 'Skills · 延遲載入操作程序', tag: '2025-10-16 · 先推出',
+      def: '延遲載入的是整套操作程序(procedural knowledge)——SKILL.md 裡的指示、範例、腳本。',
+      example: '三層載入模型管的是「怎麼做一件事的說明」什麼時候該被讀進來。'
+    },
+    'toolsearch-side': {
+      title: 'Tool Search Tool · 延遲載入工具定義', tag: '2025-11-19/20 · 晚了超過一個月',
+      def: '延遲載入的是工具定義(tool schema)——用 `defer_loading: true` 標記,Claude 需要時才搜尋、載入完整 schema。',
+      example: '容易誤會 Tool Search Tool 是 Skills 的前身,但官方原始碼裡的版本識別碼(`tool_search_tool_regex_20251119`)跟 beta header(`advanced-tool-use-2025-11-20`)確認它比 Skills 晚了超過一個月——不是前身,是同一個 progressive disclosure 原理,分兩次套在兩種不同內容上。'
+    }
+  };
+  const panelToolSearch = document.getElementById('panelToolSearch');
+  const nodesToolSearch = document.querySelectorAll('#toolSearchRow .node');
+  function renderToolSearch(key){
+    const d = TOOLSEARCH[key];
+    nodesToolSearch.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelToolSearch.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      <div class="ex">${d.example}</div>
+    `;
+    fadeIn(panelToolSearch);
+  }
+  nodesToolSearch.forEach(n => n.addEventListener('click', () => renderToolSearch(n.dataset.key)));
+
+  const STEERING = {
+    skill: {
+      title: 'Skill', tag: '判斷軸:主線程可見度',
+      def: '選 Skill 的判準是:要不要在主線程裡看得到、能介入每一步。延遲載入,但一旦觸發,是在你看得到的主對話裡跑。',
+      example: '跟 Subagent/Hook 不同源——三者分開、依序上線(Subagent 2025-07 → Hook 2025-09 → Skill 2025-10),不是同一套底層機制的三種變體。'
+    },
+    subagent: {
+      title: 'Subagent', tag: '判斷軸:Context 隔離',
+      def: '選 Subagent 的判準是:會不會產生一堆不想留在主對話裡的中間雜訊。整個丟到全新、乾淨的 context 裡跑,只有最後結果回來。',
+      example: '2025 年 7 月上線,是三者裡最早的。'
+    },
+    hook: {
+      title: 'Hook', tag: '判斷軸:確定性',
+      def: '選 Hook 的判準是:要不要不看 LLM 判斷、每次都固定執行。在特定生命週期事件上觸發,可以是純 shell 指令,完全不需要 LLM 決定要不要做。',
+      example: '官方部落格〈Steering Claude Code〉把 Skill/Subagent/Hook 歸為「七種指揮 Claude Code 的方法」之一,三條軸互相獨立,不是三個變體——雖然可以互相組合(Skill/Subagent 的 frontmatter 都能定義自己的 hooks),但組合得起來不代表同源。'
+    }
+  };
+  const panelSteering = document.getElementById('panelSteering');
+  const nodesSteering = document.querySelectorAll('#steeringRow .node');
+  function renderSteering(key){
+    const d = STEERING[key];
+    nodesSteering.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelSteering.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      <div class="ex">${d.example}</div>
+    `;
+    fadeIn(panelSteering);
+  }
+  nodesSteering.forEach(n => n.addEventListener('click', () => renderSteering(n.dataset.key)));
+</script>
+</body>
+</html>
