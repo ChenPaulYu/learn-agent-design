@@ -42,6 +42,9 @@ tags:
 - [pages/tool-scaling](pages/tool-scaling.html) —
   互動版太多工具問題:圖 A 三個壞處、圖 B context window 填滿比例(笨拙 vs Progressive
   Discovery 切換)、圖 C 多輪來回 vs Code Mode 一次跑完
+- [pages/governance](pages/governance.html) —
+  互動版 SEP 治理:圖 A SEP 狀態機(為什麼有些機制標「未定案」)、圖 B 四層治理階梯、
+  圖 C 現況 vs 目標(Working Group 怎麼解決審查瓶頸)
 - [code/](code/) — 官方 Python SDK 寫的最小 server(一個 tool + 一個 resource + 一個 prompt)
   + 一個 client 跑過一輪 `list_tools` / `call_tool` / `read_resource` / `get_prompt`
 
