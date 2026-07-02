@@ -4,13 +4,6 @@ Living list of candidate topics — things worth studying next, not yet started.
 log (git log / the docs themselves are that); this only tracks what's still open. Pull an item
 out (and delete its line here) once its own topic/note exists.
 
-## `mcp`
-
-- **多 server 疊加(Gateway 架構)** — 一個 MCP server 自己可不可以當另一個 server 的
-  client(proxy/aggregate 多個下游 server)。跟安全模型那篇的 Confused Deputy 有重疊(那篇談
-  的就是「MCP server 當代理」的情境),這篇是從架構模式角度重新看,不是安全視角。MCP 規格本身
-  沒定義這個模式,查證對象是社群實作範例。
-
 ## 還沒開的新主題(候選)
 
 - **advanced-tool-use** — Claude Developer Platform 自己的三個 beta 功能:Tool Search Tool

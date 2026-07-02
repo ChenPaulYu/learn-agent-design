@@ -29,6 +29,11 @@ tags:
   進階主題:一個 host 接多個 server 之後,工具清單塞爆 context 怎麼辦——Progressive Tool
   Discovery(先搜尋、後載入)、Programmatic Tool Calling / Code Mode(模型寫程式碼在沙箱裡
   跑,只把最終結果送回)、兩者疊加,以及跟 `tools/list` pagination 的區別
+- [mcp-gateway-pattern](docs/2026-07-02-mcp-gateway-pattern.md) —
+  進階主題(社群/廠商模式,非官方規格):一個 MCP server 自己當另一個 server 的 client——
+  工具聚合、name-prefixing 路由、多下游 session 合併,新風險(privilege concentration:
+  gateway 被攻破 = 拿到所有下游權限總和、稽核軌跡碎片化),微軟/MetaMCP/Stacklok 等多方
+  獨立實作
 - [mcp-ecosystem-reality](docs/2026-07-02-mcp-ecosystem-reality.md) —
   進階主題(查證方式是新聞/公告,不是規格):採用規模、OpenAI 的採用時間線、MCP 被捐給新成立的
   Agentic AI Foundation(不再是「Anthropic 的協定」)、registry 數字互相打架、registry 不做
