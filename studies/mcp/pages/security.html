@@ -548,7 +548,7 @@ render_with_liquid: false
     exchange: {
       title: '換 Token', tag: '第 4 步 · resource 參數生效',
       def: 'Client 拿著 authorization code + code_verifier + resource 參數去換 access token。官方原句:「access tokens are cryptographically bound to their intended resources, preventing them from being misused across different services」。',
-      example: '這就是防 Token Passthrough 的機制——token 一開始就綁死「只能用在這一台 server」,就算被偷走,拿去別的 MCP server 也用不了。'
+      example: '這就是防 Token Passthrough 的機制——token 一開始就綁死「只能用在這一台 server」,就算被偷走,拿去別的 MCP server 也用不了。<br><br><b>注意這防的是 Token Passthrough,不是 Confused Deputy</b>——Confused Deputy 的病根是「proxy 對不同 client 共用同一份同意狀態」,resource 參數管不到這件事,得靠下面 Confused Deputy 卡片講的逐個 client 檢查同意。'
     },
     validate: {
       title: '每次請求都要重新驗', tag: '第 5 步 · Access Token Usage',

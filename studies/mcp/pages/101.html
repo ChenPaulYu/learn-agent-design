@@ -548,6 +548,7 @@ render_with_liquid: false
       def: 'Server 把結構化的日誌訊息推給 client——不是給 LLM 看的,是給人(開發者)debug 用的。8 級 syslog 嚴重度(RFC 5424):debug/info/notice/warning/error/critical/alert/emergency。',
       example: 'client 可以用 logging/setLevel 告訴 server「低於這個等級的不用送」,篩掉太吵的訊息。',
       analogy: '廠商把每次辦事的過程記錄回傳給秘書存檔——不是講給你聽,是秘書自己留著,方便之後查是哪個環節出包。',
+      note: '查證方法論:architecture.mdx 把 Logging 歸在 client 端,跟這裡引用的 logging.mdx(server 宣告、server 送)講法不一致——這篇採用 logging.mdx 這份更具體的規格頁,architecture.mdx 那句可能是概覽頁的簡化/過時說法。',
       snippet: `{"method": "notifications/message",\n "params": {"level": "error", "logger": "database",\n   "data": {"error": "Connection failed"}}}`
     },
     completion: {
