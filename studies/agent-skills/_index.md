@@ -15,9 +15,11 @@ tags:
 ## 文件
 
 - [agent-skills-overview](docs/2026-07-02-agent-skills-overview.md) —
-  三層載入模型、`SKILL.md` 結構、寫作準則(精簡是關鍵)、從哪裡來(2025-10 推出 →
+  三層載入模型、`SKILL.md` 結構、寫作準則(精簡是關鍵)、progressive disclosure 借自 1995
+  年 Nielsen 的 UX 原則、沒有 Skills 之前的具體天花板(~10 個能力)、從哪裡來(2025-10 推出 →
   2025-12 開放成跨平台標準)、三個使用入口(claude.ai/API/Claude Code)、安全稽核(企業版
-  風險分級)、跟 Tool Search Tool 的邊界、跟 Subagent/Hook 的邊界(不同源,三條獨立判斷軸)
+  風險分級)、跟 Tool Search Tool 的邊界(順序跟直覺相反,Skills 反而先推出)、跟 Subagent/Hook
+  的邊界(不同源,三條獨立判斷軸)
 
 ## 出處
 
