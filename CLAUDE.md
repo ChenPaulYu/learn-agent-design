@@ -37,6 +37,15 @@ re-sync the page and bump the date; (4) published URL is `/<topic>/<content>/` (
 `studies/mcp/pages/101.html` → `/mcp/101/`) — one per-topic permalink entry in `site/_config.yml`,
 added when a topic publishes its first page.
 
+**Every topic with published pages needs its own topic-index page, or its base URL 404s /
+shows a bare directory listing.** `/mcp/101/` and `/mcp/security/` each have their own
+`index.html`, but `/mcp/` itself has nothing unless you add one — Jekyll never auto-generates
+a directory index. Fix: add `studies/<topic>/pages/index.md` with front matter
+`title: <Topic>` · `topic: <topic>` · `permalink: /<topic>/` · `layout: default`, plus one
+short intro sentence as its body. The shared layout (`site/_layouts/default.html`) branches on
+`page.topic`: set → scope the card list to just that topic's own pages; unset → the homepage's
+full all-topics view. Do this the same turn a topic's first page ships, not as an afterthought.
+
 ## Writing a study note
 
 - Distilled conclusion, point-first — not a transcript of how the conclusion was reached.
