@@ -25,11 +25,16 @@ tags:
   進階主題(101 之外):誰該防誰的責任分工、遠端授權怎麼跑(OAuth 2.1、PKCE、resource
   indicator)、本機 server 淪陷風險、Confused Deputy Problem、Session Hijacking 兩種變體、
   Lethal Trifecta(私密資料 + 不信任內容 + 對外通訊三者疊加)、tool description 本身是攻擊面
+- [mcp-tool-scaling-problem](docs/2026-07-02-mcp-tool-scaling-problem.md) —
+  進階主題:一個 host 接多個 server 之後,工具清單塞爆 context 怎麼辦——Progressive Tool
+  Discovery(先搜尋、後載入)、Programmatic Tool Calling / Code Mode(模型寫程式碼在沙箱裡
+  跑,只把最終結果送回)、兩者疊加,以及跟 `tools/list` pagination 的區別
 - [pages/101](pages/101.html) —
   互動版 MCP 101(可長期回看的教學頁,內容以 docs/ 為真相來源):圖 A 架構、圖 B 脈絡、
   圖 C 傳輸協定怎麼選,點卡片看細節
 - [pages/security](pages/security.html) —
-  互動版安全模型:圖 A 責任分工、圖 B Lethal Trifecta(Venn 圖)、圖 C 四個具體攻擊
+  互動版安全模型:圖 A 責任分工、圖 B Lethal Trifecta(Venn 圖)、圖 C OAuth 2.1 流程、
+  圖 D 四個具體攻擊
 - [code/](code/) — 官方 Python SDK 寫的最小 server(一個 tool + 一個 resource + 一個 prompt)
   + 一個 client 跑過一輪 `list_tools` / `call_tool` / `read_resource` / `get_prompt`
 
