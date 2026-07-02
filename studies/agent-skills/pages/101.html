@@ -1,6 +1,6 @@
 ---
 title: Agent Skills 101 — 互動圖解
-summary: 三張互動圖:三層 progressive disclosure 載入模型、血緣脈絡(1995 UX 原則 → system prompt 天花板 → 推出 → 開放成標準)、跟 Tool Search Tool / Subagent / Hook 的邊界。
+summary: 三張互動圖:三層 progressive disclosure 載入模型(手冊場景比喻)、血緣脈絡(1995 UX 原則 → system prompt 天花板 → 推出 → 開放成標準)、跟 Tool Search Tool / Subagent / Hook 的邊界。
 date: 2026-07-02
 tags:
   - agent-skills
@@ -16,8 +16,9 @@ render_with_liquid: false
     ../docs/2026-07-02-agent-skills-overview.md
   Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
   What it is:
-    圖 A(三層載入)— Metadata(永遠載入)/ Instructions(觸發時載入)/ 更深參考資料(需要時
-      才載入),點卡片看每一層裝什麼、什麼時候讀。
+    圖 A(三層載入)— 手冊場景(資料夾標籤/翻開的正文/後面沒翻到的參考頁)+ 卡片,對應
+      Metadata(永遠載入)/ Instructions(觸發時載入)/ 更深參考資料(需要時才載入),點場景
+      或卡片看每一層裝什麼、什麼時候讀。
     圖 B(血緣)— 1995 UX 原則(Nielsen)→ system prompt 天花板(~10 個能力)→ 推出
       (2025-10)→ 開放成標準(2025-12),點「推出」節點看借了什麼/解決了什麼/新開放了什麼。
     圖 C(邊界)— 跟 Tool Search Tool(同原理、順序反直覺,Skills 反而先推出)、跟
@@ -83,6 +84,15 @@ render_with_liquid: false
   .fan-col.new .ftag{color:var(--rose)}
   .fan-col p{margin-top:6px;line-height:1.55}
 
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}
+  .zone{cursor:pointer}
+  .zone .st{transition:stroke .15s ease}
+  .zone .stf{transition:fill .15s ease}
+  .zone:hover .st,.zone.active .st{stroke:currentColor}
+  .zone:hover .stf,.zone.active .stf{fill:currentColor}
+  .zone.active .fillable{fill:color-mix(in srgb,currentColor 8%,var(--panel))}
+  .zone.active text{fill:currentColor}
+
   .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
   .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
     padding:16px 18px}
@@ -132,9 +142,47 @@ render_with_liquid: false
     <div class="sec-kicker">圖 A · 核心機制</div>
     <div class="sec-title">三層載入,一層比一層晚讀</div>
     <p class="sec-sub">
-      一個 Skill 的內容分三層,分三個時間點載入——這是整個 Skills 設計裡最核心的機制。點卡片看
-      每一層裝什麼、什麼時候讀。
+      官方形容整個過程像「an onboarding guide」——一份新人手冊,不是一次性塞給你,是你翻到哪一頁
+      才讀那一頁。點場景裡的資料夾標籤、翻開的那一頁、後面那疊參考頁,看對應哪一層。
     </p>
+
+    <div class="scene-box">
+      <svg id="manualScene" viewBox="0 0 700 260" style="width:100%;height:auto;display:block">
+        <!-- 資料夾本體(裝飾,不可點) -->
+        <rect x="40" y="70" width="600" height="160" rx="14" fill="none" stroke="#d8d0c0" stroke-width="2" stroke-dasharray="7 6"/>
+        <text x="56" y="95" font-size="11" fill="#a99c8a" style="font-family:var(--mono)">一個 SKILL 資料夾</text>
+
+        <!-- reference:後面那疊參考頁,部分被遮住,還沒翻到 -->
+        <g class="zone" data-key="reference" style="color:#0c7a59">
+          <rect x="470" y="118" width="110" height="92" rx="6" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <rect x="486" y="106" width="110" height="92" rx="6" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <rect x="502" y="94" width="110" height="92" rx="6" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <line x1="516" y1="118" x2="580" y2="118" class="st" stroke="#b9ad9c" stroke-width="1.4" stroke-dasharray="3 3"/>
+          <line x1="516" y1="132" x2="570" y2="132" class="st" stroke="#b9ad9c" stroke-width="1.4" stroke-dasharray="3 3"/>
+          <line x1="516" y1="146" x2="575" y2="146" class="st" stroke="#b9ad9c" stroke-width="1.4" stroke-dasharray="3 3"/>
+          <text x="502" y="200" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">更深的參考頁(還沒翻到)</text>
+        </g>
+
+        <!-- instructions:翻開、正在讀的那一頁 -->
+        <g class="zone" data-key="instructions" style="color:#9a6b2e">
+          <rect x="230" y="88" width="200" height="140" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <line x1="250" y1="118" x2="410" y2="118" class="st" stroke="#b9ad9c" stroke-width="2"/>
+          <line x1="250" y1="140" x2="410" y2="140" class="st" stroke="#b9ad9c" stroke-width="1.6"/>
+          <line x1="250" y1="158" x2="390" y2="158" class="st" stroke="#b9ad9c" stroke-width="1.6"/>
+          <line x1="250" y1="176" x2="400" y2="176" class="st" stroke="#b9ad9c" stroke-width="1.6"/>
+          <line x1="250" y1="194" x2="360" y2="194" class="st" stroke="#b9ad9c" stroke-width="1.6"/>
+          <text x="248" y="212" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">SKILL.md 正文(觸發後才翻開)</text>
+        </g>
+
+        <!-- metadata:資料夾標籤,從外面就看得到 -->
+        <g class="zone" data-key="metadata" style="color:#2f6f9e">
+          <path d="M 70 70 L 70 40 Q 70 30 80 30 L 160 30 Q 170 30 170 40 L 170 70 Z" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <line x1="82" y1="46" x2="158" y2="46" class="st" stroke="#b9ad9c" stroke-width="1.6"/>
+          <line x1="82" y1="58" x2="140" y2="58" class="st" stroke="#b9ad9c" stroke-width="1.6"/>
+          <text x="55" y="20" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">標籤(name+description,永遠看得到)</text>
+        </g>
+      </svg>
+    </div>
 
     <div class="row" id="tierRow">
       <div class="node" data-key="metadata">
@@ -305,10 +353,10 @@ render_with_liquid: false
     }
   };
   const panelA = document.getElementById('panelA');
-  const nodesA = document.querySelectorAll('#tierRow .node');
+  const allA = [...document.querySelectorAll('#tierRow .node'), ...document.querySelectorAll('#manualScene .zone')];
   function renderA(key){
     const d = TIER[key];
-    nodesA.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    allA.forEach(n => n.classList.toggle('active', n.dataset.key === key));
     panelA.innerHTML = `
       <div class="ph">${d.tag}</div>
       <h2>${d.title}</h2>
@@ -317,7 +365,7 @@ render_with_liquid: false
     `;
     fadeIn(panelA);
   }
-  nodesA.forEach(n => n.addEventListener('click', () => renderA(n.dataset.key)));
+  allA.forEach(n => n.addEventListener('click', () => renderA(n.dataset.key)));
 
   const LINEAGE = {
     ux: {
