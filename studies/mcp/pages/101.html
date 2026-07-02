@@ -142,50 +142,60 @@ render_with_liquid: false
     <div class="sec-kicker">圖 A · 設計與使用</div>
     <div class="sec-title">三個角色,一條專屬線</div>
     <p class="sec-sub">
-      把它想成「插座」:Host 是你的房子,每個 Server 是一個電器,Client 是那條專屬的電源線——
-      一個電器一條線,不是所有電器共用一條延長線。點下面場景裡的房子、電線、電器,看對應哪個角色。
+      把它想成「你 + 秘書 + 廠商專線」:Host 是你正在指揮、正在對話的秘書(不是被動的容器);
+      Client 是秘書自己保管的專屬電話線,一個廠商一條,不是打去總機共用一條;Server 是外部廠商——
+      可能在隔壁棟,也可能在很遠的地方,反正不歸你管,秘書只能透過那條專線請它辦事。點下面場景裡的
+      你、秘書、電話線、廠商,看對應哪個角色。
     </p>
 
     <div style="margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px">
       <svg id="houseScene" viewBox="0 0 700 300" style="width:100%;height:auto;display:block">
-        <!-- Host: 房子 -->
+        <!-- 你:發指令的人,純裝飾,不是可點的角色 -->
+        <g style="color:#8a7d6e">
+          <circle cx="45" cy="150" r="12" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <path d="M 30 200 L 30 178 Q 30 168 45 168 Q 60 168 60 178 L 60 200 Z" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <path d="M 63 158 L 82 158" fill="none" stroke="#b9ad9c" stroke-width="1.6" stroke-dasharray="3 3"/>
+          <path d="M 76 153 L 82 158 L 76 163" fill="none" stroke="#b9ad9c" stroke-width="1.6"/>
+          <text x="18" y="222" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">你(下指令)</text>
+        </g>
+        <!-- Host:秘書辦公桌 -->
         <g class="zone" data-key="host" style="color:#9a6b2e">
-          <polygon points="70,150 150,90 230,150" fill="none" class="st" stroke="#b9ad9c" stroke-width="2.5"/>
-          <rect x="85" y="150" width="130" height="100" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.5"/>
-          <rect x="135" y="195" width="30" height="55" fill="none" class="st" stroke="#b9ad9c" stroke-width="2"/>
-          <circle cx="157" cy="222" r="2" class="stf" fill="#b9ad9c"/>
-          <rect x="95" y="165" width="24" height="24" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.8"/>
-          <line x1="107" y1="165" x2="107" y2="189" class="st" stroke="#b9ad9c" stroke-width="1.2"/>
-          <line x1="95" y1="177" x2="119" y2="177" class="st" stroke="#b9ad9c" stroke-width="1.2"/>
-          <text x="90" y="140" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">HOST</text>
-          <!-- 三個插座,牆上突出的小點 -->
+          <rect x="90" y="195" width="140" height="12" fill="none" class="st" stroke="#b9ad9c" stroke-width="2.2"/>
+          <rect x="98" y="207" width="10" height="38" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.8"/>
+          <rect x="212" y="207" width="10" height="38" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.8"/>
+          <circle cx="150" cy="150" r="13" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.2"/>
+          <path d="M 133 195 L 133 176 Q 133 164 150 164 Q 167 164 167 176 L 167 195 Z" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.2"/>
+          <rect x="188" y="176" width="26" height="19" rx="2" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="90" y="188" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">HOST · 秘書</text>
+          <!-- 三個電話線插孔 -->
           <circle cx="215" cy="175" r="4" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="1.8"/>
           <circle cx="215" cy="205" r="4" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="1.8"/>
           <circle cx="215" cy="235" r="4" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="1.8"/>
         </g>
-        <!-- 三條專屬電源線(Client)—— 各自獨立,不共用一條延長線 -->
+        <!-- 三條專屬電話線(Client)—— 各自獨立,不共用一條總機線 -->
         <path class="zone cord" data-key="client" d="M 215 175 Q 320 130 430 110" fill="none" style="color:#b04a6a" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
         <path class="zone cord" data-key="client" d="M 215 205 Q 320 205 430 195" fill="none" style="color:#b04a6a" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
         <path class="zone cord" data-key="client" d="M 215 235 Q 320 275 430 275" fill="none" style="color:#b04a6a" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-        <!-- 三個電器(Server)—— 燈泡 / 風扇 / 遠端伺服器機架 -->
+        <!-- 三個外部廠商(Server)—— 近的辦公室 / 遠一點的辦公室 / 遠端小辦公室 -->
         <g class="zone" data-key="server" style="color:#0c7a59">
-          <circle cx="460" cy="95" r="20" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.2"/>
-          <path d="M 452 100 L 468 100 M 455 104 L 465 104 M 458 108 L 462 108" class="st" stroke="#b9ad9c" stroke-width="1.6" stroke-linecap="round"/>
-          <text x="490" y="99" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">SERVER(本機)</text>
+          <rect x="435" y="70" width="55" height="45" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.2"/>
+          <rect x="445" y="98" width="12" height="17" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.4"/>
+          <rect x="463" y="80" width="9" height="9" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.2"/>
+          <rect x="476" y="80" width="9" height="9" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.2"/>
+          <text x="498" y="99" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">廠商(近)</text>
         </g>
         <g class="zone" data-key="server" style="color:#0c7a59">
-          <circle cx="460" cy="195" r="20" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.2"/>
-          <circle cx="460" cy="195" r="4" class="stf" fill="#b9ad9c"/>
-          <path d="M 460 195 L 460 181 M 460 195 L 471 188 M 460 195 L 471 202 M 460 195 L 449 202 M 460 195 L 449 188"
-                class="st" stroke="#b9ad9c" stroke-width="1.6" stroke-linecap="round"/>
-          <text x="490" y="199" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">SERVER(本機)</text>
+          <rect x="435" y="172" width="55" height="45" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.2"/>
+          <rect x="445" y="200" width="12" height="17" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.4"/>
+          <rect x="463" y="182" width="9" height="9" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.2"/>
+          <rect x="476" y="182" width="9" height="9" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.2"/>
+          <text x="498" y="201" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">廠商(遠一點)</text>
         </g>
         <g class="zone" data-key="server" style="color:#0c7a59">
-          <rect x="440" y="255" width="40" height="40" rx="4" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.2"/>
-          <circle cx="450" cy="264" r="2" class="stf" fill="#b9ad9c"/>
-          <line x1="446" y1="275" x2="474" y2="275" class="st" stroke="#b9ad9c" stroke-width="1.4"/>
-          <line x1="446" y1="283" x2="474" y2="283" class="st" stroke="#b9ad9c" stroke-width="1.4"/>
-          <text x="488" y="279" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">SERVER(遠端)</text>
+          <rect x="450" y="262" width="35" height="28" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2"/>
+          <rect x="457" y="280" width="8" height="10" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.2"/>
+          <rect x="470" y="268" width="7" height="7" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.1"/>
+          <text x="490" y="280" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">廠商(遠端,較小較模糊)</text>
         </g>
       </svg>
     </div>
@@ -450,19 +460,19 @@ render_with_liquid: false
 <script>
   const ROLE = {
     host: {
-      title: 'Host', tag: 'Role · Host',
-      def: '使用者實際在用的 AI 應用本體——聊天介面、IDE 助手、CLI 工具。它裡面可以同時開好幾個 Client。',
-      example: 'Claude Desktop、Claude Code 本身就是一個 Host。'
+      title: 'Host', tag: 'Role · Host · 你的秘書',
+      def: '使用者實際在用的 AI 應用本體——聊天介面、IDE 助手、CLI 工具。是你正在指揮、正在對話的那個角色,不是被動的容器——它裡面可以同時維護好幾條對外的專線(Client)。',
+      example: 'Claude Desktop、Claude Code 本身就是一個 Host——你交代事情的對象一直是它,它才去找各個廠商辦事。'
     },
     client: {
-      title: 'Client', tag: 'Role · Client',
-      def: 'Host 內部,每接一個 Server 就配一個的連線物件——負責跟「那一個」Server 講 MCP 的語言。',
-      example: 'Host 接了檔案系統跟資料庫兩個 Server,裡面就會有兩個各自獨立的 Client。'
+      title: 'Client', tag: 'Role · Client · 專屬電話線',
+      def: '秘書自己保管的私人電話簿——每接洽一個廠商,就開一條只跟那個廠商講話的專線,不是打去總機、由總機轉接給所有廠商共用。',
+      example: '秘書同時跟檔案系統、資料庫兩個廠商有業務往來,私人電話簿裡就有兩條各自獨立的專線,不會混在一起。'
     },
     server: {
-      title: 'Server', tag: 'Role · Server',
-      def: '真正擁有能力的一端,可以是本機程序(用 stdio 傳訊息),也可以是遠端服務(用 Streamable HTTP)。',
-      example: '一個包了公司內部 API 的 MCP server,讓任何裝了對應 Client 的 Host 都能用。'
+      title: 'Server', tag: 'Role · Server · 外部廠商',
+      def: '真正擁有能力、但不歸你管的外部單位——可以是隔壁棟的本機服務(stdio),也可以是遠在另一座城市的遠端服務(Streamable HTTP)。你不擁有它,只是透過專線請它辦事。',
+      example: '一間把公司內部 API 包成廠商窗口的 MCP server,讓任何有這條專線的秘書(Host)都能去下單。'
     }
   };
 
