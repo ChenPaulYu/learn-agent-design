@@ -47,18 +47,17 @@
   <div class="wrap">
     <header>
       <div class="kicker">interactive pages · 互動教學頁</div>
-      <h1>{{ site.title }}</h1>
+      <h1>{{ page.title | default: site.title }}</h1>
       <div class="tagline">{{ content }}</div>
     </header>
 
-    {% assign study_pages = site.pages | where_exp: "p", "p.path contains 'studies/'" %}
-    {% assign grouped = study_pages | group_by_exp: "p", "p.path | split: '/' | slice: 0, 2 | join: '/'" %}
-    {% for group in grouped %}
-      {% assign topic = group.name | split: '/' | last %}
+    {% if page.topic %}
+      <!-- Topic-index page (e.g. /mcp/): scope to just this topic's own pages. -->
+      {% assign topic_path = 'studies/' | append: page.topic | append: '/' %}
+      {% assign scoped_pages = site.pages | where_exp: "p", "p.path contains topic_path and p.path != page.path" %}
       <section class="topic">
-        <div class="topic-name">{{ topic }}</div>
         <div class="cards">
-          {% assign sorted = group.items | sort: "date" | reverse %}
+          {% assign sorted = scoped_pages | sort: "date" | reverse %}
           {% for p in sorted %}
             <a class="card" href="{{ p.url | relative_url }}">
               <div class="card-title">{{ p.title | default: p.name }}
@@ -69,7 +68,28 @@
           {% endfor %}
         </div>
       </section>
-    {% endfor %}
+    {% else %}
+      <!-- Homepage: every topic, grouped. -->
+      {% assign study_pages = site.pages | where_exp: "p", "p.path contains 'studies/'" %}
+      {% assign grouped = study_pages | group_by_exp: "p", "p.path | split: '/' | slice: 0, 2 | join: '/'" %}
+      {% for group in grouped %}
+        {% assign topic = group.name | split: '/' | last %}
+        <section class="topic">
+          <div class="topic-name">{{ topic }}</div>
+          <div class="cards">
+            {% assign sorted = group.items | sort: "date" | reverse %}
+            {% for p in sorted %}
+              <a class="card" href="{{ p.url | relative_url }}">
+                <div class="card-title">{{ p.title | default: p.name }}
+                  <span class="date">{{ p.date | date: "%Y-%m-%d" }}</span>
+                </div>
+                {% if p.summary %}<div class="summary">{{ p.summary }}</div>{% endif %}
+              </a>
+            {% endfor %}
+          </div>
+        </section>
+      {% endfor %}
+    {% endif %}
 
     <footer>
       <span>內容以 repo 內 studies/*/docs/ 的筆記為真相來源</span>
