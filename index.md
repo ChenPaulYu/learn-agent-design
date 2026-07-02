@@ -1,8 +1,6 @@
 ---
-title: learn-agent-design
+title: Learn Agent Design
 ---
 
-Paul 個人學習 agent design 的地方。這個站只放各主題的**互動教學頁**——內容衍生自 repo 裡的
-markdown 筆記(真相來源),但筆記本身不對外呈現。
-
-點上面的導覽看各主題的互動頁。
+學習 agent design 的地方——讀懂一個概念、蒸餾成筆記,再把它做成**可以點的互動教學頁**。
+這個站只放互動頁;筆記本身留在 repo 裡當真相來源,不對外呈現。
