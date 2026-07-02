@@ -28,6 +28,8 @@ tags:
 - [pages/101](pages/101.html) —
   互動版 MCP 101(可長期回看的教學頁,內容以 docs/ 為真相來源):圖 A 架構、圖 B 脈絡、
   圖 C 傳輸協定怎麼選,點卡片看細節
+- [pages/security](pages/security.html) —
+  互動版安全模型:圖 A 責任分工、圖 B Lethal Trifecta(Venn 圖)、圖 C 四個具體攻擊
 - [code/](code/) — 官方 Python SDK 寫的最小 server(一個 tool + 一個 resource + 一個 prompt)
   + 一個 client 跑過一輪 `list_tools` / `call_tool` / `read_resource` / `get_prompt`
 

