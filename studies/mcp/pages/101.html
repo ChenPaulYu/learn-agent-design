@@ -462,7 +462,8 @@ render_with_liquid: false
     host: {
       title: 'Host', tag: 'Role · Host · 你的秘書',
       def: '使用者實際在用的 AI 應用本體——聊天介面、IDE 助手、CLI 工具。是你正在指揮、正在對話的那個角色,不是被動的容器——它裡面可以同時維護好幾條對外的專線(Client)。',
-      example: 'Claude Desktop、Claude Code 本身就是一個 Host——你交代事情的對象一直是它,它才去找各個廠商辦事。'
+      example: 'Claude Desktop、Claude Code 本身就是一個 Host——你交代事情的對象一直是它,它才去找各個廠商辦事。',
+      note: '秘書 ≠ 完全等於「agent」——秘書是「agent 本人」+「它拿來對外聯繫的那套系統」的合體。真正做判斷的部分(要打給哪個廠商、要不要多想幾種辦法)才是嚴格意義的 agent;私人電話簿(Client)這套基礎設施是 agent 拿來用的工具層。對照 agent-anatomy 的五層框架:agent 本人 = Pattern + Computation Model + Runtime 三層疊起來;Host = 那個 agent,再加上它接觸外部世界的 Tool 層機制(Client 這套電話系統)。'
     },
     client: {
       title: 'Client', tag: 'Role · Client · 專屬電話線',
