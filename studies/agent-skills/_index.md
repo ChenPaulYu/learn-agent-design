@@ -19,7 +19,8 @@ tags:
   年 Nielsen 的 UX 原則、沒有 Skills 之前的具體天花板(~10 個能力)、從哪裡來(2025-10 推出 →
   2025-12 開放成跨平台標準)、三個使用入口(claude.ai/API/Claude Code)、安全稽核(企業版
   風險分級)、跟 Tool Search Tool 的邊界(順序跟直覺相反,Skills 反而先推出)、跟 Subagent/Hook
-  的邊界(不同源,三條獨立判斷軸)
+  的邊界(不同源,三條獨立判斷軸)、跟 Workflow/MCP 的關係(推理整理,非官方比較——內部組織
+  vs 碰外部世界,垂直不是同一排)
 - [pages/101](pages/101.html) —
   互動版 Agent Skills 101:圖 A 三層載入、圖 B 血緣(UX 1995 → 天花板 → 推出 → 開放標準)、
   圖 C 邊界(跟 Tool Search Tool、跟 Subagent/Hook)
