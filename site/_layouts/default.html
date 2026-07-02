@@ -23,10 +23,15 @@
     .tagline p{margin-top:6px}
     .tagline strong{color:var(--ink)}
 
+    .home-link{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;
+      color:var(--muted);text-decoration:none;margin-bottom:18px}
+    .home-link:hover{color:var(--accent)}
+
     .topic{margin-top:44px}
     .topic-name{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;
       text-transform:uppercase;display:flex;align-items:center;gap:10px}
     .topic-name::after{content:"";flex:1;height:1px;background:var(--line)}
+    .group-note{margin-top:6px;font-size:12.5px;color:var(--muted);max-width:66ch}
     .cards{margin-top:14px;display:grid;grid-template-columns:1fr;gap:12px}
     a.card{display:block;background:var(--panel);border:1px solid var(--line);border-radius:14px;
       box-shadow:var(--shadow);padding:18px 20px;text-decoration:none;color:var(--ink);
@@ -45,6 +50,9 @@
 </head>
 <body>
   <div class="wrap">
+    {% if page.topic %}
+      <a class="home-link" href="{{ '/' | relative_url }}">← 回首頁</a>
+    {% endif %}
     <header>
       <div class="kicker">interactive pages · 互動教學頁</div>
       <h1>{{ page.title | default: site.title }}</h1>
@@ -55,19 +63,48 @@
       <!-- Topic-index page (e.g. /mcp/): scope to just this topic's own pages. -->
       {% assign topic_path = 'studies/' | append: page.topic | append: '/' %}
       {% assign scoped_pages = site.pages | where_exp: "p", "p.path contains topic_path and p.path != page.path" %}
-      <section class="topic">
-        <div class="cards">
-          {% assign sorted = scoped_pages | sort: "date" | reverse %}
-          {% for p in sorted %}
-            <a class="card" href="{{ p.url | relative_url }}">
-              <div class="card-title">{{ p.title | default: p.name }}
-                <span class="date">{{ p.date | date: "%Y-%m-%d" }}</span>
-              </div>
-              {% if p.summary %}<div class="summary">{{ p.summary }}</div>{% endif %}
-            </a>
-          {% endfor %}
-        </div>
-      </section>
+
+      {% if page.groups %}
+        <!-- Curated reading order, defined in this page's frontmatter (groups: [{label, note, pages}]). -->
+        {% for group in page.groups %}
+          <section class="topic">
+            <div class="topic-name">{{ group.label }}</div>
+            {% if group.note %}<div class="group-note">{{ group.note }}</div>{% endif %}
+            <div class="cards">
+              {% for basename in group.pages %}
+                {% assign p = nil %}
+                {% for sp in scoped_pages %}
+                  {% assign sp_basename = sp.name | remove: '.html' | remove: '.md' %}
+                  {% if sp_basename == basename %}{% assign p = sp %}{% endif %}
+                {% endfor %}
+                {% if p %}
+                  <a class="card" href="{{ p.url | relative_url }}">
+                    <div class="card-title">{{ p.title | default: p.name }}
+                      <span class="date">{{ p.date | date: "%Y-%m-%d" }}</span>
+                    </div>
+                    {% if p.summary %}<div class="summary">{{ p.summary }}</div>{% endif %}
+                  </a>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </section>
+        {% endfor %}
+      {% else %}
+        <!-- No curated order defined yet — fall back to a flat, date-sorted list. -->
+        <section class="topic">
+          <div class="cards">
+            {% assign sorted = scoped_pages | sort: "date" | reverse %}
+            {% for p in sorted %}
+              <a class="card" href="{{ p.url | relative_url }}">
+                <div class="card-title">{{ p.title | default: p.name }}
+                  <span class="date">{{ p.date | date: "%Y-%m-%d" }}</span>
+                </div>
+                {% if p.summary %}<div class="summary">{{ p.summary }}</div>{% endif %}
+              </a>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
     {% else %}
       <!-- Homepage: every topic, grouped. -->
       {% assign study_pages = site.pages | where_exp: "p", "p.path contains 'studies/'" %}
