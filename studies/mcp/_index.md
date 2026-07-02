@@ -55,6 +55,9 @@ tags:
 - [pages/ecosystem](pages/ecosystem.html) —
   互動版生態現況:圖 A 採用時間線、圖 B Platinum 會員(競爭對手同桌)、圖 C 三個 registry
   數字打架、圖 D 信任缺口切換
+- [pages/inspector](pages/inspector.html) —
+  互動版 MCP Inspector:圖 A 瀏覽器/Proxy/Server 架構場景(Proxy 雙重角色)、圖 B 四個分頁
+  對應哪些 primitive、圖 C 三層安全機制
 - [code/](code/) — 官方 Python SDK 寫的最小 server(一個 tool + 一個 resource + 一個 prompt)
   + 一個 client 跑過一輪 `list_tools` / `call_tool` / `read_resource` / `get_prompt`
 

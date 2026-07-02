@@ -1,0 +1,294 @@
+---
+title: MCP Inspector — 互動圖解
+summary: 三張互動圖:為什麼拆成 Client + Proxy 兩個元件、四個分頁對應哪些 primitive、預設的三層安全機制(localhost-only、session token、防 DNS rebinding)。
+date: 2026-07-02
+tags:
+  - mcp
+  - tooling
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — MCP Inspector:三張互動圖解。可長期回看的教學頁(pages/ genre,發布於
+  /mcp/inspector/),不是 disposable mockup。101 之外的「進階」主題,寫的是官方除錯工具本身,
+  不是協定概念。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-02-mcp-inspector.md
+  Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(架構)— 瀏覽器 UI → Proxy(身兼 client + HTTP server 雙重角色)→ 你的 server,
+      點三個區塊看細節,含三種指到 server 的範例指令。
+    圖 B(四個分頁)— Tools/Resources/Prompts/Notifications,點卡片看對應哪個 primitive、
+      為什麼沒有 Sampling/Elicitation/Roots 的分頁。
+    圖 C(安全機制)— port 綁定/session token/Origin header 防 DNS rebinding,三張卡片。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP Inspector — 互動圖解</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:180px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:100px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .snippet{margin-top:8px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;
+    background:var(--line-soft);border-left-color:var(--muted);padding:11px 14px;border-radius:0 10px 10px 0;
+    border-left:3px solid var(--muted)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}
+  .zone{cursor:pointer}
+  .zone .st{transition:stroke .15s ease}
+  .zone .stf{transition:fill .15s ease}
+  .zone:hover .st,.zone.active .st{stroke:currentColor}
+  .zone:hover .stf,.zone.active .stf{fill:currentColor}
+  .zone.active .fillable{fill:color-mix(in srgb,currentColor 8%,var(--panel))}
+  .zone.active text{fill:currentColor}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Interactive · MCP Inspector</div>
+    <h1>MCP Inspector — 官方自己的除錯/測試工具</h1>
+    <p class="tagline">
+      101 之外的進階主題,寫的是工具本身不是協定概念。圖 A 是它為什麼拆成兩個元件,圖 B 是四個
+      分頁對應哪些 primitive,圖 C 是預設打開的三層安全機制。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 架構 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 為什麼拆成兩個元件</div>
+    <div class="sec-title">瀏覽器沒辦法自己開一個 stdio 子行程</div>
+    <p class="sec-sub">
+      點場景裡的瀏覽器、Proxy、你的 Server,看每一塊在整條線裡扮演什麼角色——Proxy 是整張圖的
+      關鍵,它身兼兩個身分。
+    </p>
+
+    <div class="scene-box">
+      <svg id="archScene" viewBox="0 0 820 200" style="width:100%;height:auto;display:block">
+        <!-- 瀏覽器(MCPI) -->
+        <g class="zone" data-key="browser" style="color:#2f6f9e">
+          <rect x="20" y="40" width="180" height="120" rx="12" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <rect x="36" y="56" width="148" height="18" rx="3" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.5"/>
+          <circle cx="46" cy="65" r="3" class="stf" fill="#b9ad9c"/>
+          <rect x="36" y="86" width="60" height="50" rx="4" class="st" fill="none" stroke="#b9ad9c" stroke-width="1.5"/>
+          <rect x="104" y="86" width="60" height="50" rx="4" class="st" fill="none" stroke="#b9ad9c" stroke-width="1.5"/>
+          <text x="45" y="180" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">瀏覽器(MCPI)</text>
+        </g>
+        <path d="M 205 100 L 300 100" class="st" stroke="#d8d0c0" stroke-width="2" marker-end="url(#arrowI)"/>
+        <text x="215" y="90" font-size="9.5" fill="#8a7d6e" style="font-family:var(--mono)">localhost:6274</text>
+        <!-- Proxy(MCPP) 雙重角色 -->
+        <g class="zone" data-key="proxy" style="color:#9a6b2e">
+          <rect x="310" y="30" width="200" height="140" rx="12" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <rect x="326" y="46" width="168" height="46" rx="6" class="st" fill="none" stroke="#b9ad9c" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <text x="334" y="73" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">HTTP server(對瀏覽器)</text>
+          <rect x="326" y="104" width="168" height="46" rx="6" class="st" fill="none" stroke="#b9ad9c" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <text x="345" y="131" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">client(對 server)</text>
+          <text x="352" y="185" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">Proxy(MCPP)</text>
+        </g>
+        <path d="M 515 100 L 610 100" class="st" stroke="#d8d0c0" stroke-width="2" marker-end="url(#arrowI)"/>
+        <text x="518" y="90" font-size="9.5" fill="#8a7d6e" style="font-family:var(--mono)">localhost:6277</text>
+        <!-- 你的 Server -->
+        <g class="zone" data-key="server" style="color:#0c7a59">
+          <rect x="620" y="40" width="180" height="120" rx="12" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <circle cx="710" cy="90" r="20" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <path d="M 700 90 L 720 90 M 710 80 L 710 100" class="st" stroke="#b9ad9c" stroke-width="2" stroke-linecap="round"/>
+          <text x="640" y="180" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">你的 MCP Server</text>
+        </g>
+        <defs>
+          <marker id="arrowI" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6" fill="none" stroke="#d8d0c0" stroke-width="1.5"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="panel" id="panelA">
+      <p class="placeholder">↑ 點場景裡任一區塊看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: 四個分頁 ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 四個分頁對上哪些 primitive</div>
+    <div class="sec-title">Tools / Resources / Prompts / Notifications</div>
+    <p class="sec-sub">
+      三個 server 端 primitive 各一個分頁,加一個看 Logging 通知的地方——沒有 Sampling/
+      Elicitation/Roots 的分頁,點卡片看為什麼。
+    </p>
+
+    <div class="chips" id="tabChips">
+      <div class="chip" data-key="tools"><h4>Tools tab</h4><div class="sub">列 schema、帶輸入測試呼叫</div></div>
+      <div class="chip" data-key="resources"><h4>Resources tab</h4><div class="sub">看內容、測試訂閱</div></div>
+      <div class="chip" data-key="prompts"><h4>Prompts tab</h4><div class="sub">看參數、預覽組出的訊息</div></div>
+      <div class="chip" data-key="notifications"><h4>Notifications pane</h4><div class="sub">匯總所有 log/通知</div></div>
+      <div class="chip" data-key="missing"><h4>沒有的三個</h4><div class="sub">Sampling/Elicitation/Roots?</div></div>
+    </div>
+
+    <div class="panel" id="panelB">
+      <p class="placeholder">↑ 點上面任一張卡片看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: 安全機制 ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 預設打開的三層安全機制</div>
+    <div class="sec-title">它自己也是一個能執行工具呼叫的東西,官方沒放寬警惕</div>
+    <p class="sec-sub">
+      跟安全模型筆記裡「本機 server 的風險」同一個精神——即使只是開發工具,預設一樣要防。
+    </p>
+
+    <div class="chips" id="secChips">
+      <div class="chip" data-key="localhost"><h4>只綁 Localhost</h4><div class="sub">UI 6274,Proxy 6277</div></div>
+      <div class="chip" data-key="token"><h4>Session Token</h4><div class="sub">啟動時隨機生成,印在終端機</div></div>
+      <div class="chip" data-key="origin"><h4>Origin Header 檢查</h4><div class="sub">防 DNS Rebinding</div></div>
+    </div>
+
+    <div class="panel" id="panelC">
+      <p class="placeholder">↑ 點上面任一張卡片看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">架構跟安全機制查證自 Inspector 自己的 repo,不是主規格倉庫——兩個不同來源。</p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">MCP 官方文件</div>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/tools/inspector.mdx">inspector.mdx — 官方定義、四個分頁的 Feature overview、CLI 指令範例</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">Inspector 自己的 repo</div>
+        <a href="https://github.com/modelcontextprotocol/inspector">modelcontextprotocol/inspector — README 裡的 MCPI/MCPP 架構、port 配置、安全機制</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/2026-07-02-mcp-inspector.md 為真相來源(經 context7 + WebSearch 查證)·
+    最後同步 2026-07-02
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  const ARCH = {
+    browser: {
+      title: '瀏覽器(MCPI)', tag: 'React 網頁 UI',
+      def: '你實際看到、點來點去的介面——Tools/Resources/Prompts 分頁、Notifications 面板全部畫在這裡。它自己完全不會直接連 MCP server。',
+      example: '瀏覽器 JavaScript 沒有權限直接 spawn 一個 stdio 子行程——這正是為什麼需要下面 Proxy 這一層代打的原因。'
+    },
+    proxy: {
+      title: 'Proxy(MCPP)', tag: 'Node.js server · 身兼兩個角色',
+      def: '對瀏覽器來說它是 HTTP server(把網頁 UI 端出來);對你的 MCP server 來說它是真正的 client(送 JSON-RPC、維護連線)。',
+      example: '不管你的 server 用 stdio、SSE、還是 Streamable HTTP,Proxy 都負責把它轉譯成瀏覽器聽得懂的統一介面——同一份 UI,不用管 transport 是哪一種。'
+    },
+    server: {
+      title: '你的 MCP Server', tag: '被測試的對象',
+      def: '三種常見指法(範例指令):',
+      example: `# 本機開發中(Node.js)\nnpx @modelcontextprotocol/inspector node path/to/server/index.js\n\n# 已發布在 npm 上\nnpx -y @modelcontextprotocol/inspector npx @modelcontextprotocol/server-filesystem /Users/you/Desktop\n\n# 已發布在 PyPI 上\nnpx @modelcontextprotocol/inspector uvx mcp-server-git --repository ~/code/repo.git`
+    }
+  };
+  const panelA = document.getElementById('panelA');
+  const zonesA = document.querySelectorAll('#archScene .zone');
+  function renderArch(key){
+    const d = ARCH[key];
+    zonesA.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelA.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="ex">${d.def}</div>
+      ${d.example.includes('npx') ? `<div class="snippet">${d.example}</div>` : `<div class="ex" style="margin-top:8px;border-left-color:var(--muted);background:var(--line-soft)">${d.example}</div>`}
+    `;
+    fadeIn(panelA);
+  }
+  zonesA.forEach(n => n.addEventListener('click', () => renderArch(n.dataset.key)));
+
+  const TABS = {
+    tools: { title: 'Tools tab', tag: 'Server 擁有 · Tools primitive', def: '列出所有工具、看 schema 跟描述,帶自訂輸入去測試呼叫,看執行結果——寫 server 的人最常用來確認「我的工具參數設計得對不對」的地方。' },
+    resources: { title: 'Resources tab', tag: 'Server 擁有 · Resources primitive', def: '列出所有 resource、看 metadata、檢視內容,也能測試訂閱——101 筆記補過的 resources/subscribe 機制,這裡就是拿來實測的地方。' },
+    prompts: { title: 'Prompts tab', tag: 'Server 擁有 · Prompts primitive', def: '列出 prompt template、看參數、測試、預覽組出來的訊息長什麼樣——在真的接上 AI host 之前,先確認 prompt 填完參數後的樣子是不是你想要的。' },
+    notifications: { title: 'Notifications pane', tag: '延伸能力 · Logging', def: '把 server 送過來的所有 log/通知匯總在一個地方看——對應 101 筆記補過的 Logging capability(notifications/message、8 級 syslog 嚴重度)。' },
+    missing: { title: '為什麼沒有 Sampling/Elicitation/Roots 分頁', tag: '方向相反', def: 'Tools/Resources/Prompts/Logging 都是「server 提供、client 使用」的方向,Inspector 本身扮演 client 角色,天生就能測。但 Sampling/Elicitation/Roots 是反過來——server 找 client 要東西(要模型生成、要使用者輸入、要檔案路徑)。Inspector 已經站在 client 這一端,不需要額外分頁去模擬「被 server 呼叫」這件事,它本來就在被呼叫的那一側。' }
+  };
+  const panelB = document.getElementById('panelB');
+  const chipsB = document.querySelectorAll('#tabChips .chip');
+  chipsB.forEach(n => n.addEventListener('click', () => {
+    chipsB.forEach(c => c.classList.toggle('active', c === n));
+    const d = TABS[n.dataset.key];
+    panelB.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelB);
+  }));
+
+  const SEC = {
+    localhost: { title: '只綁 Localhost', tag: 'UI :6274 · Proxy :6277', def: 'Inspector 開起來會佔兩個 port,兩個都預設只綁定 localhost——不是隨便誰在同一個網路上都連得到,外部裝置連不進來。' },
+    token: { title: 'Session Token', tag: '啟動時隨機生成', def: 'Proxy server 預設要求身分驗證:啟動時生成一個隨機的 session token,印在終端機裡——沒有這個 token,就算連得到 port 也用不了。' },
+    origin: { title: 'Origin Header 檢查', tag: '防 DNS Rebinding', def: '驗證進來的請求的 Origin header,預設只准來自 CLIENT_PORT(預設 6274)的請求通過——擋掉惡意網頁想偷偷從瀏覽器裡打你本機的 Inspector proxy 這種攻擊。' }
+  };
+  const panelC = document.getElementById('panelC');
+  const chipsC = document.querySelectorAll('#secChips .chip');
+  chipsC.forEach(n => n.addEventListener('click', () => {
+    chipsC.forEach(c => c.classList.toggle('active', c === n));
+    const d = SEC[n.dataset.key];
+    panelC.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelC);
+  }));
+</script>
+</body>
+</html>
