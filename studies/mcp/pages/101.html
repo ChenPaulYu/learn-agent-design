@@ -1,6 +1,6 @@
 ---
 title: MCP 101 — 互動圖解
-summary: 四張互動圖 + 參考資料:架構與六個 primitive(加上 Logging/Completion)、從 M×N 問題到 LSP 的血緣脈絡(加上跟 A2A 的邊界)、線路層為什麼選 JSON-RPC、長時間任務與斷線續傳。
+summary: 四張互動圖 + 參考資料:架構與六個 primitive(加上 Logging/Completion、五種 Content Type、Resources 訂閱)、從 M×N 問題到 LSP 的血緣脈絡(加上跟 A2A 的邊界)、線路層為什麼選 JSON-RPC、長時間任務與斷線續傳。
 date: 2026-07-02
 tags:
   - mcp
@@ -258,6 +258,20 @@ render_with_liquid: false
       </div>
     </div>
 
+    <div class="sec-sub" style="margin-top:30px">
+      前面 Tools/Resources 的範例都只示範過文字——這兩個補上「內容其實不只文字」跟「Resources
+      可以訂閱,變了會通知你」兩個常被漏掉的細節。
+    </div>
+    <div class="primitive-groups">
+      <div class="pgroup server">
+        <span class="glabel">● 內容與訂閱</span>
+        <div class="chips" id="contentChips">
+          <div class="chip" data-key="contenttypes"><h4>五種 Content Type</h4><div class="sub">不只 text,還有 image/audio/resource</div></div>
+          <div class="chip" data-key="subscribe"><h4>Resources 訂閱</h4><div class="sub">變了推通知,不用一直重複問</div></div>
+        </div>
+      </div>
+    </div>
+
     <div class="panel" id="panelA">
       <p class="placeholder">↑ 點上面任一張卡片,看它的一句話定義、例子,跟一段最小 JSON。</p>
     </div>
@@ -426,6 +440,8 @@ render_with_liquid: false
         <a href="https://modelcontextprotocol.io/specification/2025-11-25">Spec Overview — 「MCP takes inspiration from the Language Server Protocol」官方原句</a>
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/utilities/logging.mdx">logging.mdx — Logging capability、8 級 syslog 嚴重度</a>
         <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/utilities/completion.mdx">completion.mdx — completion/complete 請求/回應範例</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/tools.mdx">tools.mdx — 五種 content type 官方範例(text/image/audio/resource_link/resource)</a>
+        <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/resources.mdx">resources.mdx — resources/subscribe、notifications/resources/updated</a>
       </div>
       <div class="ref-group">
         <div class="ref-head">MCP 官方(transport / SEP)</div>
@@ -536,6 +552,19 @@ render_with_liquid: false
       example: '使用者在 code_review 這個 prompt 的 language 參數打了 "py",server 建議 python / pytorch / pyside。',
       analogy: '你在填一張訂購單,寫到一半,廠商幫你把接下來大概會填什麼先列出來讓你選。',
       snippet: `{"method": "completion/complete",\n "params": {"ref": {"type": "ref/prompt", "name": "code_review"},\n   "argument": {"name": "language", "value": "py"}}}`
+    },
+    contenttypes: {
+      title: '五種 Content Type', tag: 'Tools/Resources 共用 · 內容形狀',
+      def: '一個工具的回傳結果(或一份 Resource 的內容)有五種形狀:text、image、audio、resource_link(只給指標,內容要再問一次 resources/read)、resource(直接內嵌完整內容,不用再問)。',
+      example: 'resource_link 省 token(先不載入完整內容);resource 省一次來回(不用再問一次)——跟太多工具問題那頁「要不要延後載入」是同一個取捨,只是套用在單次結果上。',
+      note: '還有 annotations.audience(這段內容是給使用者看還是給模型看)、annotations.priority(0~1 的重要性分數)——是給 host 端做呈現決策的 hint,不是給 LLM 推理用的資訊。',
+      snippet: `{"type": "resource_link", "uri": "file:///project/src/main.rs",\n "name": "main.rs", "mimeType": "text/x-rust"}`
+    },
+    subscribe: {
+      title: 'Resources 訂閱', tag: 'Resources 擁有 · subscribe capability',
+      def: 'Resources 除了讀一次拿一份快照,還可以訂閱——變了會主動通知,不用自己一直重複問。要 server 宣告 `resources: {subscribe: true}` 才能用。',
+      example: '訂閱後只會收到「這個 uri 變了」的通知(不含新內容),要自己再發一次 resources/read 才拿得到新版本——通知只是「該去看一下了」的信號,不會自動把資料塞進 context。',
+      snippet: `{"method": "resources/subscribe", "params": {"uri": "file:///project/src/main.rs"}}\n// ...之後...\n{"method": "notifications/resources/updated", "params": {"uri": "file:///project/src/main.rs"}}`
     }
   };
 

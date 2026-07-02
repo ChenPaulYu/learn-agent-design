@@ -114,6 +114,55 @@ template 上:
 多參數的 prompt 可以在 `context.arguments` 帶前面幾個參數已經填的值,讓自動完成有上下文可以參考
 (見 [`completion.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/utilities/completion.mdx))。
 
+## 內容不只是文字——五種 content type
+
+前面 Tools/Resources 的範例都只示範過文字,但一個工具的回傳結果(或一份 Resource 的內容)其實
+有五種形狀,不是只有 `text`:
+
+```json
+{"type": "text", "text": "Tool result text"}
+{"type": "image", "data": "base64-encoded-data", "mimeType": "image/png"}
+{"type": "audio", "data": "base64-encoded-audio-data", "mimeType": "audio/wav"}
+{"type": "resource_link", "uri": "file:///project/src/main.rs", "name": "main.rs", "mimeType": "text/x-rust"}
+{"type": "resource", "resource": {"uri": "file:///project/src/main.rs", "mimeType": "text/x-rust",
+  "text": "fn main() {\n    println!(\"Hello world!\");\n}"}}
+```
+
+（見 [`server/tools.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/tools.mdx)）
+
+`resource_link` 跟 `resource` 這兩個容易搞混,差在**要不要把內容真的塞進這次的回應裡**:
+`resource_link` 只給一個指標(uri + 描述),真正的內容要另外發一次 `resources/read` 才拿到;
+`resource` 是直接把整份內容(這裡是 `text` 欄位)內嵌在回應裡,不用再問一次。前者省 token、
+後者省一次來回——跟前面「太多工具問題」筆記裡「要不要延後載入」的取捨是同一個精神,只是套用在
+單次工具結果上,不是整份工具清單上。
+
+還有一個容易漏掉的欄位:`annotations.audience` 跟 `annotations.priority`——內容可以標明
+「這是給使用者看的還是給模型看的」(`audience: ["user"]` 或 `["user", "assistant"]`)、
+「這條內容多重要」(`priority` 0 到 1 的分數)。這是給 host 端做呈現決策用的 hint,不是給
+LLM 推理用的資訊。
+
+## Resources 可以訂閱——變了會通知你
+
+Resources 除了讀一次拿一份快照,還可以訂閱,變了會主動通知,不用自己一直重複問:
+
+```json
+// client 訂閱
+{"jsonrpc": "2.0", "id": 4, "method": "resources/subscribe", "params": {"uri": "file:///project/src/main.rs"}}
+// server 確認訂閱成功(空物件)
+{"jsonrpc": "2.0", "id": 4, "result": {}}
+// ...之後檔案真的變了,server 主動推
+{"jsonrpc": "2.0", "method": "notifications/resources/updated", "params": {"uri": "file:///project/src/main.rs"}}
+```
+
+（見 [`server/resources.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/resources.mdx)）
+
+注意 `notifications/resources/updated` 只講「這個 uri 變了」,**沒有把新內容一起送過來**——
+收到通知後,client 要自己再發一次 `resources/read` 才拿得到新版本。這個設計跟前面 Sampling/
+Elicitation 的人工審核精神一致:通知只是「該去看一下了」的信號,不會自己把資料塞進 context,
+中間還留了一個「要不要真的去讀」的決策點。不訂閱時,想用完就用 `resources/unsubscribe` 停掉,
+一樣帶 `uri`。這整套機制要 server 在 capability 宣告時開 `resources: {subscribe: true}` 才能用
+(見前面 Lifecycle 段落)。
+
 ## Lifecycle:先握手,再談能力
 
 每條 client-server 連線開始都要先做 `initialize`:
@@ -219,9 +268,13 @@ Pattern 層能力」的洞——值得之後回去對照 orthogonal-analysis 那
 - [`specification/2025-11-25/server/utilities/completion.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/utilities/completion.mdx)
   ——`completion/complete` 請求/回應範例、`context.arguments`。
 - [`specification/2025-11-25/server/tools.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/tools.mdx)
-  ——Tools capability 宣告(`listChanged`)。
+  ——Tools capability 宣告(`listChanged`)、五種 content type 的官方範例(text/image/audio/
+  resource_link/resource)。
 - [`specification/2025-11-25/server/prompts.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/prompts.mdx)
   ——Prompts capability 宣告。
+- [`specification/2025-11-25/server/resources.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/resources.mdx)
+  ——`resources/subscribe`、`resources/unsubscribe`、`notifications/resources/updated` 的
+  請求/回應範例。
 - [`specification/2025-11-25/client/sampling.mdx`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/client/sampling.mdx)
   ——`sampling/createMessage` 的請求格式範例。
 - [SEP-1577 `sampling-with-tools.md`](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/1577--sampling-with-tools.md)
