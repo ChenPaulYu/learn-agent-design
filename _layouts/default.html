@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page.title | default: site.title }}</title>
+  <style>
+    body { font: 15px/1.7 -apple-system, "PingFang TC", sans-serif; max-width: 900px;
+      margin: 0 auto; padding: 30px 24px 80px; color: #2a211c; background: #f7f4ec; }
+    nav { border: 1px solid #e7e0d2; border-radius: 10px; padding: 14px 18px; margin-bottom: 30px;
+      background: #fffdf8; }
+    nav h2 { font-size: 13px; text-transform: uppercase; color: #9a6b2e; margin: 0 0 8px; }
+    nav ul { margin: 0 0 12px; padding-left: 20px; }
+    nav li { margin: 2px 0; }
+    a { color: #9a6b2e; }
+    h1 { font-size: 24px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <h2>互動教學頁 — 新增 interactive 不用手動改這裡</h2>
+    {% assign study_pages = site.pages | where_exp: "p", "p.path contains 'studies/'" %}
+    {% assign grouped = study_pages | group_by_exp: "p", "p.path | split: '/' | slice: 0, 2 | join: '/'" %}
+    {% for group in grouped %}
+      <strong>{{ group.name }}</strong>
+      <ul>
+        {% for p in group.items %}
+          <li><a href="{{ p.url | relative_url }}">{{ p.title | default: p.name }}</a></li>
+        {% endfor %}
+      </ul>
+    {% endfor %}
+  </nav>
+
+  <h1>{{ page.title | default: site.title }}</h1>
+  {{ content }}
+</body>
+</html>

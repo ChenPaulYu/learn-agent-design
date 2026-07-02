@@ -1,0 +1,48 @@
+title: learn-agent-design
+description: >-
+  Paul's personal workspace for learning agent design — read a concept,
+  distill it into a note, then try it hands-on in code.
+lang: zh-Hant
+
+markdown: kramdown
+theme: null
+
+# studies/<topic>/mockups/**/*.html and code/ files carry no front matter,
+# so Jekyll already treats them as static assets and copies them through
+# untouched — no special config needed for that passthrough.
+
+# The site publishes ONLY studies/*/pages/ pages. Everything else in
+# the repo (markdown notes, mockups, code) is source material that stays
+# private to the repo — docs/ remain the source of truth the interactives
+# derive from, but they are not rendered into the site.
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - README.md
+  - CLAUDE.md
+  - mockups
+  - "studies/*/docs"
+  - "studies/*/code"
+  - "studies/*/mockups"
+
+# Apply the shared layout to every markdown page without editing each note's
+# front matter — the notes stay exactly as they are for any other consumer.
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
+  # URL rule: /<topic>/<content>/ — e.g. studies/mcp/pages/101.html publishes
+  # at /mcp/101/. Files stay where they live in the repo; only the public URL
+  # changes. One scope entry per topic — add a new entry when a new topic
+  # publishes its first page.
+  - scope:
+      path: "studies/mcp"
+    values:
+      permalink: "/mcp/:basename/"
+  - scope:
+      path: "studies/agent-anatomy"
+    values:
+      permalink: "/agent-anatomy/:basename/"
