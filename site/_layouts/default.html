@@ -136,26 +136,24 @@
         </section>
       {% endif %}
     {% else %}
-      <!-- Homepage: every topic, grouped. -->
-      {% assign study_pages = site.pages | where_exp: "p", "p.path contains 'studies/'" %}
-      {% assign grouped = study_pages | group_by_exp: "p", "p.path | split: '/' | slice: 0, 2 | join: '/'" %}
-      {% for group in grouped %}
-        {% assign topic = group.name | split: '/' | last %}
-        <section class="topic">
-          <div class="topic-name">{{ topic }}</div>
-          <div class="cards">
-            {% assign sorted = group.items | sort: "date" | reverse %}
-            {% for p in sorted %}
-              <a class="card" href="{{ p.url | relative_url }}">
-                <div class="card-title">{{ p.title | default: p.name }}
-                  <span class="date">{{ p.date | date: "%Y-%m-%d" }}</span>
-                </div>
-                {% if p.summary %}<div class="summary">{{ p.summary }}</div>{% endif %}
-              </a>
-            {% endfor %}
-          </div>
-        </section>
-      {% endfor %}
+      <!-- Homepage: one card per topic (not per page — a topic's own page list keeps
+           growing, the homepage shouldn't grow with it). Each topic's own pages/index.md
+           (the page carrying `topic:` in frontmatter) supplies the title + intro sentence;
+           the card links into that topic's own reading-path page. -->
+      {% assign topic_pages = site.pages | where_exp: "p", "p.topic" %}
+      <section class="topic">
+        <div class="cards">
+          {% assign sorted = topic_pages | sort: "date" | reverse %}
+          {% for p in sorted %}
+            <a class="card" href="{{ p.url | relative_url }}">
+              <div class="card-title">{{ p.title }}
+                <span class="date">{{ p.date | date: "%Y-%m-%d" }}</span>
+              </div>
+              <div class="summary">{{ p.content | strip_html | strip_newlines | strip }}</div>
+            </a>
+          {% endfor %}
+        </div>
+      </section>
     {% endif %}
 
     <footer>
