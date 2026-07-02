@@ -1,0 +1,399 @@
+---
+title: Agent 解剖學 101 — 互動圖解
+date: 2026-07-02
+tags:
+  - agent-anatomy
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Agent 解剖學 101:三張互動圖解。可長期回看的教學頁(pages/ genre,
+  發布於 /agent-anatomy/101/),不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-01-five-layer-framework.md
+    ../docs/2026-07-01-orthogonal-analysis.md
+    ../docs/2026-07-01-computation-model-first-principles.md
+    ../docs/2026-07-01-runtime-first-principles.md
+  Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(五層)— Pattern → Computation Model → Runtime → Tool → Environment,上方標
+      Decision/Execution 兩軸分組;點一層看回答的問題、定義、deliverable、人類對應、例子。
+    圖 B(那條邊)— orthogonal 分析發現的 conditioning edge(哪個 Runtime state 餵給哪個
+      Pattern primitive):虛線弧 + 方向性 + 兩種 state((A) 記憶型 /(B) 機制型)。
+    圖 C(Computation Model)— 重建後的定義(探索政策,不是 topology)+ 常見政策一覽
+      (Linear / Self-Consistency / Beam / ToT / MCTS / GoT / Reflexion 式 / 遞迴分解),
+      點一個看四要素拆解;含「prompt 裝成 CM」的陷阱。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 解剖學 101 — 五層、那條邊、探索政策</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .axes{display:flex;gap:10px;margin-top:22px}
+  .axis{flex:0 0 auto;border-radius:9px 9px 0 0;padding:5px 14px;font-family:var(--mono);font-size:11px;
+    letter-spacing:.03em;text-transform:uppercase}
+  .axis.decision{flex:2;background:rgba(47,111,158,.1);color:var(--blue)}
+  .axis.execution{flex:3;background:rgba(12,122,89,.1);color:var(--green)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:8px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .diagram{position:relative;margin-top:56px;padding-top:52px}
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}
+  path.edge{fill:none;stroke:var(--rose);stroke-width:2;stroke-dasharray:6 6;animation:dash 22s linear infinite}
+  @keyframes dash{to{stroke-dashoffset:-300}}
+  .edge-hit{fill:none;stroke:transparent;stroke-width:22;pointer-events:stroke;cursor:pointer}
+  .edge-badge{position:absolute;z-index:3;transform:translate(-50%,-50%);cursor:pointer}
+  .edge-badge .pill{display:inline-flex;align-items:center;gap:6px;background:var(--panel);
+    border:1.5px dashed var(--rose);color:var(--rose);border-radius:999px;padding:5px 12px;
+    font-size:12px;font-weight:650;box-shadow:var(--shadow);white-space:nowrap}
+  .edge-badge .pill:hover{background:#fff5f7}
+  .mini-row{display:flex;align-items:stretch;gap:8px;position:relative;z-index:2}
+  .mini{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 10px;
+    font-size:12px;text-align:center;color:var(--muted)}
+  .mini.hot{border-color:var(--rose);color:var(--ink);font-weight:650}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;flex:1;min-width:150px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .fan{margin-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
+  .fan-col{border-radius:10px;padding:11px 12px;font-size:12.5px;background:var(--line-soft)}
+  .fan-col .ftag{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--accent)}
+  .fan-col p{margin-top:6px;line-height:1.55}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Interactive · Agent 解剖學 101</div>
+    <h1>Agent 解剖學 — 五層、那條沒名字的邊、探索政策</h1>
+    <p class="tagline">
+      一套「怎麼把任何 agent 系統拆開來看」的框架。圖 A 是五層本體(加上 Decision/Execution
+      兩軸分組);圖 B 是 orthogonal 分析發現、框架原本沒有格子裝的那條邊;圖 C 深入五層中最容易
+      被講糊的一層——Computation Model。點任何卡片看細節。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 五層 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 五層本體</div>
+    <div class="sec-title">五層,各自回答一個問題</div>
+    <p class="sec-sub">
+      如果 agent 是一個人:上面兩層決定「做什麼」(Decision 軸),下面三層決定「怎麼做」
+      (Execution 軸)。兩軸靠 Runtime 不斷回頭問 Computation Model「下一步呢」接成一個迴圈。
+    </p>
+
+    <div class="axes">
+      <div class="axis decision">Decision 軸 — 決定做什麼</div>
+      <div class="axis execution">Execution 軸 — 決定怎麼做</div>
+    </div>
+    <div class="row" id="layerRow">
+      <div class="node" data-key="pattern">
+        <div class="idx">01 · PATTERN</div>
+        <h3>Pattern</h3>
+        <div class="q">腦中的念頭,哪些自然接著哪些?</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="compute">
+        <div class="idx">02 · COMPUTATION MODEL</div>
+        <h3>Computation Model</h3>
+        <div class="q">直覺反應,還是多想幾種再選?</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="runtime">
+        <div class="idx">03 · RUNTIME</div>
+        <h3>Runtime</h3>
+        <div class="q">怎麼維持是你、把決定確實做出來?</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="tool">
+        <div class="idx">04 · TOOL</div>
+        <h3>Tool</h3>
+        <div class="q">能拿起哪些外部工具?哪些不行?</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="environment">
+        <div class="idx">05 · ENVIRONMENT</div>
+        <h3>Environment</h3>
+        <div class="q">這個世界長什麼樣?什麼控制不了?</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelA">
+      <p class="placeholder">↑ 點一層,看它的定義、deliverable、對應人類的什麼、例子。</p>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>Prompt 不是一層</b> — 它是 primitive 的 instantiation(具體內容),不是 primitive 本身。</div>
+      <div class="exclusion"><b>Multi-Agent 不是 Computation Model 的取值</b> — 它是好幾個「各自完整」的 agent 堆疊怎麼組合,單位跟「一個決策者怎麼探索」不同,層級不一樣。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: conditioning edge ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 那條沒名字的邊</div>
+    <div class="sec-title">Conditioning edge — 框架沒有格子裝的東西</div>
+    <p class="sec-sub">
+      Orthogonal 分析驗過五層乾淨獨立(每一對都找得到「動一個、另一個沒動」的反例)。但分析中
+      發現一條被漏掉的<b>邊</b>:哪個 Runtime state 餵給哪個 Pattern primitive、什麼時間點餵。
+      點虛線看細節。
+    </p>
+
+    <div class="diagram" id="edgeDiagram">
+      <svg class="edges" id="edgeSvg">
+        <path class="edge" id="edgePath" d=""></path>
+        <path class="edge-hit" id="edgeHit" d=""></path>
+      </svg>
+      <div class="edge-badge" id="edgeBadge" style="left:0;top:0">
+        <span class="pill">? conditioning edge</span>
+      </div>
+      <div class="mini-row" id="miniRow">
+        <div class="mini hot" data-key="pattern">Pattern</div>
+        <div class="mini">Computation Model</div>
+        <div class="mini hot" data-key="runtime">Runtime</div>
+        <div class="mini">Tool</div>
+        <div class="mini">Environment</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelB">
+      <p class="placeholder">↑ 點那條虛線(或問號標籤),看這條邊是什麼、為什麼重要。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: Computation Model ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 最容易講糊的一層</div>
+    <div class="sec-title">Computation Model = 探索政策,不是形狀</div>
+    <p class="sec-sub">
+      慣例把這層講成「execution topology(線/樹/圖)」——但那只是<b>結果的幾何描述</b>。
+      First-principles 重建後:它是一個「計算預算怎麼分配去探索 Pattern 打開的候選延續空間」的
+      <b>政策</b>,topology 只是政策跑出來的痕跡。每個政策由四要素組成,點下面任一個看拆解。
+    </p>
+
+    <div class="chips" id="cmChips">
+      <div class="chip" data-key="linear"><h4>Linear</h4><div class="sub">每步只算一條</div></div>
+      <div class="chip" data-key="sc"><h4>Self-Consistency</h4><div class="sub">N 條獨立解投票</div></div>
+      <div class="chip" data-key="beam"><h4>Beam Search</h4><div class="sub">每步固定留 K 條</div></div>
+      <div class="chip" data-key="tot"><h4>Tree of Thoughts</h4><div class="sub">分岔+評分+剪枝</div></div>
+      <div class="chip" data-key="mcts"><h4>MCTS / LATS</h4><div class="sub">模擬到底再回推</div></div>
+      <div class="chip" data-key="got"><h4>Graph of Thoughts</h4><div class="sub">分岔可以合併回來</div></div>
+      <div class="chip" data-key="reflexion"><h4>迭代修正(Reflexion 式)</h4><div class="sub">跑完自我批評,決定重不重跑</div></div>
+      <div class="chip" data-key="rlm"><h4>遞迴分解(RLM 式)</h4><div class="sub">不是探索候選,是拆子問題</div></div>
+    </div>
+
+    <div class="panel" id="panelC">
+      <p class="placeholder">↑ 點一個政策,看它的四要素:分岔幾條 / 什麼結構 / 怎麼比較 / 何時收斂。</p>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>陷阱:prompt 裝成 Computation Model</b> — 寫一個 prompt 叫模型「自己在心裡想三種做法、選一個」,全部在同一次生成裡完成——這是 Pattern 的內容在<b>裝成</b>探索,沒有真的多分配運算資源,不是 Computation Model。CM 永遠是 code(控制流程),不是 prompt。</div>
+      <div class="exclusion"><b>Debate 類要看實作</b> — 同一個決策迴路生兩個候選角色互相比較,還算 CM;若是兩個各自獨立完整的 agent 在對話,單位不對,跟 Multi-Agent 一樣不屬於這層。</div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/ 四篇筆記為真相來源(five-layer-framework · orthogonal-analysis ·
+    computation-model-first-principles · runtime-first-principles)· 最後同步 2026-07-02
+  </footer>
+</div>
+
+<script>
+  const LAYERS = {
+    pattern: {
+      title: 'Pattern', tag: '01 · Decision 軸',
+      q: '腦中的念頭,哪些自然接著哪些?',
+      def: '認知原語(Cognitive Primitive)+ 局部文法——哪個 primitive 可以接哪個。',
+      deliverable: 'Primitive 列表 + 接續關係',
+      human: '長期學會的能力(skills / cognitive repertoire)',
+      example: 'ReAct 的 Thought → Action → Observation。'
+    },
+    compute: {
+      title: 'Computation Model', tag: '02 · Decision 軸',
+      q: '面對決定,是直覺反應,還是要多想幾種、比較後才選?',
+      def: '一個「計算預算怎麼分配去探索 Pattern 打開的候選延續空間」的政策——分岔幾條、什麼結構、怎麼比較、何時收斂。詳見圖 C。',
+      deliverable: '分岔幾條 / 什麼結構 / 怎麼比較 / 何時收斂',
+      human: '當下採用的思考策略',
+      example: 'Linear、Self-Consistency、Beam Search、ToT、MCTS/LATS、GoT。'
+    },
+    runtime: {
+      title: 'Runtime', tag: '03 · Execution 軸',
+      q: '身體怎麼讓你維持是你、又怎麼確實把決定做出來?',
+      def: '在無狀態的 primitive 呼叫之間製造連續性的機制——單次 LLM 呼叫什麼都不會自動留下,所以要有外部機制決定:留住什麼、下次餵回哪些、每一步怎麼確保機械上真的執行成功。',
+      deliverable: 'Loop/scheduler + state schema + context builder + tool dispatch + caching',
+      human: '當下整個人(身體狀態 + 工作記憶 + 注意力 + 目標)——身體被 Runtime 吸收,所以 Tool 可以單純回到「外部工具」',
+      example: 'Reflexion 的 Reflection Memory、Voyager 的 Skill Library + Experience Store。'
+    },
+    tool: {
+      title: 'Tool', tag: '04 · Execution 軸',
+      q: '能拿起哪些外部工具去擴充原本做不到的事?哪些被允許用、哪些不行?',
+      def: '與世界溝通的抽象介面——工具集合 + 權限邊界。跟 Runtime 的分工:Tool 是菜單(靜態合約),Runtime 是服務生(真的去下單、失敗要不要重試、結果怎麼處理)。這層原本叫 Harness,因 OpenAI 把該詞泛用成「模型以外的整套軟體」而改名,選 Tool 是因為業界 API 本來就用這個字。',
+      deliverable: '介面規格 + 工具抽象 + 權限邊界',
+      human: '身體以外借用的東西(手機、筆、電腦、扳手)',
+      example: 'Coding Tool 層的 read_file() / run_bash(),以及 MCP 這種工具介面協定。'
+    },
+    environment: {
+      title: 'Environment', tag: '05 · Execution 軸',
+      q: '所在的這個世界長什麼樣,有什麼是控制不了的?',
+      def: 'Agent 真正作用的世界:資源清單、觀測/行動限制(可見性/延遲/成本)、世界的動態。',
+      deliverable: '資源清單 + 觀測/行動限制 + 世界動態',
+      human: '世界',
+      example: 'Coding Agent 的 Git Repository + Filesystem。'
+    }
+  };
+
+  const panelA = document.getElementById('panelA');
+  const nodesA = document.querySelectorAll('#layerRow .node');
+  function renderA(key){
+    const d = LAYERS[key];
+    nodesA.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelA.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta">
+        <b>回答的問題</b><span>${d.q}</span>
+        <b>一句話定義</b><span>${d.def}</span>
+        <b>Deliverable</b><span>${d.deliverable}</span>
+        <b>對應人類的</b><span>${d.human}</span>
+      </div>
+      <div class="ex">${d.example}</div>
+    `;
+  }
+  nodesA.forEach(n => n.addEventListener('click', () => renderA(n.dataset.key)));
+
+  const panelB = document.getElementById('panelB');
+  function renderEdge(){
+    panelB.innerHTML = `
+      <div class="ph">Unnamed · 層與層之間的關係線</div>
+      <h2>conditioning edge<span style="font-family:var(--mono);font-size:10.5px;background:rgba(176,74,106,.12);color:var(--rose);padding:2px 8px;border-radius:6px;margin-left:8px;vertical-align:middle">待命名</span></h2>
+      <div class="meta">
+        <b>是什麼</b><span>「哪個 Runtime state 餵給哪個 Pattern primitive、在什麼時間點餵」——它不是一個層(不回答「Agent 怎麼 X」),是層與層之間的一條邊,五層框架目前沒有位置放它。</span>
+        <b>為什麼重要</b><span>Reflexion 每加一種 Runtime state(Reflection Memory),Pattern 幾乎同時多一個 primitive(Reflection)去讀寫它;Voyager 也一樣(Skill Library ↔ verify-and-store)。這條邊,才是這些系統真正創新發生的位置。但這是設計慣例不是必然——你可以只換 state 壓縮策略、完全不碰 Pattern,所以五層仍然獨立。</span>
+        <b>方向性</b><span>單向依賴——Pattern 的 primitive 要「吃」Runtime 的 state 才有料;反過來 Runtime 換一種存法,不必然需要 Pattern 長出新 primitive。</span>
+      </div>
+      <div class="ex">Runtime state 依「誰讀」分兩種:<b>(A) 記憶型</b>——目的是變成某個 primitive 的內容(記憶庫、對話歷史),memory+retrieve 系統(Generative Agents、MemGPT)的創新幾乎全部集中在這種,而這正是走 conditioning edge 的 state;<b>(B) 機制型</b>——只給 Runtime/Computation Model 內部記帳用(重試次數、快取、預算),永遠不進 prompt,模型看不到它,也就不走這條邊。</div>
+    `;
+  }
+  document.getElementById('edgeHit').addEventListener('click', renderEdge);
+  document.getElementById('edgeBadge').addEventListener('click', renderEdge);
+
+  function layoutEdge(){
+    const diagram = document.getElementById('edgeDiagram');
+    const minis = document.querySelectorAll('#miniRow .mini');
+    const patternEl = minis[0];
+    const runtimeEl = minis[2];
+    const dRect = diagram.getBoundingClientRect();
+    const pRect = patternEl.getBoundingClientRect();
+    const rRect = runtimeEl.getBoundingClientRect();
+    const x1 = pRect.left + pRect.width / 2 - dRect.left;
+    const y1 = pRect.top - dRect.top;
+    const x2 = rRect.left + rRect.width / 2 - dRect.left;
+    const y2 = rRect.top - dRect.top;
+    const midX = (x1 + x2) / 2;
+    const arcY = Math.min(y1, y2) - 42;
+    const path = `M ${x1} ${y1} Q ${midX} ${arcY} ${x2} ${y2}`;
+    document.getElementById('edgePath').setAttribute('d', path);
+    document.getElementById('edgeHit').setAttribute('d', path);
+    const badge = document.getElementById('edgeBadge');
+    badge.style.left = midX + 'px';
+    badge.style.top = arcY + 'px';
+  }
+  window.addEventListener('resize', layoutEdge);
+
+  const CM = {
+    linear: { title: 'Linear', fork: '恆為 1', shape: '單一序列', compare: '不用比', stop: '到達終止條件',
+      note: '大多數 agent 產品(含 Claude Code)的預設——分岔/結構/深度三要素都是常數,只剩收斂判準這個變數還活著。' },
+    sc: { title: 'Self-Consistency(取樣投票)', fork: 'N 條完全獨立的完整解法', shape: '平行、互不知道彼此', compare: '全部跑完才比', stop: '多數決選最常見答案',
+      note: '候選之間零溝通——靠「同一題多抽幾次,眾數比較可信」這個統計直覺。' },
+    beam: { title: 'Beam Search', fork: '每步固定留 K 條', shape: '樹狀但限制寬度', compare: '每步用分數排序剪枝', stop: '固定深度或終止符',
+      note: '從 NLP 解碼借來的老招:比 Linear 多探,比全展開省。' },
+    tot: { title: 'Tree of Thoughts', fork: '某些節點分 N 條', shape: '樹狀,候選互相看得到', compare: '評分後剪枝', stop: '深度/分數判準',
+      note: '這一層最乾淨的範例——四要素全部具體對應得上,而且全程只有一個決策者。' },
+    mcts: { title: 'MCTS / LATS', fork: '動態(探索/利用權衡決定)', shape: '樹,用模擬(rollout)估分', compare: '模擬到底,回推更新節點分數', stop: '模擬預算用完或分數夠好',
+      note: '把「這條路值不值得深入」變成動態決策,不事先固定。' },
+    got: { title: 'Graph of Thoughts', fork: '跟 Tree 類似會分岔', shape: '允許把分岔結果合併回同一節點(DAG)', compare: '合併時聚合候選精華', stop: '同 Tree',
+      note: '比 Tree 多的是「殊途可以同歸」——分頭探索的結果能匯流。' },
+    reflexion: { title: '迭代修正迴圈(Reflexion 式)', fork: '恆為 1(不是真分岔)', shape: '線性但允許回頭重跑', compare: '用自我批評結果決定要不要重跑', stop: '批評通過或到最大重試次數',
+      note: '注意:它的「探索」發生在時間軸上(重跑),不是空間上(平行分岔)。' },
+    rlm: { title: '遞迴分解(RLM 式)', fork: '不是探索候選解,是拆子問題', shape: '遞迴樹(節點是子問題)', compare: '子問題各自解完後合併', stop: '遞迴到底層可直接解決',
+      note: '跟其他政策的軸略有不同——分的不是「同一個問題的幾種答案」,是「一個問題的幾個部分」。' }
+  };
+
+  const panelC = document.getElementById('panelC');
+  const chipsC = document.querySelectorAll('#cmChips .chip');
+  function renderC(key){
+    const d = CM[key];
+    chipsC.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelC.innerHTML = `
+      <div class="ph">Computation Model · ${d.title}</div>
+      <h2>${d.title}</h2>
+      <div class="fan">
+        <div class="fan-col"><div class="ftag">分岔幾條</div><p>${d.fork}</p></div>
+        <div class="fan-col"><div class="ftag">什麼結構</div><p>${d.shape}</p></div>
+        <div class="fan-col"><div class="ftag">怎麼比較</div><p>${d.compare}</p></div>
+        <div class="fan-col"><div class="ftag">何時收斂</div><p>${d.stop}</p></div>
+      </div>
+      <div class="ex">${d.note}</div>
+    `;
+  }
+  chipsC.forEach(n => n.addEventListener('click', () => renderC(n.dataset.key)));
+
+  renderA('pattern');
+  layoutEdge();
+</script>
+</body>
+</html>

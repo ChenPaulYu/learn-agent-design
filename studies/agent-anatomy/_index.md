@@ -24,8 +24,11 @@ tags:
 - [human-analogy-elicit](docs/2026-07-01-human-analogy-elicit.md) —
   五句「回答的問題」從人類經驗重建的 elicit 收斂記錄(身體=Runtime、Tool 層名確認不用換、
   Enact P1 證明 Tool 是獨立第五層)
+- [pages/101](pages/101.html) —
+  互動版 Agent 解剖學 101(可長期回看的教學頁,內容以 docs/ 為真相來源):圖 A 五層 +
+  Decision/Execution 兩軸、圖 B conditioning edge、圖 C Computation Model 政策一覽
 - [mockups/2026-07-01-agent-anatomy-layers](mockups/2026-07-01-agent-anatomy-layers/index.html) —
-  互動圖解:五層 + 那條沒名字的 conditioning edge
+  互動圖解:五層 + 那條沒名字的 conditioning edge(disposable mockup,當初為 elicit 收斂用)
 
 ## 出處
 
