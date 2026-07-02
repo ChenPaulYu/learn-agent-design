@@ -543,17 +543,17 @@ render_with_liquid: false
   const STEERING = {
     skill: {
       title: 'Skill', tag: '判斷軸:主線程可見度',
-      def: '選 Skill 的判準是:要不要在主線程裡看得到、能介入每一步。延遲載入,但一旦觸發,是在你看得到的主對話裡跑。',
+      def: '什麼時候用 Skill:這件事你想留在主對話裡看著、隨時能介入——像演員在片場翻自己的劇本小抄,你看得到他翻、看得到他怎麼做。Skill 延遲載入,但一旦觸發,是在你看得到的主對話裡跑,不是躲到別的地方。',
       example: '跟 Subagent/Hook 不同源——三者分開、依序上線(Subagent 2025-07 → Hook 2025-09 → Skill 2025-10),不是同一套底層機制的三種變體。'
     },
     subagent: {
       title: 'Subagent', tag: '判斷軸:Context 隔離',
-      def: '選 Subagent 的判準是:會不會產生一堆不想留在主對話裡的中間雜訊。整個丟到全新、乾淨的 context 裡跑,只有最後結果回來。',
+      def: '什麼時候用 Subagent:這件事做的過程會產生很多中間雜訊,你不想讓它們塞滿主對話——像把一段戲整個丟給一個演員去單獨拍,你不會看到拍攝過程,只會拿到剪好的那一段。Subagent 整個丟到全新、乾淨的 context 裡跑,只有最後結果送回來。',
       example: '2025 年 7 月上線,是三者裡最早的。'
     },
     hook: {
       title: 'Hook', tag: '判斷軸:確定性',
-      def: '選 Hook 的判準是:要不要不看 LLM 判斷、每次都固定執行。在特定生命週期事件上觸發,可以是純 shell 指令,完全不需要 LLM 決定要不要做。',
+      def: '什麼時候用 Hook:你要的是「不管 LLM 當下怎麼判斷,這件事都一定要發生」——像片場的固定規矩,喊卡了就是喊卡,不會因為誰在演而改變。Hook 在特定生命週期事件上觸發,可以只是一句 shell 指令,完全不需要 LLM 決定要不要做。',
       example: '官方部落格〈Steering Claude Code〉把 Skill/Subagent/Hook 歸為「七種指揮 Claude Code 的方法」之一,三條軸互相獨立,不是三個變體——雖然可以互相組合(Skill/Subagent 的 frontmatter 都能定義自己的 hooks),但組合得起來不代表同源。'
     }
   };
