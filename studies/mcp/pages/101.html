@@ -481,24 +481,28 @@ render_with_liquid: false
       title: 'Tools', tag: 'Server 擁有 · Tools',
       def: '可執行的函式,帶 input schema——LLM 看得懂「這個工具要餵什麼參數」,決定要不要呼叫它。',
       example: 'get_weather(city) 這種:LLM 決定呼叫,server 執行,回結果。',
+      analogy: '廠商幫你辦一件事——秘書打電話請廠商處理退款,廠商真的去做了,不是只回報資訊。',
       snippet: `{"name": "get_weather",\n "inputSchema": {"type": "object",\n   "properties": {"city": {"type": "string"}}}}`
     },
     resources: {
       title: 'Resources', tag: 'Server 擁有 · Resources',
       def: '可讀的資料源,唯讀的情境資料,不是用來「做事」,是用來「知道」。',
       example: '一個檔案的內容、一筆資料庫記錄、一份設定檔——讀取但不會有副作用。',
+      analogy: '廠商給你看一份資料——廠商把最新價目表傳過來,你只是看,廠商沒有因此多做什麼事。',
       snippet: `{"uri": "studies://topics",\n "mimeType": "text/plain"}`
     },
     prompts: {
       title: 'Prompts', tag: 'Server 擁有 · Prompts',
       def: '可重用的 prompt 模板,server 定義好「這種情境該怎麼問」,讓不同 Host 都能套用同一套問法。',
       example: '一個 summarize(text) 模板,任何接上這個 server 的 Host 都能直接套用,不用自己重寫措辭。',
+      analogy: '廠商附的標準表格——廠商說「用我們這張訂購單填就好」,秘書不用每次自己想措辭。',
       snippet: `{"name": "summarize",\n "arguments": {"text": "string"}}`
     },
     sampling: {
       title: 'Sampling', tag: 'Client 擁有 · Sampling',
       def: '反過來:server 請 client 幫它跑一次 LLM 生成。Server 自己沒有 LLM,借 client 手上那個用。',
       example: '一個「幫我把這段資料整理成摘要」的 server,自己不接 LLM API,而是丟一句 sampling 請求給 client 代跑。',
+      analogy: '廠商反過來問秘書:「這個特殊要求我判斷不了,可以借用你的判斷幫忙想個說法嗎?」——借的是秘書的腦,不是打去問你本人。',
       note: 'LLM 不需要知道這是「sampling」——它收到的就是一段普通 messages。真正把關的是多層人工審核:server 發請求 → client 給人審核 → 才轉給模型 → 模型的回應再給人看一次 → 才回給 server。這條「server 反過來敲 client 的門」的機制也不是 MCP 發明的,LSP 的 window/showMessageRequest、workspace/configuration 早就是這樣做。自己拿 FastAPI 搭一樣的事做得到,但要換成 WebSocket,而且要自己重新發明三件事:id 怎麼配對、client 支不支援這能力的協商、審核是規範還是自己記得寫。',
       snippet: `{"method": "sampling/createMessage",\n "params": {"messages": [...]}}`
     },
@@ -506,6 +510,7 @@ render_with_liquid: false
       title: 'Elicitation', tag: 'Client 擁有 · Elicitation',
       def: '反過來:server 向使用者要資訊——一個表單、一次確認,而不是直接假設或猜。',
       example: '執行一個有風險的操作前,server 先發一個 elicitation 請求,跳出「確定要刪除嗎?」讓使用者按。',
+      analogy: '廠商反過來直接問你本人(透過秘書轉達):「請確認送貨地址」——這題秘書自己不能代答,要你親自點頭。',
       note: '甚至不一定經過 LLM——server 發請求,client 直接跳表單(或轉 URL)給使用者填,填完直接回給 server。模型可能完全插不上手。',
       snippet: `{"method": "elicitation/create",\n "params": {"message": "確定要刪除嗎？"}}`
     },
@@ -513,6 +518,7 @@ render_with_liquid: false
       title: 'Roots', tag: 'Client 擁有 · Roots',
       def: 'Client 告訴 server「你能碰的檔案系統範圍就這些」,是權限邊界,不是能力。',
       example: 'Host 只把一個專案資料夾設成 root,檔案系統 server 就只能在這個資料夾裡讀寫。',
+      analogy: '秘書一開始就先講清楚:「你只能碰跟這個案子有關的檔案,其他不能看」——邊界秘書先劃好,不是廠商自己說了算。',
       note: '最單純的一個:純粹是 client 端的靜態設定查詢,跟 LLM 完全沒關係。',
       snippet: `{"uri": "file:///Users/paul/project",\n "name": "project-root"}`
     },
@@ -520,12 +526,14 @@ render_with_liquid: false
       title: 'Logging', tag: 'Server 擁有 · 延伸能力',
       def: 'Server 把結構化的日誌訊息推給 client——不是給 LLM 看的,是給人(開發者)debug 用的。8 級 syslog 嚴重度(RFC 5424):debug/info/notice/warning/error/critical/alert/emergency。',
       example: 'client 可以用 logging/setLevel 告訴 server「低於這個等級的不用送」,篩掉太吵的訊息。',
+      analogy: '廠商把每次辦事的過程記錄回傳給秘書存檔——不是講給你聽,是秘書自己留著,方便之後查是哪個環節出包。',
       snippet: `{"method": "notifications/message",\n "params": {"level": "error", "logger": "database",\n   "data": {"error": "Connection failed"}}}`
     },
     completion: {
       title: 'Completion', tag: 'Server 擁有 · 延伸能力',
       def: 'Server 幫 client 的輸入框做自動完成建議,用在 Prompts 的參數或 Resource URI template 上——打字打到一半就有建議。',
       example: '使用者在 code_review 這個 prompt 的 language 參數打了 "py",server 建議 python / pytorch / pyside。',
+      analogy: '你在填一張訂購單,寫到一半,廠商幫你把接下來大概會填什麼先列出來讓你選。',
       snippet: `{"method": "completion/complete",\n "params": {"ref": {"type": "ref/prompt", "name": "code_review"},\n   "argument": {"name": "language", "value": "py"}}}`
     }
   };
@@ -540,6 +548,7 @@ render_with_liquid: false
       <h2>${data.title}</h2>
       <div class="meta"><b>一句話定義</b><span>${data.def}</span></div>
       <div class="ex">${data.example}</div>
+      ${data.analogy ? `<div class="ex" style="margin-top:8px;border-left-color:var(--blue)">🏢 秘書比喻:${data.analogy}</div>` : ''}
       ${data.note ? `<div class="ex" style="margin-top:8px;border-left-color:var(--rose)">🔒 ${data.note}</div>` : ''}
       ${data.snippet ? `<div class="ex" style="margin-top:8px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;background:var(--line-soft);border-left-color:var(--muted)">${data.snippet}</div>` : ''}
     `;
