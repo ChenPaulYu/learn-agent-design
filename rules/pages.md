@@ -1,9 +1,10 @@
 # rules/pages.md — building & wiring `pages/*.html`
 
 Engineering reference for the `pages/` genre — the concrete "how do I make this correctly"
-rules. `CLAUDE.md` covers the *why* (docs vs. pages relationship, when a topic needs a page);
-this file covers the *how* (frontmatter schemas, CSS/JS conventions, the shared layout's
-contract). Read `CLAUDE.md` first for context, come here when actually writing code.
+rules. [`organization.md`](organization.md) covers the *why* (docs vs. pages relationship, when
+a topic needs a page); this file covers the *how* (frontmatter schemas, CSS/JS conventions, the
+shared layout's contract). Read `organization.md` first for context, come here when actually
+writing code.
 
 ## Page frontmatter & URL scheme
 
@@ -162,3 +163,26 @@ render paths that could drift out of sync.
 Used in: `studies/mcp/pages/101.html` (role scene), `studies/mcp/pages/security.html` (OAuth
 wristband scene, Client/Server building scene), `studies/agent-anatomy/pages/101.html` (human
 body scene).
+
+## `.row` and `.fan` need a mobile media query, or they overflow
+
+`.row` (the horizontal node-→-node-→-node strip used for role/lineage/wire-protocol rows) is
+`flex-wrap:nowrap` by design — the arrows only make sense left-to-right. On a narrow viewport
+that nowrap strip either forces horizontal scroll or squishes every card unreadably thin (since
+`.node` uses `flex:1;min-width:0`, it has no floor). `.fan` (a fixed 3- or 4-column comparison
+grid) has the same problem — fixed columns don't have room to shrink into on a phone.
+
+Every page using either class needs this, added once near the end of its `<style>` block:
+
+```css
+@media (max-width: 700px){
+  .row{flex-direction:column}
+  .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+  .fan{grid-template-columns:1fr}
+}
+```
+
+Rotating the arrow (rather than hiding it) keeps the "this flows into that" meaning even once the
+row becomes a vertical stack. `align-items:stretch` already on `.row` makes each `.node`/`.fan-col`
+fill the stack's width once it's a column, so no extra width rule is needed on the children
+themselves.
