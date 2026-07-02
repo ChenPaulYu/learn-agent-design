@@ -113,6 +113,15 @@ render_with_liquid: false
   .ref-group a:hover{color:var(--accent)}
   .ref-group a:hover::before{color:var(--accent)}
 
+  .zone{cursor:pointer}
+  .zone .st{transition:stroke .15s ease}
+  .zone .stf{transition:fill .15s ease}
+  .zone:hover .st,.zone.active .st{stroke:currentColor}
+  .zone:hover .stf,.zone.active .stf{fill:currentColor}
+  .zone.active .fillable{fill:color-mix(in srgb,currentColor 8%,var(--panel))}
+  .zone.cord{opacity:.4;transition:opacity .15s ease}
+  .zone.cord:hover,.zone.cord.active{opacity:1}
+
   footer{margin-top:40px;color:var(--faint);font-size:12px}
 </style>
 </head>
@@ -134,8 +143,52 @@ render_with_liquid: false
     <div class="sec-title">三個角色,一條專屬線</div>
     <p class="sec-sub">
       把它想成「插座」:Host 是你的房子,每個 Server 是一個電器,Client 是那條專屬的電源線——
-      一個電器一條線,不是所有電器共用一條延長線。
+      一個電器一條線,不是所有電器共用一條延長線。點下面場景裡的房子、電線、電器,看對應哪個角色。
     </p>
+
+    <div style="margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px">
+      <svg id="houseScene" viewBox="0 0 700 300" style="width:100%;height:auto;display:block">
+        <!-- Host: 房子 -->
+        <g class="zone" data-key="host" style="color:#9a6b2e">
+          <polygon points="70,150 150,90 230,150" fill="none" class="st" stroke="#b9ad9c" stroke-width="2.5"/>
+          <rect x="85" y="150" width="130" height="100" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.5"/>
+          <rect x="135" y="195" width="30" height="55" fill="none" class="st" stroke="#b9ad9c" stroke-width="2"/>
+          <circle cx="157" cy="222" r="2" class="stf" fill="#b9ad9c"/>
+          <rect x="95" y="165" width="24" height="24" fill="none" class="st" stroke="#b9ad9c" stroke-width="1.8"/>
+          <line x1="107" y1="165" x2="107" y2="189" class="st" stroke="#b9ad9c" stroke-width="1.2"/>
+          <line x1="95" y1="177" x2="119" y2="177" class="st" stroke="#b9ad9c" stroke-width="1.2"/>
+          <text x="90" y="140" font-size="11" fill="#8a7d6e" style="font-family:var(--mono)">HOST</text>
+          <!-- 三個插座,牆上突出的小點 -->
+          <circle cx="215" cy="175" r="4" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="1.8"/>
+          <circle cx="215" cy="205" r="4" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="1.8"/>
+          <circle cx="215" cy="235" r="4" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="1.8"/>
+        </g>
+        <!-- 三條專屬電源線(Client)—— 各自獨立,不共用一條延長線 -->
+        <path class="zone cord" data-key="client" d="M 215 175 Q 320 130 430 110" fill="none" style="color:#b04a6a" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        <path class="zone cord" data-key="client" d="M 215 205 Q 320 205 430 195" fill="none" style="color:#b04a6a" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        <path class="zone cord" data-key="client" d="M 215 235 Q 320 275 430 275" fill="none" style="color:#b04a6a" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        <!-- 三個電器(Server)—— 燈泡 / 風扇 / 遠端伺服器機架 -->
+        <g class="zone" data-key="server" style="color:#0c7a59">
+          <circle cx="460" cy="95" r="20" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.2"/>
+          <path d="M 452 100 L 468 100 M 455 104 L 465 104 M 458 108 L 462 108" class="st" stroke="#b9ad9c" stroke-width="1.6" stroke-linecap="round"/>
+          <text x="490" y="99" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">SERVER(本機)</text>
+        </g>
+        <g class="zone" data-key="server" style="color:#0c7a59">
+          <circle cx="460" cy="195" r="20" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.2"/>
+          <circle cx="460" cy="195" r="4" class="stf" fill="#b9ad9c"/>
+          <path d="M 460 195 L 460 181 M 460 195 L 471 188 M 460 195 L 471 202 M 460 195 L 449 202 M 460 195 L 449 188"
+                class="st" stroke="#b9ad9c" stroke-width="1.6" stroke-linecap="round"/>
+          <text x="490" y="199" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">SERVER(本機)</text>
+        </g>
+        <g class="zone" data-key="server" style="color:#0c7a59">
+          <rect x="440" y="255" width="40" height="40" rx="4" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.2"/>
+          <circle cx="450" cy="264" r="2" class="stf" fill="#b9ad9c"/>
+          <line x1="446" y1="275" x2="474" y2="275" class="st" stroke="#b9ad9c" stroke-width="1.4"/>
+          <line x1="446" y1="283" x2="474" y2="283" class="st" stroke="#b9ad9c" stroke-width="1.4"/>
+          <text x="488" y="279" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">SERVER(遠端)</text>
+        </g>
+      </svg>
+    </div>
 
     <div class="row" id="roleRow">
       <div class="node" data-key="host">
@@ -468,7 +521,8 @@ render_with_liquid: false
   };
 
   const panelA = document.getElementById('panelA');
-  const allA = [...document.querySelectorAll('#roleRow .node'), ...document.querySelectorAll('.chip')];
+  const allA = [...document.querySelectorAll('#roleRow .node'), ...document.querySelectorAll('.chip'),
+                ...document.querySelectorAll('#houseScene .zone')];
   function renderA(key, data, activeEls){
     allA.forEach(n => n.classList.toggle('active', activeEls.includes(n)));
     panelA.innerHTML = `
@@ -480,8 +534,14 @@ render_with_liquid: false
       ${data.snippet ? `<div class="ex" style="margin-top:8px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;background:var(--line-soft);border-left-color:var(--muted)">${data.snippet}</div>` : ''}
     `;
   }
+  function activeForKey(key){
+    return [...document.querySelectorAll(`#roleRow .node[data-key="${key}"]`),
+            ...document.querySelectorAll(`#houseScene .zone[data-key="${key}"]`)];
+  }
   document.querySelectorAll('#roleRow .node').forEach(n =>
-    n.addEventListener('click', () => renderA(n.dataset.key, ROLE[n.dataset.key], [n])));
+    n.addEventListener('click', () => renderA(n.dataset.key, ROLE[n.dataset.key], activeForKey(n.dataset.key))));
+  document.querySelectorAll('#houseScene .zone').forEach(n =>
+    n.addEventListener('click', () => renderA(n.dataset.key, ROLE[n.dataset.key], activeForKey(n.dataset.key))));
   document.querySelectorAll('.chip').forEach(n =>
     n.addEventListener('click', () => renderA(n.dataset.key, PRIMITIVE[n.dataset.key], [n])));
 
