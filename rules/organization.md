@@ -11,14 +11,6 @@ the notes themselves cover that). When a tangent surfaces a topic worth studying
 of scope for the current thread, add a line there instead of chasing it immediately. Delete an
 item's line once its own topic/note actually exists.
 
-## Relationship to `../grains`
-
-Borrows `grains`' knowledge-organization pattern (a bounded topic = one folder, flat dated notes,
-a navigational `_index.md`, point-first writing) but is **not** the same contract. `grains` is
-pure curated memory — no tool code allowed. This repo is the opposite case on purpose: the code
-*is* part of learning here, so it's not exiled to a separate repo. The two repos are otherwise
-unrelated (no shared governance, no cross-repo ADRs).
-
 ## Layout
 
 | where | what |
