@@ -15,6 +15,7 @@ idea in a single folder — notes, code, and any disposable diagrams — rather 
 artifact type across parallel trees:
 
 ```
+site/                  ← Jekyll machinery (config, layout, Gemfile) — content source stays the repo root
 studies/
   agent-anatomy/       ← e.g. the 5-layer Pattern/Computation-Model/Runtime/Tool/Environment split
     _index.md          ← the topic's front door (navigation only)
@@ -36,7 +37,7 @@ studies/
   site nav automatically, with `layout: none` to keep its own standalone HTML) and a top comment
   stating *Derived from* (which docs) + *Last synced* (bump the date whenever the docs change
   materially and the page is re-synced). Published URL follows `/<topic>/<content>/` (e.g.
-  `studies/mcp/pages/101.html` → `/mcp/101/`), via one per-topic permalink entry in `_config.yml`.
+  `studies/mcp/pages/101.html` → `/mcp/101/`), via one per-topic permalink entry in `site/_config.yml`.
 
 ## Relationship to `../grains`
 

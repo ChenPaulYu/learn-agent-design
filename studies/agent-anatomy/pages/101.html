@@ -1,6 +1,6 @@
 ---
 title: Agent 解剖學 101 — 互動圖解
-summary: 三張互動圖:五層框架與 Decision/Execution 兩軸、沒名字的 conditioning edge、Computation Model 的八種探索政策。
+summary: 四張互動圖:五層框架與 Decision/Execution 兩軸、人體對應比喻(點人身上的部位)、沒名字的 conditioning edge、Computation Model 的八種探索政策。
 date: 2026-07-02
 tags:
   - agent-anatomy
@@ -17,13 +17,16 @@ render_with_liquid: false
     ../docs/2026-07-01-orthogonal-analysis.md
     ../docs/2026-07-01-computation-model-first-principles.md
     ../docs/2026-07-01-runtime-first-principles.md
+    ../docs/2026-07-01-human-analogy-elicit.md
   Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
   What it is:
     圖 A(五層)— Pattern → Computation Model → Runtime → Tool → Environment,上方標
       Decision/Execution 兩軸分組;點一層看回答的問題、定義、deliverable、人類對應、例子。
-    圖 B(那條邊)— orthogonal 分析發現的 conditioning edge(哪個 Runtime state 餵給哪個
+    圖 B(人體對應)— SVG 人形場景,點頭/思考泡泡/身體/手上工具/背景世界,看每個部位對應
+      哪一層 + 為什麼(身體=Runtime、跨邊界判準、內建 vs 外部工具)。
+    圖 C(那條邊)— orthogonal 分析發現的 conditioning edge(哪個 Runtime state 餵給哪個
       Pattern primitive):虛線弧 + 方向性 + 兩種 state((A) 記憶型 /(B) 機制型)。
-    圖 C(Computation Model)— 重建後的定義(探索政策,不是 topology)+ 常見政策一覽
+    圖 D(Computation Model)— 重建後的定義(探索政策,不是 topology)+ 常見政策一覽
       (Linear / Self-Consistency / Beam / ToT / MCTS / GoT / Reflexion 式 / 遞迴分解),
       點一個看四要素拆解;含「prompt 裝成 CM」的陷阱。
 -->
@@ -114,6 +117,14 @@ render_with_liquid: false
   .fan-col .ftag{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--accent)}
   .fan-col p{margin-top:6px;line-height:1.55}
 
+  .zone{cursor:pointer}
+  .zone .st{transition:stroke .15s ease}
+  .zone .stf{transition:fill .15s ease}
+  .zone:hover .st,.zone.active .st{stroke:currentColor}
+  .zone:hover .stf,.zone.active .stf{fill:currentColor}
+  .zone.active .fillable{fill:color-mix(in srgb,currentColor 8%,var(--panel))}
+  .zone.active text{fill:currentColor}
+
   footer{margin-top:40px;color:var(--faint);font-size:12px}
 </style>
 </head>
@@ -124,8 +135,9 @@ render_with_liquid: false
     <h1>Agent 解剖學 — 五層、那條沒名字的邊、探索政策</h1>
     <p class="tagline">
       一套「怎麼把任何 agent 系統拆開來看」的框架。圖 A 是五層本體(加上 Decision/Execution
-      兩軸分組);圖 B 是 orthogonal 分析發現、框架原本沒有格子裝的那條邊;圖 C 深入五層中最容易
-      被講糊的一層——Computation Model。點任何卡片看細節。
+      兩軸分組);圖 B 把五層對應回一個人的身體,點部位就懂;圖 C 是 orthogonal 分析發現、框架
+      原本沒有格子裝的那條邊;圖 D 深入五層中最容易被講糊的一層——Computation Model。
+      點任何卡片看細節。
     </p>
   </header>
 
@@ -184,9 +196,88 @@ render_with_liquid: false
     </div>
   </section>
 
-  <!-- ============ SECTION B: conditioning edge ============ -->
+  <!-- ============ SECTION B: 人體對應 ============ -->
   <section>
-    <div class="sec-kicker">圖 B · 那條沒名字的邊</div>
+    <div class="sec-kicker">圖 B · 如果 agent 是一個人</div>
+    <div class="sec-title">五層對應人體 — 點部位看對應</div>
+    <p class="sec-sub">
+      五句「回答的問題」就是從人類經驗重建出來的。想像一個正在踢球的人:點下面場景裡的
+      <b>頭、思考泡泡、身體、拿著的手機、周圍的世界</b>,看它對應哪一層、為什麼。
+    </p>
+
+    <div style="margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px">
+      <svg id="humanSvg" viewBox="0 0 760 400" style="width:100%;height:auto;display:block">
+        <!-- Environment: 整個背景 -->
+        <g class="zone" data-key="env" style="color:#8a7d6e">
+          <rect class="st fillable" x="10" y="10" width="740" height="380" rx="16" fill="rgba(47,111,158,.04)" stroke="#d8d0c0" stroke-width="2" stroke-dasharray="7 6"/>
+          <circle cx="672" cy="66" r="24" fill="none" class="st" stroke="#d8d0c0" stroke-width="2"/>
+          <line x1="30" y1="342" x2="730" y2="342" class="st" stroke="#d8d0c0" stroke-width="2"/>
+          <path d="M 640 342 L 640 296 M 640 308 L 622 288 M 640 300 L 658 282" fill="none" class="st" stroke="#d8d0c0" stroke-width="3" stroke-linecap="round"/>
+          <text x="34" y="40" font-size="12" fill="#8a7d6e" style="font-family:var(--mono)">ENVIRONMENT · 世界(點背景任一處)</text>
+        </g>
+        <!-- Computation Model: 思考泡泡 -->
+        <g class="zone" data-key="cm" style="color:#2f6f9e">
+          <circle cx="348" cy="118" r="4" fill="#b9ad9c" class="stf"/>
+          <circle cx="368" cy="100" r="6" fill="#b9ad9c" class="stf"/>
+          <ellipse cx="432" cy="72" rx="62" ry="34" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2"/>
+          <circle cx="408" cy="76" r="5" class="stf" fill="#b9ad9c"/>
+          <line x1="412" y1="73" x2="434" y2="58" class="st" stroke="#b9ad9c" stroke-width="2"/>
+          <line x1="412" y1="79" x2="434" y2="88" class="st" stroke="#b9ad9c" stroke-width="2"/>
+          <circle cx="440" cy="56" r="5" class="stf" fill="#b9ad9c"/>
+          <circle cx="440" cy="88" r="5" class="stf" fill="#b9ad9c"/>
+          <line x1="446" y1="54" x2="466" y2="62" class="st" stroke="#b9ad9c" stroke-width="2"/>
+          <circle cx="472" cy="64" r="5" class="stf" fill="#b9ad9c"/>
+          <text x="398" y="112" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">多想幾種再選?</text>
+        </g>
+        <!-- Pattern: 頭 -->
+        <g class="zone" data-key="pattern" style="color:#9a6b2e">
+          <circle cx="302" cy="150" r="27" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.5"/>
+          <circle cx="294" cy="146" r="3.5" class="stf" fill="#b9ad9c"/>
+          <circle cx="308" cy="141" r="3.5" class="stf" fill="#b9ad9c"/>
+          <circle cx="306" cy="158" r="3.5" class="stf" fill="#b9ad9c"/>
+          <line x1="296" y1="147" x2="306" y2="142" class="st" stroke="#b9ad9c" stroke-width="1.5"/>
+          <line x1="307" y1="144" x2="306" y2="155" class="st" stroke="#b9ad9c" stroke-width="1.5"/>
+        </g>
+        <!-- Runtime: 身體(軀幹+腿) -->
+        <g class="zone" data-key="runtime" style="color:#b04a6a">
+          <rect x="282" y="182" width="40" height="92" rx="18" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.5"/>
+          <polyline points="288,225 296,225 300,214 306,236 310,225 318,225" fill="none" class="st" stroke="#b9ad9c" stroke-width="2"/>
+          <line x1="292" y1="272" x2="282" y2="338" class="st" stroke="#b9ad9c" stroke-width="6" stroke-linecap="round"/>
+          <line x1="312" y1="272" x2="330" y2="336" class="st" stroke="#b9ad9c" stroke-width="6" stroke-linecap="round"/>
+        </g>
+        <!-- Tool: 伸出去的手 + 手機 -->
+        <g class="zone" data-key="tool" style="color:#0c7a59">
+          <line x1="320" y1="196" x2="392" y2="224" class="st" stroke="#b9ad9c" stroke-width="6" stroke-linecap="round"/>
+          <rect x="388" y="210" width="20" height="32" rx="4" fill="var(--panel)" class="st fillable" stroke="#b9ad9c" stroke-width="2.5"/>
+          <line x1="394" y1="236" x2="402" y2="236" class="st" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="416" y="232" font-size="10.5" fill="#8a7d6e" style="font-family:var(--mono)">外部工具</text>
+        </g>
+        <!-- 足球(裝飾,呼應 Runtime 的例子) -->
+        <circle cx="352" cy="330" r="11" fill="var(--panel)" stroke="#d8d0c0" stroke-width="2"/>
+        <path d="M 348 326 L 356 326 L 358 333 L 352 337 L 346 333 Z" fill="none" stroke="#d8d0c0" stroke-width="1.5"/>
+      </svg>
+      <div class="chips" id="humanChips" style="margin-top:14px">
+        <div class="chip" data-key="pattern"><h4>頭 · 能力庫</h4><div class="sub">Pattern</div></div>
+        <div class="chip" data-key="cm"><h4>思考泡泡</h4><div class="sub">Computation Model</div></div>
+        <div class="chip" data-key="runtime"><h4>身體</h4><div class="sub">Runtime</div></div>
+        <div class="chip" data-key="tool"><h4>手上的工具</h4><div class="sub">Tool</div></div>
+        <div class="chip" data-key="env"><h4>世界</h4><div class="sub">Environment</div></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelHuman">
+      <p class="placeholder">↑ 點場景裡的部位(或下面的小卡),看它對應哪一層、為什麼這樣對。</p>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>身體被 Runtime 吸收</b> — 心跳、呼吸、體力、注意力都是「當下這個人」的一部分,歸 Runtime。這樣 Tool 就不用糾結「器官算不算工具」,回到單純的「拿起來用的東西」。</div>
+      <div class="exclusion"><b>Tool 是真正獨立的第五層</b> — 檢驗:拿掉 Tool,Runtime 還完整嗎?Enact P1 論文(純對話 agent,不碰工具)證明可以——Runtime 的身分狀態、記憶、迴圈完全自洽,所以 Tool 是並列的一層,不是 Runtime 的附屬資源。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: conditioning edge ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 那條沒名字的邊</div>
     <div class="sec-title">Conditioning edge — 框架沒有格子裝的東西</div>
     <p class="sec-sub">
       Orthogonal 分析驗過五層乾淨獨立(每一對都找得到「動一個、另一個沒動」的反例)。但分析中
@@ -216,9 +307,9 @@ render_with_liquid: false
     </div>
   </section>
 
-  <!-- ============ SECTION C: Computation Model ============ -->
+  <!-- ============ SECTION D: Computation Model ============ -->
   <section>
-    <div class="sec-kicker">圖 C · 最容易講糊的一層</div>
+    <div class="sec-kicker">圖 D · 最容易講糊的一層</div>
     <div class="sec-title">Computation Model = 探索政策,不是形狀</div>
     <p class="sec-sub">
       慣例把這層講成「execution topology(線/樹/圖)」——但那只是<b>結果的幾何描述</b>。
@@ -266,7 +357,7 @@ render_with_liquid: false
     compute: {
       title: 'Computation Model', tag: '02 · Decision 軸',
       q: '面對決定,是直覺反應,還是要多想幾種、比較後才選?',
-      def: '一個「計算預算怎麼分配去探索 Pattern 打開的候選延續空間」的政策——分岔幾條、什麼結構、怎麼比較、何時收斂。詳見圖 C。',
+      def: '一個「計算預算怎麼分配去探索 Pattern 打開的候選延續空間」的政策——分岔幾條、什麼結構、怎麼比較、何時收斂。詳見圖 D。',
       deliverable: '分岔幾條 / 什麼結構 / 怎麼比較 / 何時收斂',
       human: '當下採用的思考策略',
       example: 'Linear、Self-Consistency、Beam Search、ToT、MCTS/LATS、GoT。'
@@ -392,6 +483,49 @@ render_with_liquid: false
     `;
   }
   chipsC.forEach(n => n.addEventListener('click', () => renderC(n.dataset.key)));
+
+  const HUMAN = {
+    pattern: { title: '頭 · 腦中的能力庫', layer: 'Pattern', color: '#9a6b2e',
+      what: '長期學會的能力(skills / cognitive repertoire)——腦中的念頭,哪些自然接著哪些。',
+      why: '踢球的人「看到空檔 → 想到傳球」這種念頭接續,是長期練出來的能力庫,不是當下才發明的。agent 對應:primitive 列表 + 局部文法(ReAct 的 Thought → Action → Observation)。',
+      ex: '注意跟思考泡泡的分工:能力庫是「會什麼」,泡泡是「當下怎麼用」。' },
+    cm: { title: '思考泡泡 · 當下的思考策略', layer: 'Computation Model', color: '#2f6f9e',
+      what: '面對決定,是直覺反應,還是停下來多想幾種、比較後才選——對應 Kahneman 的 System 1/2。',
+      why: '同一個人、同一套能力,可以換不同思考策略:直覺出腳(Linear)vs 在腦中分岔比較幾種踢法再選(ToT 那類)。泡泡裡那個分岔的小圖,就是「多想幾種」的樣子。',
+      ex: '這就是為什麼 Pattern 跟 Computation Model 是兩層:能力庫不變,策略可以換。' },
+    runtime: { title: '身體 · 當下整個人', layer: 'Runtime', color: '#b04a6a',
+      what: '身體狀態 + 工作記憶 + 注意力 + 目標——「Runtime」的字義就是讓東西持續跑下去的機制,人類經驗裡最符合的是身體。',
+      why: '兩個子功能剛好對應身體的兩面:心跳呼吸讓你持續是你(自動維持=記憶連續性);決定伸手拿東西時,神經肌肉系統確保動作真的做出來、沒抓到會自動調整重試(確實執行=執行可靠性)。',
+      ex: '足球例:「腳很重」「體力下降」「左腳不穩」都不是能力或策略——是 Runtime state。地上那顆球旁邊的狀態,就是這種。' },
+    tool: { title: '手上的工具 · 跨出去碰世界的', layer: 'Tool', color: '#0c7a59',
+      what: '身體以外借用的東西(手機、筆、扳手),加上真正跨出去碰世界的器官(手、腳、嘴巴)。',
+      why: '判準是「跨不跨越 Agent–Environment 邊界」:腳現在累不累(狀態,不跨)歸 Runtime;腳實際去踢球(跨出去、碰到世界)歸 Tool。所以同一個部位,兩個面向落在不同層。',
+      ex: 'Tool 分兩種來源:內建(眼睛/耳朵/手腳——模型天生就會、不需要 schema 的能力)vs 外部撿起來的(扳手/手機——需要一份 schema 才會用的 read_file()/click())。' },
+    env: { title: '世界 · 控制不了的部分', layer: 'Environment', color: '#8a7d6e',
+      what: '所在的這個世界長什麼樣,有什麼是控制不了的——場地、天氣、對手。',
+      why: '你可以決定怎麼踢(Decision 軸)、確保腳真的踢出去(Execution 軸),但球落地後會怎麼彈、對手會怎麼反應,是世界的動態,不歸你管。',
+      ex: 'agent 對應:Git repository、filesystem、API 的可用性與延遲——資源清單 + 觀測/行動限制 + 世界動態。' }
+  };
+
+  const panelHuman = document.getElementById('panelHuman');
+  const zones = document.querySelectorAll('#humanSvg .zone');
+  const humanChips = document.querySelectorAll('#humanChips .chip');
+  function renderHuman(key){
+    const d = HUMAN[key];
+    zones.forEach(z => z.classList.toggle('active', z.dataset.key === key));
+    humanChips.forEach(c => c.classList.toggle('active', c.dataset.key === key));
+    panelHuman.innerHTML = `
+      <div class="ph" style="color:${d.color}">人體對應 · ${d.layer}</div>
+      <h2>${d.title}</h2>
+      <div class="meta">
+        <b>人類的什麼</b><span>${d.what}</span>
+        <b>為什麼這樣對</b><span>${d.why}</span>
+      </div>
+      <div class="ex" style="border-left-color:${d.color}">${d.ex}</div>
+    `;
+  }
+  zones.forEach(z => z.addEventListener('click', () => renderHuman(z.dataset.key)));
+  humanChips.forEach(c => c.addEventListener('click', () => renderHuman(c.dataset.key)));
 
   renderA('pattern');
   layoutEdge();

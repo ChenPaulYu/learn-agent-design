@@ -1,5 +1,5 @@
-_site/
-.jekyll-cache/
-.jekyll-metadata
-vendor/bundle/
-.bundle/
+site/_site/
+site/.jekyll-cache/
+site/.jekyll-metadata
+site/vendor/
+site/.bundle/

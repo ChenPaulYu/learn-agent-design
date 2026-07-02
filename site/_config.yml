@@ -7,21 +7,23 @@ lang: zh-Hant
 markdown: kramdown
 theme: null
 
-# studies/<topic>/mockups/**/*.html and code/ files carry no front matter,
-# so Jekyll already treats them as static assets and copies them through
-# untouched — no special config needed for that passthrough.
+# All Jekyll machinery lives in site/, but the CONTENT source stays the repo
+# root (studies/ is the content). Run from site/:
+#   bundle exec jekyll serve -s .. -c _config.yml -d _site
+# layouts_dir / cache_dir below are relative to that root source.
+layouts_dir: site/_layouts
+cache_dir: site/.jekyll-cache
 
-# The site publishes ONLY studies/*/pages/ pages. Everything else in
-# the repo (markdown notes, mockups, code) is source material that stays
-# private to the repo — docs/ remain the source of truth the interactives
-# derive from, but they are not rendered into the site.
+# The site publishes ONLY studies/*/pages/ pages (+ the homepage in
+# site/index.md). Everything else in the repo (markdown notes, mockups, code)
+# is source material that stays private to the repo — docs/ remain the source
+# of truth the pages derive from, but they are not rendered into the site.
 exclude:
-  - Gemfile
-  - Gemfile.lock
-  - vendor
+  - site/Gemfile
+  - site/Gemfile.lock
+  - site/vendor
   - README.md
   - CLAUDE.md
-  - mockups
   - "studies/*/docs"
   - "studies/*/code"
   - "studies/*/mockups"

@@ -1,5 +1,6 @@
 ---
 title: Learn Agent Design
+permalink: /
 ---
 
 學習 agent design 的地方——讀懂一個概念、蒸餾成筆記,再把它做成**可以點的互動教學頁**。

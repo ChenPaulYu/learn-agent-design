@@ -34,7 +34,7 @@ carries Jekyll front matter (`title`/`date`/`tags`, `layout: none`, `render_with
 so it auto-appears in the site nav while keeping its own standalone HTML; (3) its top comment
 states *Derived from* (which docs) + *Last synced* (date) — when the docs change materially,
 re-sync the page and bump the date; (4) published URL is `/<topic>/<content>/` (e.g.
-`studies/mcp/pages/101.html` → `/mcp/101/`) — one per-topic permalink entry in `_config.yml`,
+`studies/mcp/pages/101.html` → `/mcp/101/`) — one per-topic permalink entry in `site/_config.yml`,
 added when a topic publishes its first page.
 
 ## Writing a study note
