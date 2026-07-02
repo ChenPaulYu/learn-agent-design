@@ -25,10 +25,6 @@ tags:
   進階主題(101 之外):誰該防誰的責任分工、遠端授權怎麼跑(OAuth 2.1、PKCE、resource
   indicator)、本機 server 淪陷風險、Confused Deputy Problem、Session Hijacking 兩種變體、
   Lethal Trifecta(私密資料 + 不信任內容 + 對外通訊三者疊加)、tool description 本身是攻擊面
-- [mcp-sep-governance](docs/2026-07-02-mcp-sep-governance.md) —
-  進階主題:SEP 提案機制(抄 Python PEP/Rust RFC)、狀態機(Draft→In-Review→Accepted→Final,
-  這是為什麼 Tasks 機制標「未定案」的判斷依據)、四層治理結構(Contributors→Maintainers→
-  Core Maintainers→Lead Maintainers)、Anthropic 跟社群共用治理層級、Working/Interest Group
 - [mcp-tool-scaling-problem](docs/2026-07-02-mcp-tool-scaling-problem.md) —
   進階主題:一個 host 接多個 server 之後,工具清單塞爆 context 怎麼辦——Progressive Tool
   Discovery(先搜尋、後載入)、Programmatic Tool Calling / Code Mode(模型寫程式碼在沙箱裡
@@ -42,9 +38,6 @@ tags:
 - [pages/tool-scaling](pages/tool-scaling.html) —
   互動版太多工具問題:圖 A 三個壞處、圖 B context window 填滿比例(笨拙 vs Progressive
   Discovery 切換)、圖 C 多輪來回 vs Code Mode 一次跑完
-- [pages/governance](pages/governance.html) —
-  互動版 SEP 治理:圖 A SEP 狀態機(為什麼有些機制標「未定案」)、圖 B 四層治理階梯、
-  圖 C 現況 vs 目標(Working Group 怎麼解決審查瓶頸)
 - [code/](code/) — 官方 Python SDK 寫的最小 server(一個 tool + 一個 resource + 一個 prompt)
   + 一個 client 跑過一輪 `list_tools` / `call_tool` / `read_resource` / `get_prompt`
 
