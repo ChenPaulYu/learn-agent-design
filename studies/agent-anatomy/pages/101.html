@@ -117,6 +117,17 @@ render_with_liquid: false
   .fan-col .ftag{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--accent)}
   .fan-col p{margin-top:6px;line-height:1.55}
 
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
   .zone{cursor:pointer}
   .zone .st{transition:stroke .15s ease}
   .zone .stf{transition:fill .15s ease}
@@ -338,9 +349,47 @@ render_with_liquid: false
     </div>
   </section>
 
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      跟 MCP 101 不同,<b>這個五層框架是個人的理解與原創分層</b>——不是業界標準或某份官方規格,
+      是一系列 first-principles / orthogonal / elicit 分析推導出來的一種「怎麼看 agent 系統」的
+      視角。真相來源是下面五篇推導筆記;外部連結只有兩類:查證過的(Tool 層改名的由來),跟
+      延伸閱讀(文中提到的案例系統原始論文,未逐篇查證,僅供追源頭)。
+    </p>
+
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">推導筆記(真相來源,本 repo)</div>
+        <a href="https://github.com/ChenPaulYu/learn-agent-design/blob/main/studies/agent-anatomy/docs/2026-07-01-five-layer-framework.md">five-layer-framework — 五層定義、兩軸分組、命名決策</a>
+        <a href="https://github.com/ChenPaulYu/learn-agent-design/blob/main/studies/agent-anatomy/docs/2026-07-01-orthogonal-analysis.md">orthogonal-analysis — 逐對獨立性檢查、conditioning edge 的發現</a>
+        <a href="https://github.com/ChenPaulYu/learn-agent-design/blob/main/studies/agent-anatomy/docs/2026-07-01-computation-model-first-principles.md">computation-model-first-principles — 探索政策的重建、政策一覽表</a>
+        <a href="https://github.com/ChenPaulYu/learn-agent-design/blob/main/studies/agent-anatomy/docs/2026-07-01-runtime-first-principles.md">runtime-first-principles — 連續性機制、(A)/(B) 兩種 state</a>
+        <a href="https://github.com/ChenPaulYu/learn-agent-design/blob/main/studies/agent-anatomy/docs/2026-07-01-human-analogy-elicit.md">human-analogy-elicit — 人體對應的收斂記錄(圖 B 的來源)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">查證過的外部來源</div>
+        <a href="https://openai.com/index/harness-engineering/">OpenAI「Harness engineering」— Tool 層為什麼不叫 Harness 的查證對象</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">延伸閱讀(案例系統,未逐篇查證)</div>
+        <a href="https://arxiv.org/abs/2210.03629">ReAct — Thought/Action/Observation 文法的出處</a>
+        <a href="https://arxiv.org/abs/2305.10601">Tree of Thoughts — 圖 D 最乾淨的政策範例</a>
+        <a href="https://arxiv.org/abs/2303.11366">Reflexion — Reflection Memory(conditioning edge 的例子)</a>
+        <a href="https://arxiv.org/abs/2305.16291">Voyager — Skill Library(conditioning edge 的例子)</a>
+        <a href="https://arxiv.org/abs/2203.11171">Self-Consistency — 取樣投票政策</a>
+        <a href="https://arxiv.org/abs/2308.09687">Graph of Thoughts — 分岔合併(DAG)政策</a>
+        <a href="https://www.langchain.com/langgraph">LangGraph — CM(nodes/edges)vs Runtime(State)的實作對照</a>
+      </div>
+    </div>
+  </section>
+
   <footer>
     互動教學頁 · 內容以 docs/ 四篇筆記為真相來源(five-layer-framework · orthogonal-analysis ·
-    computation-model-first-principles · runtime-first-principles)· 最後同步 2026-07-02
+    computation-model-first-principles · runtime-first-principles · human-analogy-elicit)·
+    最後同步 2026-07-02
   </footer>
 </div>
 
