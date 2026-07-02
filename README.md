@@ -1,12 +1,12 @@
 # learn-agent-design
 
-> Paul's personal workspace for learning agent design — read a concept, distill it into a note,
+> A personal workspace for learning agent design — read a concept, distill it into a note,
 > then try it hands-on in code.
-> Paul 個人學習 agent design 的地方——讀懂一個概念、蒸餾成筆記,然後動手寫 code 驗證看看。
+> 個人學習 agent design 的地方——讀懂一個概念、蒸餾成筆記,然後動手寫 code 驗證看看。
 
-**Not a product.** No shipping, no users, nothing here is meant to go anywhere but Paul's own
-head. Disposable by nature — a study can be abandoned, a mockup thrown away, a code experiment
-rewritten from scratch, all without ceremony.
+**Not a product.** No shipping, no users, nothing here is meant to go anywhere but this
+workspace's own use. Disposable by nature — a study can be abandoned, a mockup thrown away, a
+code experiment rewritten from scratch, all without ceremony.
 
 ## What lives here
 
@@ -59,7 +59,7 @@ cross-repo ADRs — the resemblance is borrowed habit, not coupling.
 
 ## 中文
 
-**這不是產品。** 不上線、沒有使用者,這裡的東西只為了 Paul 自己學懂而存在。用完即丟是常態——一個
+**這不是產品。** 不上線、沒有使用者,這裡的東西只為了個人學懂而存在。用完即丟是常態——一個
 study 可以放棄、一份 mockup 可以丟掉、一段 code 可以整段重寫,都不用有心理負擔。
 
 **結構**:一個 `studies/<topic>/` 對應一個有邊界的概念。每個主題把「這個想法的一切」都收在同一個

@@ -29,6 +29,8 @@ exclude:
   - site/vendor
   - README.md
   - CLAUDE.md
+  - BACKLOG.md
+  - rules
   - "studies/*/docs"
   - "studies/*/code"
   - "studies/*/mockups"
