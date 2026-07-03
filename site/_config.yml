@@ -59,3 +59,7 @@ defaults:
       path: "studies/agent-skills"
     values:
       permalink: "/agent-skills/:basename/"
+  - scope:
+      path: "studies/tool-use"
+    values:
+      permalink: "/tool-use/:basename/"

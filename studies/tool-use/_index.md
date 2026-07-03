@@ -22,6 +22,9 @@ tags:
   (`defer_loading`,最多省 95% context)、Programmatic Tool Calling(`allowed_callers`,
   官方實例 43,588→27,297 token)、Tool Use Examples(`input_examples`,準確度 72%→90%)、
   三者疊在一起用各省不同的東西
+- [pages/101](pages/101.html) —
+  互動版 Tool Use 101:圖 A 三段式流程(定義/呼叫/回結果)、圖 B 多輪迴圈(成功 vs
+  is_error 兩條路徑)、圖 C tool_choice 四種模式 + extended thinking 的坑
 
 ## 出處
 

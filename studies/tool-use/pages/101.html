@@ -1,0 +1,309 @@
+---
+title: Tool Use 101 — 互動圖解
+summary: 三張互動圖:三段式流程(定義/呼叫/回結果)、多輪迴圈怎麼接+錯誤處理、tool_choice 四種模式與 extended thinking 的坑。
+date: 2026-07-03
+tags:
+  - tool-use
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Tool Use 101:三張互動圖解。可長期回看的教學頁(pages/ genre,發布於
+  /tool-use/101/),不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-03-tool-use-basics.md
+  Last synced: 2026-07-03 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(三段式流程)— 定義工具 → tool_use → tool_result,流程圖 + 點卡片看每段的 JSON
+      長什麼樣。
+    圖 B(多輪迴圈)— 切換「成功」vs「失敗(is_error)」兩條路徑,看迴圈怎麼接下去。
+    圖 C(控制選項)— tool_choice 四種模式(auto/any/tool/none)+ 平行呼叫開關,以及跟
+      extended thinking 疊用時的坑。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Tool Use 101 — 互動圖解</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:150px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:100px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .snippet{margin-top:8px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;
+    background:var(--line-soft);border-left-color:var(--muted);padding:11px 14px;border-radius:0 10px 10px 0;
+    border-left:3px solid var(--muted)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .flow-row{display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .flow-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 13px;
+    font-size:12.5px;font-weight:600;box-shadow:var(--shadow)}
+  .flow-box.model{border-color:var(--blue);color:var(--blue)}
+  .flow-box.tool{border-color:var(--rose);color:var(--rose)}
+  .flow-box.sandbox{border-color:var(--green);color:var(--green)}
+  .flow-arrow{color:var(--faint);font-size:13px}
+  .flow-round{margin-top:10px;padding:10px 12px;background:var(--line-soft);border-radius:8px}
+  .flow-round .rlabel{font-family:var(--mono);font-size:10px;color:var(--faint);margin-bottom:6px}
+
+  .toggle-row{display:flex;gap:10px;margin-top:22px}
+  .toggle-btn{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    padding:12px 16px;cursor:pointer;font-size:13.5px;font-weight:650;color:var(--muted);
+    transition:all .16s ease;text-align:center}
+  .toggle-btn.active{border-color:var(--green);color:var(--green);background:rgba(12,122,89,.06)}
+  .toggle-btn.active.bad{border-color:var(--rose);color:var(--rose);background:rgba(176,74,106,.06)}
+  .ctx-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px}
+  .ctx-label{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .ctx-fill-note{margin-top:10px;font-size:12.5px;color:var(--muted)}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .flow-row{flex-direction:column;align-items:stretch}
+    .flow-arrow{transform:rotate(90deg);align-self:center}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← Tool Use 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · Tool Use 101</div>
+    <h1>Tool Use 101 — LLM 怎麼決定要呼叫一個工具</h1>
+    <p class="tagline">
+      三張圖。圖 A 是三段式流程:定義、呼叫、回結果。圖 B 是多輪怎麼接、失敗怎麼辦。圖 C 是
+      你能插手的控制選項,跟一個容易踩的坑。點任何卡片看細節。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 三段式流程 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 一輪工具呼叫,分三段</div>
+    <div class="sec-title">定義 → 呼叫 → 回結果</div>
+    <p class="sec-sub">
+      response 的 content 陣列不保證 tool_use 排第一個(文字說明可能先出現)——要掃描整個
+      陣列去找,不能假設位置。點卡片看每段的 JSON 長什麼樣。
+    </p>
+
+    <div class="flow-row">
+      <span class="flow-box model">你定義工具(JSON Schema)</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box tool">模型回 tool_use</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box sandbox">你執行 + 回 tool_result</span>
+    </div>
+
+    <div class="chips" id="flowChips">
+      <div class="chip" data-key="define"><h4>1. 定義工具</h4><div class="sub">name + description + input_schema</div></div>
+      <div class="chip" data-key="use"><h4>2. tool_use</h4><div class="sub">模型決定呼叫</div></div>
+      <div class="chip" data-key="result"><h4>3. tool_result</h4><div class="sub">靠 tool_use_id 配對</div></div>
+    </div>
+
+    <div class="panel" id="panelA">
+      <p class="placeholder">↑ 點上面任一張卡片看細節跟 JSON 範例。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: 多輪迴圈 ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 多輪對話怎麼接</div>
+    <div class="sec-title">一個 while 迴圈,兩條可能的路徑</div>
+    <p class="sec-sub">
+      只要 stop_reason 還是 tool_use,就繼續執行、繼續送結果回去——切換下面看「成功」跟
+      「工具執行失敗」兩條路徑差在哪。
+    </p>
+
+    <div class="toggle-row" id="loopToggle">
+      <div class="toggle-btn active" data-mode="success">工具執行成功</div>
+      <div class="toggle-btn bad" data-mode="error">工具執行失敗</div>
+    </div>
+    <div class="ctx-box" id="loopBox"></div>
+  </section>
+
+  <!-- ============ SECTION C: 控制選項 ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 你能插手的控制選項</div>
+    <div class="sec-title">tool_choice,還有一個容易踩的坑</div>
+    <p class="sec-sub">
+      預設是模型自己決定要不要用工具,但你可以強制。點卡片看四種模式。
+    </p>
+
+    <div class="chips" id="choiceChips">
+      <div class="chip" data-key="auto"><h4>auto</h4><div class="sub">模型自己決定(預設)</div></div>
+      <div class="chip" data-key="any"><h4>any</h4><div class="sub">一定要用某個工具</div></div>
+      <div class="chip" data-key="tool"><h4>tool</h4><div class="sub">一定要用指定的工具</div></div>
+      <div class="chip" data-key="none"><h4>none</h4><div class="sub">這輪不准用工具</div></div>
+    </div>
+
+    <div class="panel" id="panelChoice">
+      <p class="placeholder">↑ 點上面任一張卡片看細節。</p>
+    </div>
+
+    <div class="sec-sub" style="margin-top:30px">
+      跟 Extended Thinking 疊在一起用時,有一個容易踩的坑:
+    </div>
+    <div class="ctx-box">
+      <div class="ctx-label">⚠ Thinking Block 必須原封不動傳回去</div>
+      <div class="ctx-fill-note">開了 extended thinking 後,回應會多一個帶 signature 的 thinking block。下一輪把 tool_result 送回去時,thinking block 要跟 tool_use block 一起傳回去,不能只傳 tool_use——漏了會直接噴錯。這個坑不會在單純只用 tool use 時出現,兩個功能疊在一起用才會冒出來。</div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">全部經 context7 於 2026-07-03 查證,官方文檔。</p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">Anthropic 官方文檔</div>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools">define-tools — 工具定義格式、tool_choice 四種模式</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/build-a-tool-using-agent">build-a-tool-using-agent — 完整 while 迴圈範例</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls">handle-tool-calls — is_error 錯誤處理格式</a>
+        <a href="https://platform.claude.com/docs/en/build-with-claude/extended-thinking">extended-thinking — thinking block 要跟 tool_use 一起傳回去的規則</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/2026-07-03-tool-use-basics.md 為真相來源(經 context7 查證)·
+    最後同步 2026-07-03
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  const FLOW = {
+    define: {
+      title: '1. 定義工具', tag: 'name + description + input_schema',
+      def: '標準 JSON Schema——`input_schema` 描述這個工具接受什麼參數。',
+      snippet: `{"name": "get_stock_price",\n "description": "Get the current stock price for a given ticker symbol.",\n "input_schema": {"type": "object",\n   "properties": {"ticker": {"type": "string"}},\n   "required": ["ticker"]}}`
+    },
+    use: {
+      title: '2. tool_use', tag: '模型決定呼叫,回一個 content block',
+      def: 'response 的 stop_reason 會是 "tool_use"。content 陣列裡可能先有文字說明,再接 tool_use block——要掃描整個陣列找,不能假設位置。',
+      snippet: `{"type": "tool_use", "id": "toolu_01D7FLrfh4GYq7yT1ULFeyMV",\n "name": "get_stock_price", "input": {"ticker": "^GSPC"}}`
+    },
+    result: {
+      title: '3. tool_result', tag: '靠 tool_use_id 配對,用 user 角色送回',
+      def: '你執行完工具,把結果包成 tool_result,用 tool_use_id 對應到剛剛那次呼叫——即使邏輯上是系統回報,Messages API 規定這輪要用 user 角色送。',
+      snippet: `{"type": "tool_result", "tool_use_id": "toolu_01D7FLrfh4GYq7yT1ULFeyMV",\n "content": "259.75 USD"}`
+    }
+  };
+  const panelA = document.getElementById('panelA');
+  const chipsA = document.querySelectorAll('#flowChips .chip');
+  chipsA.forEach(n => n.addEventListener('click', () => {
+    chipsA.forEach(c => c.classList.toggle('active', c === n));
+    const d = FLOW[n.dataset.key];
+    panelA.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div><div class="snippet">${d.snippet}</div>`;
+    fadeIn(panelA);
+  }));
+
+  const loopBox = document.getElementById('loopBox');
+  const loopBtns = document.querySelectorAll('#loopToggle .toggle-btn');
+  function renderLoop(mode){
+    loopBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    if (mode === 'success') {
+      loopBox.innerHTML = `
+        <div class="ctx-label">while (response.stop_reason === "tool_use")</div>
+        <div class="flow-round"><div class="rlabel">每一輪</div>
+          <div class="flow-row">
+            <span class="flow-box tool">執行 tool_use</span><span class="flow-arrow">→</span>
+            <span class="flow-box sandbox">包成 tool_result</span><span class="flow-arrow">→</span>
+            <span class="flow-box model">送回模型,繼續下一輪</span>
+          </div>
+        </div>
+        <div class="ctx-fill-note">assistant 那輪(模型回應)跟 user 那輪(工具結果)是兩個獨立訊息,不是塞進同一則——直到模型不再要求呼叫工具,迴圈才結束。</div>
+      `;
+    } else {
+      loopBox.innerHTML = `
+        <div class="ctx-label">is_error: true</div>
+        <div class="flow-round"><div class="rlabel">失敗時</div>
+          <div class="flow-row">
+            <span class="flow-box tool">執行失敗(例外)</span><span class="flow-arrow">→</span>
+            <span class="flow-box sandbox">content 包錯誤訊息 + is_error:true</span><span class="flow-arrow">→</span>
+            <span class="flow-box model">模型看到錯誤,自己判斷下一步</span>
+          </div>
+        </div>
+        <div class="ctx-fill-note">工具執行失敗不代表對話中斷——模型收到帶 is_error 的 tool_result 後,可能重試、換個做法,或直接告訴使用者失敗了,判斷權還在模型手上。</div>
+      `;
+    }
+    fadeIn(loopBox);
+  }
+  loopBtns.forEach(b => b.addEventListener('click', () => renderLoop(b.dataset.mode)));
+  renderLoop('success');
+
+  const CHOICE = {
+    auto: { title: 'auto(預設)', tag: 'tool_choice', def: '模型自己決定要不要用工具、用哪一個。不特別設定 tool_choice 時就是這個模式。' },
+    any: { title: 'any', tag: 'tool_choice', def: '一定要用某個工具,但不限定是哪個——模型自己挑一個最合適的。' },
+    tool: { title: 'tool', tag: 'tool_choice', def: '一定要用指定的工具——`{"type": "tool", "name": "get_weather"}` 這種寫法,強制模型呼叫這一個。' },
+    none: { title: 'none', tag: 'tool_choice', def: '這輪完全不准用工具,就算模型判斷需要也不行——想讓模型純粹用文字回應時用這個。另外還有 disable_parallel_tool_use 旗標,設成 true 會限制模型一次最多只能呼叫一個工具(預設可以一次回傳好幾個 tool_use block)。' }
+  };
+  const panelChoice = document.getElementById('panelChoice');
+  const chipsChoice = document.querySelectorAll('#choiceChips .chip');
+  chipsChoice.forEach(n => n.addEventListener('click', () => {
+    chipsChoice.forEach(c => c.classList.toggle('active', c === n));
+    const d = CHOICE[n.dataset.key];
+    panelChoice.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelChoice);
+  }));
+</script>
+</body>
+</html>
