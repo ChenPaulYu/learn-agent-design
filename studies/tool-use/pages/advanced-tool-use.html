@@ -1,0 +1,658 @@
+---
+title: Advanced Tool Use — 互動圖解
+summary: 四張互動圖:Tool Search Tool 的 context 節省對照、Programmatic Tool Calling 的來回次數對照、Tool Use Examples 的準確度對照、三個功能的業界普及程度總表(共識/平行案例/獨創)。
+date: 2026-07-03
+tags:
+  - tool-use
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Advanced Tool Use:四張互動圖解。可長期回看的教學頁(pages/ genre,發布於
+  /tool-use/advanced-tool-use/),不是 disposable mockup。101/origins 之外的第三張頁,
+  寫的是基礎機制不夠用時的三個 2025-11 beta 功能,以及這三個功能放到整個產業去看,普及
+  程度差很多這件事。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-03-advanced-tool-use.md
+  Last synced: 2026-07-03 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(Tool Search Tool)— 切換「全部塞進去」vs「defer_loading」,SVG 比喻場景(扛著一疊
+      工具 vs 只從貨架搜尋拉出一個)+ context window 填滿比例長條圖,底下業界對照
+      (OpenAI 幾乎同名功能已上線,Google 缺席)。
+    圖 B(Programmatic Tool Calling)— 切換「一般呼叫」vs「Programmatic Tool Calling」,
+      SVG 比喻場景(來回好幾趟 vs 寫一段程式碼丟進沙箱一次跑完)+ 來回次數流程圖對照,
+      底下業界對照(Cloudflare Code Mode、smolagents CodeAgent 是平行案例)。
+    圖 C(Tool Use Examples)— 切換「只有零件清單(schema)」vs「還有組好的範例照片
+      (examples)」的組裝家具比喻場景 + 準確度長條圖(72% → 90%),底下業界對照
+      (OpenAI/Google/Mistral/Meta 都沒有對應功能,獨創)+ 跟 Agent Skills 的 Examples/
+      examples.md 邊界(同精神,顆粒度差一個量級,連到 agent-skills 主題)。
+    圖 D(業界普及程度總表)— 三個功能各自的分類卡片(共識/平行案例/獨創),點卡片先看
+      「解決什麼問題 + 機制」,再看業界對照證據。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Advanced Tool Use — 互動圖解</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 15px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:170px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .chip .badge{display:inline-block;margin-top:6px;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:5px}
+  .chip .badge.consensus{background:rgba(12,122,89,.1);color:var(--green)}
+  .chip .badge.parallel{background:rgba(47,111,158,.1);color:var(--blue)}
+  .chip .badge.original{background:rgba(154,107,46,.1);color:var(--accent)}
+
+  .matrix-col{transition:opacity .2s ease}
+  .matrix-col.dim{opacity:.28}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:100px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .snippet,.ctx-box .snippet{margin-top:8px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;
+    background:var(--line-soft);border-left-color:var(--muted);padding:11px 14px;border-radius:0 10px 10px 0;
+    border-left:3px solid var(--muted)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .toggle-row{display:flex;gap:10px;margin-top:22px}
+  .toggle-btn{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    padding:12px 16px;cursor:pointer;font-size:13.5px;font-weight:650;color:var(--muted);
+    transition:all .16s ease;text-align:center}
+  .toggle-btn.active{border-color:var(--green);color:var(--green);background:rgba(12,122,89,.06)}
+  .toggle-btn.active.bad{border-color:var(--rose);color:var(--rose);background:rgba(176,74,106,.06)}
+
+  .scene-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}
+  .pass-state{transition:opacity .18s ease}
+  .scene-label{font-size:10.5px;fill:var(--muted);font-family:var(--sans)}
+
+  .ctx-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px}
+  .ctx-label{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:8px}
+  .ctx-bar{display:flex;height:44px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+  .ctx-seg{display:flex;align-items:center;justify-content:center;font-size:10.5px;color:#fff;
+    font-family:var(--mono);overflow:hidden;white-space:nowrap;transition:flex-basis .3s ease}
+  .ctx-seg.tool{background:var(--rose)}
+  .ctx-seg.search{background:var(--accent)}
+  .ctx-seg.room{background:var(--green);color:#fff}
+  .ctx-fill-note{margin-top:10px;font-size:12.5px;color:var(--muted)}
+
+  .flow-row{display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .flow-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 13px;
+    font-size:12.5px;font-weight:600;box-shadow:var(--shadow)}
+  .flow-box.model{border-color:var(--blue);color:var(--blue)}
+  .flow-box.tool{border-color:var(--rose);color:var(--rose)}
+  .flow-box.sandbox{border-color:var(--green);color:var(--green)}
+  .flow-arrow{color:var(--faint);font-size:13px}
+  .flow-round{margin-top:10px;padding:10px 12px;background:var(--line-soft);border-radius:8px}
+  .flow-round .rlabel{font-family:var(--mono);font-size:10px;color:var(--faint);margin-bottom:6px}
+
+  .bar-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+  .bar-row{display:flex;align-items:center;gap:12px}
+  .bar-label{flex:0 0 170px;font-size:12.5px;font-weight:600}
+  .bar-track{flex:1;background:var(--line-soft);border-radius:6px;height:22px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;
+    padding-right:8px;color:#fff;font-family:var(--mono);font-size:10.5px;transition:width .4s ease}
+  .bar-fill.a{background:var(--rose)}
+  .bar-fill.b{background:var(--green)}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .flow-row{flex-direction:column;align-items:stretch}
+    .flow-arrow{transform:rotate(90deg);align-self:center}
+    .bar-label{flex:0 0 auto}
+    .bar-row{flex-direction:column;align-items:stretch;gap:4px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← Tool Use 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · Advanced Tool Use</div>
+    <h1>Advanced Tool Use — 三個 beta 功能,三種業界普及程度</h1>
+    <p class="tagline">
+      圖 A-C 各自對照一個功能的「有 vs 沒有」差異,圖 D 是把三個功能放到整個產業去看的
+      總表——不是每個功能都一樣新,有的是業界共識,有的只有平行案例,有的是 Anthropic 獨創。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: Tool Search Tool ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · Tool Search Tool</div>
+    <div class="sec-title">工具定義不用一次全塞進 context</div>
+    <p class="sec-sub">
+      切換「全部塞進去」vs「defer_loading」,看 context window 被工具定義吃掉多少。
+    </p>
+
+    <div class="toggle-row" id="tstToggle">
+      <div class="toggle-btn active bad" data-mode="naive">全部塞進去</div>
+      <div class="toggle-btn" data-mode="deferred">defer_loading</div>
+    </div>
+
+    <div class="scene-box">
+      <svg viewBox="0 0 760 200" style="width:100%;height:auto;display:block">
+        <circle cx="130" cy="75" r="14" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="130" y1="89" x2="130" y2="125" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="130" y1="125" x2="112" y2="158" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="130" y1="125" x2="148" y2="158" stroke="#8a7d6e" stroke-width="2.5"/>
+        <text x="130" y="185" text-anchor="middle" class="scene-label">模型</text>
+
+        <g id="tstNaiveScene" class="pass-state">
+          <line x1="130" y1="100" x2="102" y2="88" stroke="#8a7d6e" stroke-width="2.5"/>
+          <line x1="130" y1="100" x2="158" y2="88" stroke="#8a7d6e" stroke-width="2.5"/>
+          <rect x="95" y="30" width="26" height="18" rx="2" fill="rgba(176,74,106,.1)" stroke="var(--rose)" stroke-width="1.6"/>
+          <rect x="102" y="46" width="26" height="18" rx="2" fill="rgba(176,74,106,.1)" stroke="var(--rose)" stroke-width="1.6"/>
+          <rect x="93" y="62" width="26" height="18" rx="2" fill="rgba(176,74,106,.1)" stroke="var(--rose)" stroke-width="1.6"/>
+          <rect x="108" y="16" width="26" height="18" rx="2" fill="rgba(176,74,106,.1)" stroke="var(--rose)" stroke-width="1.6"/>
+          <text x="45" y="42" font-size="18" font-weight="700" fill="var(--rose)">!</text>
+          <text x="245" y="80" text-anchor="middle" font-size="10" fill="var(--rose)">還沒開始做事,就先把每一個工具的完整定義都扛在身上</text>
+        </g>
+
+        <g id="tstDeferredScene" class="pass-state" style="display:none">
+          <line x1="130" y1="100" x2="165" y2="90" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+          <rect x="330" y="20" width="200" height="90" rx="8" fill="var(--line-soft)" stroke="var(--line)" stroke-width="1.6"/>
+          <rect x="345" y="32" width="34" height="20" rx="2" fill="none" stroke="#c9bfae" stroke-width="1.4" stroke-dasharray="2 2"/>
+          <rect x="388" y="32" width="34" height="20" rx="2" fill="none" stroke="#c9bfae" stroke-width="1.4" stroke-dasharray="2 2"/>
+          <rect x="431" y="32" width="34" height="20" rx="2" fill="none" stroke="#c9bfae" stroke-width="1.4" stroke-dasharray="2 2"/>
+          <rect x="474" y="32" width="34" height="20" rx="2" fill="none" stroke="#c9bfae" stroke-width="1.4" stroke-dasharray="2 2"/>
+          <rect x="388" y="64" width="34" height="20" rx="2" fill="var(--panel)" stroke="var(--green)" stroke-width="2"/>
+          <text x="140" y="30" text-anchor="middle" font-size="10" fill="var(--muted)">工具貨架(先不載入完整定義)</text>
+          <circle cx="405" cy="74" r="16" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+          <line x1="416" y1="85" x2="428" y2="97" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M 405,74 L 220,95" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-dasharray="4 3"/>
+          <text x="245" y="80" text-anchor="middle" font-size="10" fill="var(--green)">只搜尋、拉出真正需要的那一個</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="ctx-box">
+      <div class="ctx-label">Context Window 填滿比例</div>
+      <div class="ctx-bar" id="tstBar"></div>
+      <div class="ctx-fill-note" id="tstNote"></div>
+    </div>
+
+    <div class="chips" style="margin-top:22px">
+      <div class="chip" data-tst="openai"><h4>OpenAI</h4><div class="sub">幾乎同名功能已上線</div></div>
+      <div class="chip" data-tst="google"><h4>Google Gemini</h4><div class="sub">缺席,被開發者公開要求跟進</div></div>
+    </div>
+    <div class="panel" id="panelTst">
+      <p class="placeholder">↑ 點上面任一張卡片看業界對照細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: Programmatic Tool Calling ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · Programmatic Tool Calling</div>
+    <div class="sec-title">讓模型寫程式碼一次跑完,不要每步都推論一次</div>
+    <p class="sec-sub">
+      切換「一般呼叫」vs「Programmatic Tool Calling」,看來回次數差在哪。
+    </p>
+
+    <div class="toggle-row" id="ptcToggle">
+      <div class="toggle-btn active bad" data-mode="normal">一般呼叫</div>
+      <div class="toggle-btn" data-mode="ptc">Programmatic Tool Calling</div>
+    </div>
+
+    <div class="scene-box">
+      <svg viewBox="0 0 760 190" style="width:100%;height:auto;display:block">
+        <circle cx="90" cy="75" r="14" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="90" y1="89" x2="90" y2="122" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="90" y1="122" x2="74" y2="152" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="90" y1="122" x2="106" y2="152" stroke="#8a7d6e" stroke-width="2.5"/>
+        <text x="90" y="178" text-anchor="middle" class="scene-label">模型</text>
+
+        <g transform="translate(670,80)">
+          <rect x="-20" y="-16" width="40" height="32" rx="4" fill="var(--panel)" stroke="#8a7d6e" stroke-width="2"/>
+          <circle r="7" fill="none" stroke="#8a7d6e" stroke-width="2"/>
+        </g>
+        <text x="670" y="118" text-anchor="middle" class="scene-label">工具</text>
+
+        <g id="ptcNormalScene" class="pass-state">
+          <path d="M 115,65 Q 300,20 645,65" fill="none" stroke="var(--rose)" stroke-width="1.8" stroke-dasharray="4 3"/>
+          <path d="M 645,88 Q 300,60 115,88" fill="none" stroke="var(--rose)" stroke-width="1.8" stroke-dasharray="4 3"/>
+          <path d="M 115,100 Q 300,130 645,100" fill="none" stroke="var(--rose)" stroke-width="1.8" stroke-dasharray="4 3"/>
+          <text x="380" y="18" text-anchor="middle" font-size="10" fill="var(--rose)">來回 1</text>
+          <text x="380" y="145" text-anchor="middle" font-size="10" fill="var(--rose)">來回 2、3...N</text>
+          <text x="380" y="165" text-anchor="middle" font-size="10.5" font-weight="660" fill="var(--rose)">每一次來回都要重新推論一次</text>
+        </g>
+
+        <g id="ptcCodeScene" class="pass-state" style="display:none">
+          <rect x="300" y="40" width="160" height="80" rx="8" fill="var(--line-soft)" stroke="var(--accent)" stroke-width="1.8"/>
+          <text x="380" y="34" text-anchor="middle" font-size="10" fill="var(--muted)">沙箱(一次跑完整條邏輯)</text>
+          <path d="M 320,60 h30 M 320,75 h40 M 320,90 h25" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+          <path d="M 380,60 Q 420,75 380,90" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="2 2"/>
+          <line x1="115" y1="80" x2="295" y2="65" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+          <text x="200" y="55" text-anchor="middle" font-size="9.5" fill="var(--muted)">寫一段程式碼</text>
+          <path d="M 460,80 Q 550,80 645,80" fill="none" stroke="var(--green)" stroke-width="2.2"/>
+          <text x="555" y="70" text-anchor="middle" font-size="9.5" fill="var(--green)">只有最終結果回傳</text>
+          <text x="380" y="165" text-anchor="middle" font-size="10.5" font-weight="660" fill="var(--green)">中間結果不進模型 context</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="ctx-box" id="ptcBox"></div>
+
+    <div class="chips" style="margin-top:22px">
+      <div class="chip" data-ptc="cloudflare"><h4>Cloudflare「Code Mode」</h4><div class="sub">2025-09-26,MCP 工具當 TS 函式呼叫</div></div>
+      <div class="chip" data-ptc="smolagents"><h4>Hugging Face smolagents</h4><div class="sub">開源 CodeAgent,學術根源 CodeAct</div></div>
+    </div>
+    <div class="panel" id="panelPtc">
+      <p class="placeholder">↑ 點上面任一張卡片看業界對照細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: Tool Use Examples ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · Tool Use Examples</div>
+    <div class="sec-title">不只給 schema,還給具體填法</div>
+    <p class="sec-sub">
+      官方內部測試數字:準確度從 72% 提升到 90%。這塊查遍 OpenAI/Google/Mistral/Meta,
+      都沒有找到對應功能——目前是 Anthropic 獨創。
+    </p>
+
+    <p class="sec-sub" style="margin-top:-4px">
+      比喻:組裝家具時,只有零件清單(schema)知道「這裡有一顆螺絲、那裡有一塊板子」,但不知道
+      實際上怎麼搭;有一張組好的範例照片(examples),一看就懂哪些零件是配對的。
+    </p>
+
+    <div class="toggle-row" id="texToggle">
+      <div class="toggle-btn active bad" data-mode="schema">只有零件清單(schema)</div>
+      <div class="toggle-btn" data-mode="example">還有組好的範例照片</div>
+    </div>
+
+    <div class="scene-box">
+      <svg viewBox="0 0 760 190" style="width:100%;height:auto;display:block">
+        <!-- 三個零件(螺絲、木板、支架),兩個狀態共用位置 -->
+        <circle cx="120" cy="55" r="10" fill="none" stroke="#8a7d6e" stroke-width="2"/>
+        <rect x="115" y="60" width="10" height="20" fill="none" stroke="#8a7d6e" stroke-width="2"/>
+        <text x="120" y="100" text-anchor="middle" class="scene-label">螺絲</text>
+
+        <rect x="90" y="140" width="60" height="12" rx="2" fill="none" stroke="#8a7d6e" stroke-width="2"/>
+        <text x="120" y="168" text-anchor="middle" class="scene-label">木板</text>
+
+        <path d="M 235,60 L 235,105 L 275,105" fill="none" stroke="#8a7d6e" stroke-width="6" stroke-linecap="round"/>
+        <text x="255" y="128" text-anchor="middle" class="scene-label">支架</text>
+
+        <g id="texSchemaScene" class="pass-state">
+          <path d="M 130,55 Q 300,60 380,95" fill="none" stroke="var(--rose)" stroke-width="1.6" stroke-dasharray="4 3"/>
+          <path d="M 150,146 Q 300,120 380,95" fill="none" stroke="var(--rose)" stroke-width="1.6" stroke-dasharray="4 3"/>
+          <path d="M 275,90 Q 330,90 380,95" fill="none" stroke="var(--rose)" stroke-width="1.6" stroke-dasharray="4 3"/>
+          <text x="410" y="103" font-size="26" font-weight="700" fill="var(--rose)">?</text>
+          <text x="420" y="140" font-size="10" fill="var(--rose)">零件都給你了,怎麼搭只能用猜的</text>
+        </g>
+
+        <g id="texExampleScene" class="pass-state" style="display:none">
+          <path d="M 130,55 Q 300,60 380,90" fill="none" stroke="var(--green)" stroke-width="2"/>
+          <path d="M 150,146 Q 300,120 380,95" fill="none" stroke="var(--green)" stroke-width="2"/>
+          <path d="M 275,90 Q 330,90 380,92" fill="none" stroke="var(--green)" stroke-width="2"/>
+          <rect x="580" y="35" width="150" height="115" rx="8" fill="var(--line-soft)" stroke="var(--accent)" stroke-width="1.8"/>
+          <text x="655" y="28" text-anchor="middle" font-size="10" fill="var(--muted)">範例照片(3 組,完整度不同)</text>
+          <rect x="595" y="48" width="45" height="34" rx="3" fill="none" stroke="var(--green)" stroke-width="1.6"/>
+          <rect x="647" y="48" width="45" height="34" rx="3" fill="none" stroke="var(--green)" stroke-width="1.6" stroke-dasharray="2 2"/>
+          <rect x="621" y="90" width="45" height="34" rx="3" fill="none" stroke="var(--green)" stroke-width="1.6" stroke-dasharray="2 2"/>
+          <path d="M 645,135 L 651,141 L 663,127" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="420" y="140" font-size="10" fill="var(--green)">看過範例,知道哪些零件通常配對</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="bar-box">
+      <div class="bar-row">
+        <div class="bar-label">只有 input_schema</div>
+        <div class="bar-track"><div class="bar-fill a" style="width:72%">72%</div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">schema + input_examples</div>
+        <div class="bar-track"><div class="bar-fill b" style="width:90%">90%</div></div>
+      </div>
+    </div>
+
+    <div class="ctx-box">
+      <div class="ctx-label">業界對照 · 獨創</div>
+      <div class="ctx-fill-note">
+        OpenAI 的官方指引是把範例寫進 <code>description</code> 自由文字裡,沒有獨立的
+        <code>examples</code> 欄位;Google Vertex AI 的 FunctionDeclaration schema 支援
+        屬性清單裡明講沒有 <code>example</code> 這個關鍵字,官方建議一樣是塞進
+        <code>description</code>。查證當下沒找到業界通用叫法,也沒找到平行案例。
+      </div>
+    </div>
+
+    <div class="ctx-box">
+      <div class="ctx-label">跟 Agent Skills 的邊界 · 同精神,顆粒度差一個量級</div>
+      <div class="ctx-fill-note">
+        沒有業界平行案例,不代表這個「給範例」的手法在 Anthropic 自己的產品線裡是孤例——
+        Agent Skills 的 <code>SKILL.md</code>「## Examples」段落 + <code>examples.md</code>
+        附屬檔案,解決的是同一種精神的問題。差別是顆粒度差一個量級:這裡的
+        <code>input_examples</code> 只到「一次函式呼叫的參數」,是工具定義的一部分,每次都
+        跟著送;Skills 的範例範圍是「一整個任務/流程」,是 progressive disclosure 最後一層,
+        判斷需要才讀。完整比較在
+        <a href="../../agent-skills/101/" style="color:var(--accent)">agent-skills 主題的 101 頁</a>。
+      </div>
+      <div class="snippet">Tool Use Examples — 範圍只到「這一張表單怎麼填」:
+{
+  "name": "create_ticket",
+  "input_examples": [
+    {"title": "Login page returns 500 error", "priority": "critical",
+     "labels": ["bug", "authentication", "production"],
+     "reporter": {"id": "USR-12345", "name": "Jane Smith"},
+     "escalation": {"level": 2, "notify_manager": true, "sla_hours": 4}},
+    {"title": "Add dark mode support", "labels": ["feature-request", "ui"]},
+    {"title": "Update API documentation"}
+  ]
+}
+// 範例就是「表單填法」本身——三組範例,示範同一張表單的不同填寫深度</div>
+      <div class="snippet">Skills 的 Examples — 範圍是「這整件事怎麼做完」:
+---
+name: pdf-processing
+description: Extract text and tables from PDF files, fill forms, merge documents...
+---
+## Instructions
+[怎麼判斷用哪個函式庫、怎麼處理掃描檔跟原生 PDF 的差異...]
+
+## Examples
+[示範完整流程:收到一份 PDF → 判斷類型 → 抽取表格 → 填回原表單欄位 → 輸出]
+// 範例是「一整條任務怎麼跑完」——不是某一次函式呼叫的參數怎麼填</div>
+
+  <!-- ============ SECTION D: 業界普及程度總表 ============ -->
+  <section>
+    <div class="sec-kicker">圖 D · 同一個問題,三種不同的普及程度</div>
+    <div class="sec-title">不是每個 beta 功能都一樣新</div>
+    <p class="sec-sub">
+      三個功能面對的都是同一個 context 預算問題,但放到整個產業去看,普及程度差很多。點卡片看分類依據。
+    </p>
+
+    <div class="chips" id="matrixChips">
+      <div class="chip" data-key="search">
+        <h4>Tool Search Tool</h4>
+        <div class="sub">延遲載入工具定義</div>
+        <span class="badge consensus">業界共識</span>
+      </div>
+      <div class="chip" data-key="ptc">
+        <h4>Programmatic Tool Calling</h4>
+        <div class="sub">程式碼呼叫工具</div>
+        <span class="badge parallel">平行案例</span>
+      </div>
+      <div class="chip" data-key="examples">
+        <h4>Tool Use Examples</h4>
+        <div class="sub">範例參數</div>
+        <span class="badge original">獨創</span>
+      </div>
+    </div>
+
+    <div class="scene-box">
+      <svg viewBox="0 0 760 175" style="width:100%;height:auto;display:block">
+        <!-- Tool Search Tool:貨架 + 放大鏡,只挑出需要的那個 -->
+        <g class="matrix-col" data-key="search">
+          <text x="130" y="24" text-anchor="middle" font-size="10" fill="var(--muted)">Tool Search Tool</text>
+          <rect x="65" y="42" width="26" height="18" rx="2" fill="none" stroke="#c9bfae" stroke-width="1.6" stroke-dasharray="2 2"/>
+          <rect x="97" y="60" width="26" height="18" rx="2" fill="var(--panel)" stroke="var(--green)" stroke-width="2"/>
+          <rect x="137" y="42" width="26" height="18" rx="2" fill="none" stroke="#c9bfae" stroke-width="1.6" stroke-dasharray="2 2"/>
+          <rect x="165" y="60" width="26" height="18" rx="2" fill="none" stroke="#c9bfae" stroke-width="1.6" stroke-dasharray="2 2"/>
+          <circle cx="128" cy="45" r="15" fill="none" stroke="var(--accent)" stroke-width="2.4"/>
+          <line x1="139" y1="56" x2="150" y2="67" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
+          <text x="130" y="100" text-anchor="middle" font-size="10" fill="var(--green)">先搜尋,只挑真正需要的那個載入</text>
+          <text x="130" y="122" text-anchor="middle" font-size="9.5" fill="var(--muted)">其他工具的完整定義先不進 context</text>
+        </g>
+
+        <!-- Programmatic Tool Calling:寫程式碼,沙箱一次跑完 -->
+        <g class="matrix-col" data-key="ptc">
+          <text x="380" y="24" text-anchor="middle" font-size="10" fill="var(--muted)">Programmatic Tool Calling</text>
+          <text x="330" y="65" font-size="24" font-weight="700" fill="var(--blue)" font-family="var(--mono)">{</text>
+          <text x="420" y="65" font-size="24" font-weight="700" fill="var(--blue)" font-family="var(--mono)">}</text>
+          <circle cx="380" cy="55" r="10" fill="none" stroke="var(--accent)" stroke-width="2"/>
+          <circle cx="380" cy="55" r="3.5" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+          <g stroke="var(--accent)" stroke-width="1.8">
+            <line x1="380" y1="45" x2="380" y2="41"/><line x1="380" y1="65" x2="380" y2="69"/>
+            <line x1="370" y1="55" x2="366" y2="55"/><line x1="390" y1="55" x2="394" y2="55"/>
+          </g>
+          <path d="M 380,70 Q 380,85 380,90" fill="none" stroke="var(--green)" stroke-width="2" marker-end="url(#matrixArrow)"/>
+          <defs><marker id="matrixArrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0L8,4L0,8Z" fill="var(--green)"/></marker></defs>
+          <text x="380" y="100" text-anchor="middle" font-size="10" fill="var(--green)">寫一段程式碼,沙箱一次跑完整條邏輯</text>
+          <text x="380" y="122" text-anchor="middle" font-size="9.5" fill="var(--muted)">中間結果不進模型 context,只回最終結果</text>
+        </g>
+
+        <!-- Tool Use Examples:表單 + 範例 -->
+        <g class="matrix-col" data-key="examples">
+          <text x="630" y="24" text-anchor="middle" font-size="10" fill="var(--muted)">Tool Use Examples</text>
+          <rect x="575" y="35" width="110" height="55" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.8"/>
+          <line x1="585" y1="48" x2="650" y2="48" stroke="var(--line)" stroke-width="2.2"/>
+          <line x1="585" y1="60" x2="665" y2="60" stroke="var(--line)" stroke-width="2.2"/>
+          <line x1="585" y1="72" x2="630" y2="72" stroke="var(--green)" stroke-width="2.2"/>
+          <path d="M 638,68 L 644,74 L 656,60" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="630" y="100" text-anchor="middle" font-size="10" fill="var(--green)">不只給型別,還給具體範例</text>
+          <text x="630" y="122" text-anchor="middle" font-size="9.5" fill="var(--muted)">讓模型看到欄位實際上怎麼搭配</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="panel" id="panelMatrix">
+      <p class="placeholder">↑ 點上面任一張卡片看業界普及程度,場景圖裡對應的機制圖示會亮起來。</p>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">Anthropic 官方部分經 context7 於 2026-07-03 查證;業界對照部分經一次委派 subagent 的 WebSearch 深度查證,信心等級不如官方一手文檔。</p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">Anthropic 官方(經 context7)</div>
+        <a href="https://www.anthropic.com/engineering/advanced-tool-use">Introducing advanced tool use on the Claude Developer Platform</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool">tool-search-tool — defer_loading、三種搜尋類型</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling">programmatic-tool-calling — allowed_callers、code_execution_20250825</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">圖 A · Tool Search Tool 業界對照</div>
+        <a href="https://developers.openai.com/api/docs/guides/tools-tool-search">OpenAI — tool_search / defer_loading(gpt-5.4+)</a>
+        <a href="https://github.com/googleapis/python-genai/issues/2185">Gemini 缺席的開發者 issue(要求跟 Anthropic/OpenAI 對齊)</a>
+        <a href="https://ai.google.dev/gemini-api/docs/file-search">Gemini File Search(唯一相鄰功能,但是查文件不是查工具)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">圖 B · Programmatic Tool Calling 業界對照</div>
+        <a href="https://developers.openai.com/api/docs/guides/tools-code-interpreter">OpenAI Code Interpreter(不能從程式碼裡呼叫其他工具)</a>
+        <a href="https://ai.google.dev/gemini-api/docs/code-execution">Gemini Code Execution(跟 function calling 是分開協調,不是同一機制)</a>
+        <a href="https://blog.cloudflare.com/code-mode/">Cloudflare — Code Mode(2025-09-26,最接近的平行案例)</a>
+        <a href="https://blog.cloudflare.com/code-mode-mcp/">Cloudflare — Code Mode 擴展到任意 MCP portal(2026-04-23)</a>
+        <a href="https://huggingface.co/docs/smolagents">Hugging Face — smolagents CodeAgent(開源實作)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">圖 C · Tool Use Examples 業界對照</div>
+        <a href="https://developers.openai.com/api/docs/guides/function-calling">OpenAI Function Calling 官方指引(無獨立 examples 欄位)</a>
+        <a href="https://cloud.google.com/vertex-ai/generative-ai/docs/reference/rest/v1/Schema">Vertex AI — FunctionDeclaration Schema 支援屬性清單(無 example 欄位)</a>
+        <a href="https://docs.mistral.ai/capabilities/function_calling">Mistral — Function Calling 文檔(無對應功能)</a>
+        <a href="https://llama.developer.meta.com/docs/features/tool-calling">Meta Llama — Tool Calling 文檔(無對應功能)</a>
+        <a href="../../agent-skills/101/">agent-skills 主題 · 101 頁 — 跟 Skills 的 Examples/examples.md 邊界比較</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/2026-07-03-advanced-tool-use.md 為真相來源(官方部分經 context7、業界對照部分經 WebSearch 查證)·
+    最後同步 2026-07-03
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  const TST_BAR = {
+    naive: { tool: 78, search: 0, room: 22, note: '所有工具的完整定義(name/description/input_schema)一次全部列進 tools 陣列——工具數量一多,還沒開始做事,context 就被吃掉一大塊。' },
+    deferred: { tool: 8, search: 6, room: 86, note: '大多數工具標記 defer_loading:true,只留一個搜尋工具的定義在 context 裡——真的需要時才搜尋、載入完整定義。官方原句:「up to 95%」的節省幅度。' }
+  };
+  const tstBar = document.getElementById('tstBar');
+  const tstNote = document.getElementById('tstNote');
+  const tstBtns = document.querySelectorAll('#tstToggle .toggle-btn');
+  const tstNaiveScene = document.getElementById('tstNaiveScene');
+  const tstDeferredScene = document.getElementById('tstDeferredScene');
+  function renderTst(mode){
+    tstBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    tstNaiveScene.style.display = mode === 'naive' ? '' : 'none';
+    tstDeferredScene.style.display = mode === 'deferred' ? '' : 'none';
+    const d = TST_BAR[mode];
+    tstBar.innerHTML = `
+      <div class="ctx-seg tool" style="flex-basis:${d.tool}%">工具定義 ${d.tool}%</div>
+      ${d.search > 0 ? `<div class="ctx-seg search" style="flex-basis:${d.search}%">搜尋工具 ${d.search}%</div>` : ''}
+      <div class="ctx-seg room" style="flex-basis:${d.room}%">可用空間 ${d.room}%</div>
+    `;
+    tstNote.textContent = d.note;
+    fadeIn(tstBar.parentElement);
+  }
+  tstBtns.forEach(b => b.addEventListener('click', () => renderTst(b.dataset.mode)));
+  renderTst('naive');
+
+  const TST_VENDOR = {
+    openai: { title: 'OpenAI · tool_search + defer_loading', tag: '幾乎同名功能', def: 'gpt-5.4+ 限定。官方文檔直接點名解決的是同一個問題:N 個工具定義即使只用 2 個也要付全部 token。命名跟 Anthropic 幾乎一樣——這塊是業界共識,不是 Anthropic 獨創。' },
+    google: { title: 'Google Gemini · 缺席', tag: '確認過的缺口', def: '查到一個開發者在 GitHub 上直接跟 Google 要「跟 Anthropic/OpenAI 一樣的功能」,抱怨 Gemini 工具數超過 30-50 個就會退化。Gemini 目前只有 File Search(RAG 查文件),不是 RAG 查工具定義。' }
+  };
+  const panelTst = document.getElementById('panelTst');
+  const chipsTst = document.querySelectorAll('[data-tst]');
+  chipsTst.forEach(n => n.addEventListener('click', () => {
+    chipsTst.forEach(c => c.classList.toggle('active', c === n));
+    const d = TST_VENDOR[n.dataset.tst];
+    panelTst.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelTst);
+  }));
+
+  const ptcBox = document.getElementById('ptcBox');
+  const ptcBtns = document.querySelectorAll('#ptcToggle .toggle-btn');
+  const ptcNormalScene = document.getElementById('ptcNormalScene');
+  const ptcCodeScene = document.getElementById('ptcCodeScene');
+  function renderPtc(mode){
+    ptcBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    ptcNormalScene.style.display = mode === 'normal' ? '' : 'none';
+    ptcCodeScene.style.display = mode === 'ptc' ? '' : 'none';
+    if (mode === 'normal') {
+      ptcBox.innerHTML = `
+        <div class="ctx-label">每一步都要跑一次完整推論</div>
+        <div class="flow-round"><div class="rlabel">來回 1</div><div class="flow-row"><span class="flow-box model">模型推論</span><span class="flow-arrow">→</span><span class="flow-box tool">呼叫工具 A</span><span class="flow-arrow">→</span><span class="flow-box sandbox">結果進 context</span></div></div>
+        <div class="flow-round"><div class="rlabel">來回 2</div><div class="flow-row"><span class="flow-box model">模型推論</span><span class="flow-arrow">→</span><span class="flow-box tool">呼叫工具 B</span><span class="flow-arrow">→</span><span class="flow-box sandbox">結果進 context</span></div></div>
+        <div class="flow-round"><div class="rlabel">來回 3...N</div><div class="flow-row"><span class="flow-box model">重複,每次都燒一次完整推論</span></div></div>
+        <div class="ctx-fill-note">工具鏈越長,來回次數越多——每一次都要付一次完整推論的成本,中間結果全部進 context。</div>
+      `;
+    } else {
+      ptcBox.innerHTML = `
+        <div class="ctx-label">一次寫完程式碼,沙箱裡跑完整條邏輯</div>
+        <div class="flow-round"><div class="rlabel">一輪</div><div class="flow-row"><span class="flow-box model">模型寫程式碼</span><span class="flow-arrow">→</span><span class="flow-box sandbox">沙箱執行,依序呼叫 A/B/C</span><span class="flow-arrow">→</span><span class="flow-box tool">只有最終結果回傳</span></div></div>
+        <div class="ctx-fill-note">官方案例(預算合規檢查):43,588 → 27,297 token——省的是中間結果不用來回搬進模型 context,靠減少推論次數同時省 token 跟延遲。</div>
+      `;
+    }
+    fadeIn(ptcBox);
+  }
+  ptcBtns.forEach(b => b.addEventListener('click', () => renderPtc(b.dataset.mode)));
+  renderPtc('normal');
+
+  const PTC_VENDOR = {
+    cloudflare: { title: 'Cloudflare「Code Mode」', tag: '2025-09-26 · 最接近的平行案例', def: '讓 agent 寫 TypeScript 呼叫 MCP 工具(當成有型別的 API 函式),在隔離的 Worker 沙箱裡執行,官方數字最多省 81% token。「Code Mode」現在正變成業界通用叫法,不只是 Cloudflare 自家用語。' },
+    smolagents: { title: 'Hugging Face smolagents · CodeAgent', tag: '開源實作', def: '`CodeAgent` 寫 Python 呼叫工具(相對於吐 JSON 的 `ToolCallingAgent`),在沙箱裡執行。學術根源是 2024 年的 CodeAct 論文,引用數字顯示比 JSON 呼叫成功率高、步驟數少。' }
+  };
+  const panelPtc = document.getElementById('panelPtc');
+  const chipsPtc = document.querySelectorAll('[data-ptc]');
+  chipsPtc.forEach(n => n.addEventListener('click', () => {
+    chipsPtc.forEach(c => c.classList.toggle('active', c === n));
+    const d = PTC_VENDOR[n.dataset.ptc];
+    panelPtc.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelPtc);
+  }));
+
+  const MATRIX = {
+    search: {
+      title: 'Tool Search Tool · 業界共識',
+      tag: '解決什麼問題:工具定義太多,還沒開始做事 context 就被吃掉一大塊',
+      mech: '機制:大多數工具標記 defer_loading:true,只留一個搜尋工具的定義在 context 裡,真的需要時才搜尋、載入完整定義——官方數字最多省 95% context。',
+      cmp: '業界對照:OpenAI 幾乎同名功能(tool_search + defer_loading)已上線;Google Gemini 缺席,但被開發者公開要求跟進(GitHub issue)。這塊不是 Anthropic 獨創,是大家都在解的同一個問題,只是 Google 還沒跟上。'
+    },
+    ptc: {
+      title: 'Programmatic Tool Calling · 平行案例',
+      tag: '解決什麼問題:工具鏈越長,來回推論次數越多,每一次都要付一次完整推論成本',
+      mech: '機制:讓模型寫一段程式碼,在沙箱裡一次跑完整條邏輯(依序呼叫多個工具),中間結果不進模型 context,只有最終結果回傳——官方案例把一個任務從 43,588 token 壓到 27,297 token。',
+      cmp: '業界對照:OpenAI 的 Code Interpreter 不算同一件事(不能從程式碼裡呼叫其他工具);Google Gemini 也是分開的兩個工具。最接近的平行案例是 Cloudflare 的「Code Mode」跟 Hugging Face smolagents 的 CodeAgent——概念上大家都在做同一件事,但 Anthropic 走原生 API 路線,他們走框架層路線,不是同一種產品形態。'
+    },
+    examples: {
+      title: 'Tool Use Examples · 獨創',
+      tag: '解決什麼問題:input_schema 只講型別,沒講「實際上通常怎麼填」,模型面對複雜/巢狀參數常常猜錯',
+      mech: '機制:在工具定義裡加一個 input_examples 陣列,給幾組具體範例(欄位完整度刻意不同,讓模型看到哪些欄位常一起出現、哪些可有可無)——官方內部測試準確度從 72% 提升到 90%。',
+      cmp: '業界對照:查了 OpenAI、Google、Mistral、Meta,都沒有找到對應功能——沒有業界共識,也沒有平行案例。目前是三個功能裡唯一一個「只有 Anthropic 有」的。'
+    }
+  };
+  const panelMatrix = document.getElementById('panelMatrix');
+  const chipsMatrix = document.querySelectorAll('#matrixChips .chip');
+  const matrixCols = document.querySelectorAll('.matrix-col');
+  chipsMatrix.forEach(n => n.addEventListener('click', () => {
+    chipsMatrix.forEach(c => c.classList.toggle('active', c === n));
+    matrixCols.forEach(col => col.classList.toggle('dim', col.dataset.key !== n.dataset.key));
+    const d = MATRIX[n.dataset.key];
+    panelMatrix.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.mech}</div><div class="ex">${d.cmp}</div>`;
+    fadeIn(panelMatrix);
+  }));
+
+  const texBtns = document.querySelectorAll('#texToggle .toggle-btn');
+  const texSchemaScene = document.getElementById('texSchemaScene');
+  const texExampleScene = document.getElementById('texExampleScene');
+  function renderTex(mode){
+    texBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    texSchemaScene.style.display = mode === 'schema' ? '' : 'none';
+    texExampleScene.style.display = mode === 'example' ? '' : 'none';
+  }
+  texBtns.forEach(b => b.addEventListener('click', () => renderTex(b.dataset.mode)));
+  renderTex('schema');
+</script>
+</body>
+</html>

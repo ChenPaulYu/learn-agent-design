@@ -1,0 +1,498 @@
+---
+title: Client Tools vs Server Tools — 互動圖解
+summary: 五張互動圖:三種工具類型矩陣、Anthropic-schema 工具在你的環境裡跑、server-executed 工具完全不用你動手、code_execution 辨析與 Managed Agents 邊界、跟 OpenAI 的對照。
+date: 2026-07-03
+tags:
+  - tool-use
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Client Tools vs Server Tools:五張互動圖解。可長期回看的教學頁(pages/
+  genre,發布於 /tool-use/client-server-tools/),不是 disposable mockup。tool-use 主題
+  第四篇,補的是「工具不是只有你自己定義的那一種」這個缺口——basics/advanced/origins 三篇
+  都預設 user-defined tools,這篇講另外兩類。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-03-tool-use-client-server-tools.md
+  Last synced: 2026-07-03 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(三種類型,不是兩種)— 2x2 矩陣(schema 誰定義 × 程式碼在哪執行),點格子看細節,
+      其中一格(Anthropic 執行你的程式碼)不存在,標成灰色打叉。
+    圖 B(Anthropic-schema tools)— SVG 場景:「你的環境」箱子裡跑著 bash/text_editor/
+      computer/memory 四個圖示,Anthropic 只給說明書,點圖示看細節。
+    圖 C(Server-executed tools)— SVG 場景:「Anthropic 伺服器」箱子裡跑著 web_search/
+      web_fetch/code_execution/advisor,直接把結果送回模型,不經過你的環境,點圖示看細節,
+      advisor 特別標出跟其他三個性質不同(自我審查 vs 碰外部世界)。
+    圖 D(容易搞混的地方 + 邊界)— code_execution 兩種身分的辨析、Managed Agents 為什麼
+      不算進來,兩個靜態說明卡各配一張小 SVG(齒輪雙重身分、Managed Agents 兩層堆疊框)。
+    圖 E(跟 OpenAI 對照)— 比較表(9 組 Anthropic ↔ OpenAI 對應)+ 兩個重點:三個
+      server-executed 工具同一天上線、OpenAI 的 tool_search 橫跨兩種執行模式。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Client Tools vs Server Tools — 互動圖解</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:100px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .snippet{margin-top:8px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;
+    background:var(--line-soft);border-left-color:var(--muted);padding:11px 14px;border-radius:0 10px 10px 0;
+    border-left:3px solid var(--muted)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .matrix{margin-top:22px;display:grid;grid-template-columns:140px 1fr 1fr;gap:8px}
+  .matrix .hcell{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;padding:8px}
+  .matrix .vcell{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;text-align:right;justify-content:flex-end;padding:8px}
+  .matrix .cell{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease;min-height:70px}
+  .matrix .cell:hover{transform:translateY(-2px);border-color:var(--accent)}
+  .matrix .cell.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .matrix .cell h4{font-size:13px;font-weight:660}
+  .matrix .cell .sub{font-size:11px;color:var(--muted);margin-top:4px}
+  .matrix .cell.impossible{cursor:default;background:var(--line-soft);opacity:.6}
+  .matrix .cell.impossible:hover{transform:none;border-color:var(--line)}
+
+  .scene-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}
+  .scene-label{font-size:10.5px;fill:var(--muted);font-family:var(--sans)}
+
+  .zone{cursor:pointer}
+  .zone .st{transition:stroke .15s ease}
+  .zone .stf{transition:fill .15s ease}
+  .zone:hover .st,.zone.active .st{stroke:currentColor}
+  .zone:hover .stf,.zone.active .stf{fill:currentColor}
+  .zone.active .fillable{fill:color-mix(in srgb,currentColor 10%,var(--panel))}
+  .zone:hover .fillable{fill:color-mix(in srgb,currentColor 10%,var(--panel))}
+  .zone.active text{fill:currentColor}
+
+  .ctx-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px}
+  .ctx-label{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:8px}
+  .ctx-fill-note{margin-top:10px;font-size:12.5px;color:var(--muted)}
+
+  .compare-table{margin-top:18px;width:100%;border-collapse:collapse;font-size:12.5px}
+  .compare-table th{text-align:left;font-family:var(--mono);font-size:10.5px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.03em;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .compare-table td{padding:9px 10px;border-bottom:1px solid var(--line-soft)}
+  .compare-table tr:last-child td{border-bottom:none}
+  .exec-badge{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:5px}
+  .exec-badge.server{background:rgba(47,111,158,.1);color:var(--blue)}
+  .exec-badge.client{background:rgba(154,107,46,.1);color:var(--accent)}
+  .exec-badge.dual{background:rgba(12,122,89,.1);color:var(--green)}
+  .exec-badge.none{background:rgba(176,74,106,.1);color:var(--rose)}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .matrix{grid-template-columns:90px 1fr 1fr;font-size:10px}
+    .matrix .cell h4{font-size:11.5px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← Tool Use 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · Client Tools vs Server Tools</div>
+    <h1>Client Tools vs Server Tools — 工具不是只有你自己定義的那一種</h1>
+    <p class="tagline">
+      前面三篇都預設「你自己寫 schema、你自己執行」——這篇補上另外兩類:Anthropic 給你
+      說明書但你自己執行,以及 Anthropic 自己伺服器全包、你完全不用動手。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 三種類型矩陣 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 兩個軸交叉出三種類型</div>
+    <div class="sec-title">「誰定義 schema」×「程式碼在哪執行」</div>
+    <p class="sec-sub">
+      點格子看細節——右下那格是不存在的組合,Anthropic 不會執行你自己寫的程式碼。
+    </p>
+
+    <div class="matrix" id="matrixGrid">
+      <div class="hcell"></div>
+      <div class="hcell">程式碼在你的環境執行</div>
+      <div class="hcell">程式碼在 Anthropic 伺服器執行</div>
+
+      <div class="vcell">Schema 是你定義的</div>
+      <div class="cell" data-key="user-defined"><h4>User-defined tools</h4><div class="sub">basics 篇講的都是這種</div></div>
+      <div class="cell impossible">
+        <svg width="34" height="34" viewBox="0 0 34 34" style="display:block;margin:0 auto 4px">
+          <text x="17" y="22" text-anchor="middle" font-size="16" font-weight="700" font-family="var(--mono)" fill="var(--faint)">{ }</text>
+          <circle cx="17" cy="17" r="15" fill="none" stroke="var(--rose)" stroke-width="2"/>
+          <line x1="7" y1="27" x2="27" y2="7" stroke="var(--rose)" stroke-width="2"/>
+        </svg>
+        <h4 style="text-align:center">不存在</h4><div class="sub" style="text-align:center">Anthropic 不會執行你的程式碼</div>
+      </div>
+
+      <div class="vcell">Schema 是 Anthropic 定義的</div>
+      <div class="cell" data-key="anthropic-schema"><h4>Anthropic-schema tools</h4><div class="sub">bash / text_editor / computer / memory</div></div>
+      <div class="cell" data-key="server-executed"><h4>Server-executed tools</h4><div class="sub">web_search / web_fetch / code_execution / advisor</div></div>
+    </div>
+
+    <div class="panel" id="panelMatrix">
+      <p class="placeholder">↑ 點上面任一格看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: Anthropic-schema tools ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · Anthropic-schema Tools</div>
+    <div class="sec-title">說明書是 Anthropic 寫的,力氣是你自己出的</div>
+    <p class="sec-sub">
+      四個工具都跑在「你的環境」裡——Anthropic 只是先把 schema 設計好、訓練模型可靠使用。
+    </p>
+
+    <div class="scene-box">
+      <svg viewBox="0 0 700 210" style="width:100%;height:auto;display:block">
+        <rect x="30" y="30" width="640" height="150" rx="12" fill="var(--line-soft)" stroke="var(--line)" stroke-width="1.6"/>
+        <text x="350" y="20" text-anchor="middle" font-size="11" fill="var(--muted)">你的環境(你的機器 / 容器)</text>
+
+        <g class="zone" data-key="bash" style="color:#9a6b2e">
+          <rect x="60" y="60" width="120" height="90" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="120" y="90" text-anchor="middle" font-size="16" font-family="var(--mono)" fill="#8a7d6e">&gt;_</text>
+          <text x="120" y="130" text-anchor="middle" font-size="10.5" font-weight="660" fill="#3a3128">bash</text>
+          <text x="120" y="176" text-anchor="middle" class="scene-label">bash_20250124</text>
+        </g>
+
+        <g class="zone" data-key="text_editor" style="color:#2f6f9e">
+          <rect x="205" y="60" width="120" height="90" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <path d="M 250,80 h30 v30 l-8,8 h-22 z" fill="none" stroke="#8a7d6e" stroke-width="2"/>
+          <line x1="250" y1="92" x2="272" y2="92" stroke="#8a7d6e" stroke-width="1.6"/>
+          <line x1="250" y1="100" x2="272" y2="100" stroke="#8a7d6e" stroke-width="1.6"/>
+          <text x="265" y="130" text-anchor="middle" font-size="10.5" font-weight="660" fill="#3a3128">text_editor</text>
+          <text x="265" y="176" text-anchor="middle" class="scene-label">str_replace_based_edit_tool</text>
+        </g>
+
+        <g class="zone" data-key="computer" style="color:#0c7a59">
+          <rect x="350" y="60" width="120" height="90" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <rect x="382" y="78" width="56" height="36" rx="2" fill="none" stroke="#8a7d6e" stroke-width="2"/>
+          <line x1="410" y1="114" x2="410" y2="122" stroke="#8a7d6e" stroke-width="2"/>
+          <line x1="396" y1="122" x2="424" y2="122" stroke="#8a7d6e" stroke-width="2"/>
+          <text x="410" y="140" text-anchor="middle" font-size="10.5" font-weight="660" fill="#3a3128">computer</text>
+          <text x="410" y="176" text-anchor="middle" class="scene-label">computer_20251124</text>
+        </g>
+
+        <g class="zone" data-key="memory" style="color:#b04a6a">
+          <rect x="495" y="60" width="120" height="90" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <path d="M 528,88 h20 l6,8 h20 v22 h-46 z" fill="none" stroke="#8a7d6e" stroke-width="2"/>
+          <text x="555" y="130" text-anchor="middle" font-size="10.5" font-weight="660" fill="#3a3128">memory</text>
+          <text x="555" y="176" text-anchor="middle" class="scene-label">memory_20250818</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="panel" id="panelSchema">
+      <p class="placeholder">↑ 點上面任一個圖示看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: Server-executed tools ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · Server-executed Tools</div>
+    <div class="sec-title">完全不用你動手,連 tool_result 都不用寫</div>
+    <p class="sec-sub">
+      這四個工具跑在 Anthropic 自己的伺服器裡——結果直接送回模型,你收到的已經是最終回應。
+    </p>
+
+    <div class="scene-box">
+      <svg viewBox="0 0 700 210" style="width:100%;height:auto;display:block">
+        <rect x="30" y="30" width="640" height="150" rx="12" fill="rgba(47,111,158,.06)" stroke="var(--blue)" stroke-width="1.6" stroke-dasharray="5 4"/>
+        <text x="350" y="20" text-anchor="middle" font-size="11" fill="var(--blue)">Anthropic 自己的伺服器</text>
+
+        <g class="zone" data-key="web_search" style="color:#9a6b2e">
+          <rect x="55" y="60" width="110" height="90" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <circle cx="105" cy="90" r="13" fill="none" stroke="#8a7d6e" stroke-width="2"/>
+          <line x1="114" y1="99" x2="123" y2="108" stroke="#8a7d6e" stroke-width="2" stroke-linecap="round"/>
+          <text x="110" y="132" text-anchor="middle" font-size="10.5" font-weight="660" fill="#3a3128">web_search</text>
+          <text x="110" y="176" text-anchor="middle" class="scene-label">20250305 → 20260318</text>
+        </g>
+
+        <g class="zone" data-key="web_fetch" style="color:#2f6f9e">
+          <rect x="190" y="60" width="110" height="90" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <path d="M 220,85 h50 M 220,95 h50 M 220,105 h35" stroke="#8a7d6e" stroke-width="2" stroke-linecap="round"/>
+          <path d="M 260,100 l8,8 l-8,8" fill="none" stroke="#8a7d6e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="245" y="132" text-anchor="middle" font-size="10.5" font-weight="660" fill="#3a3128">web_fetch</text>
+          <text x="245" y="176" text-anchor="middle" class="scene-label">20260209 / 20260318</text>
+        </g>
+
+        <g class="zone" data-key="code_execution" style="color:#0c7a59">
+          <rect x="325" y="60" width="110" height="90" rx="8" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="380" y="98" text-anchor="middle" font-size="18" font-weight="700" font-family="var(--mono)" fill="#8a7d6e">{ }</text>
+          <text x="380" y="132" text-anchor="middle" font-size="10.5" font-weight="660" fill="#3a3128">code_execution</text>
+          <text x="380" y="176" text-anchor="middle" class="scene-label">獨立身分,非 PTC 開關</text>
+        </g>
+
+        <g class="zone spotlight" data-key="advisor" style="color:#b04a6a">
+          <rect x="460" y="60" width="110" height="90" rx="8" class="st fillable" fill="var(--panel)" stroke="var(--rose)" stroke-width="2.4"/>
+          <circle cx="515" cy="88" r="10" fill="none" stroke="var(--rose)" stroke-width="2"/>
+          <path d="M 511,88 a4,4 0 1,1 8,2" fill="none" stroke="var(--rose)" stroke-width="1.6"/>
+          <circle cx="515" cy="97" r="0.8" fill="var(--rose)"/>
+          <text x="515" y="132" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rose)">advisor ★</text>
+          <text x="515" y="176" text-anchor="middle" class="scene-label">advisor_20260301 · 自我審查</text>
+        </g>
+
+        <path d="M 620,105 h60" stroke="var(--green)" stroke-width="2" marker-end="url(#csArrow)"/>
+        <defs><marker id="csArrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0L8,4L0,8Z" fill="var(--green)"/></marker></defs>
+        <text x="650" y="95" text-anchor="middle" font-size="9.5" fill="var(--green)">直接回模型</text>
+      </svg>
+    </div>
+
+    <div class="panel" id="panelServer">
+      <p class="placeholder">↑ 點上面任一個圖示看細節,紅框那個(advisor)性質跟其他三個不一樣。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION D: 辨析 + 邊界 ============ -->
+  <section>
+    <div class="sec-kicker">圖 D · 容易搞混的地方,以及一個刻意不收的邊界</div>
+    <div class="sec-title">兩個誠實澄清</div>
+
+    <div class="ctx-box">
+      <div class="ctx-label">code_execution 出現兩次,身分不一樣</div>
+      <svg viewBox="0 0 700 110" style="width:100%;height:auto;display:block;margin-top:6px">
+        <g transform="translate(130,55)">
+          <circle r="20" fill="none" stroke="var(--green)" stroke-width="2.4"/>
+          <circle r="7" fill="none" stroke="var(--green)" stroke-width="2"/>
+          <g stroke="var(--green)" stroke-width="2">
+            <line x1="0" y1="-20" x2="0" y2="-28"/><line x1="0" y1="20" x2="0" y2="28"/>
+            <line x1="-20" y1="0" x2="-28" y2="0"/><line x1="20" y1="0" x2="28" y2="0"/>
+          </g>
+        </g>
+        <text x="130" y="98" text-anchor="middle" font-size="10.5" fill="var(--green)">獨立 server tool——自己執行、自己回結果</text>
+        <text x="130" y="20" text-anchor="middle" font-size="9.5" fill="var(--muted)">這篇講的 code_execution</text>
+
+        <g transform="translate(430,55)">
+          <circle r="20" fill="none" stroke="var(--accent)" stroke-width="2.4"/>
+          <circle r="7" fill="none" stroke="var(--accent)" stroke-width="2"/>
+          <g stroke="var(--accent)" stroke-width="2">
+            <line x1="0" y1="-20" x2="0" y2="-28"/><line x1="0" y1="20" x2="0" y2="28"/>
+            <line x1="-20" y1="0" x2="-28" y2="0"/><line x1="20" y1="0" x2="28" y2="0"/>
+          </g>
+          <line x1="20" y1="0" x2="70" y2="-20" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="3 3"/>
+          <line x1="20" y1="0" x2="70" y2="20" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="3 3"/>
+          <rect x="70" y="-30" width="30" height="20" rx="3" fill="none" stroke="var(--rose)" stroke-width="1.8"/>
+          <rect x="70" y="10" width="30" height="20" rx="3" fill="none" stroke="var(--rose)" stroke-width="1.8"/>
+        </g>
+        <text x="430" y="98" text-anchor="middle" font-size="10.5" fill="var(--accent)">開關——讓程式碼伸手去呼叫「其他」工具</text>
+        <text x="430" y="20" text-anchor="middle" font-size="9.5" fill="var(--muted)">Programmatic Tool Calling 的 code_execution_20250825</text>
+      </svg>
+      <div class="ctx-fill-note">
+        <a href="../advanced-tool-use/" style="color:var(--accent)">advanced-tool-use 頁</a>
+        的 Programmatic Tool Calling 用 <code>code_execution_20250825</code>
+        當「開關」——讓模型寫的程式碼可以呼叫其他已宣告的工具。這篇講的 <code>code_execution</code>
+        是它自己作為一個獨立 server tool 的身分——單純執行一段程式碼、拿 stdout/stderr 回來,
+        不牽涉呼叫其他工具。同一個底層工具類型,兩種不同的用法角色。
+      </div>
+    </div>
+
+    <div class="ctx-box">
+      <div class="ctx-label">Managed Agents 為什麼不算進來</div>
+      <svg viewBox="0 0 700 130" style="width:100%;height:auto;display:block;margin-top:6px">
+        <rect x="150" y="15" width="400" height="42" rx="6" fill="rgba(47,111,158,.08)" stroke="var(--blue)" stroke-width="1.8"/>
+        <text x="350" y="32" text-anchor="middle" font-size="11" font-weight="660" fill="var(--blue)">Managed Agents</text>
+        <text x="350" y="47" text-anchor="middle" font-size="9.5" fill="var(--muted)">Session / SessionThread / streaming events / 權限政策</text>
+
+        <line x1="350" y1="57" x2="350" y2="72" stroke="var(--faint)" stroke-width="1.6" stroke-dasharray="3 3"/>
+
+        <rect x="150" y="72" width="400" height="42" rx="6" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+        <text x="350" y="89" text-anchor="middle" font-size="11" font-weight="660" fill="#3a3128">Messages API(這篇講的層級)</text>
+        <text x="350" y="104" text-anchor="middle" font-size="9.5" fill="var(--muted)">bash / web_search 這些工具本身,單一次 API 呼叫</text>
+
+        <text x="80" y="40" text-anchor="middle" font-size="9.5" fill="var(--muted)">上層</text>
+        <text x="80" y="97" text-anchor="middle" font-size="9.5" fill="var(--muted)">下層</text>
+      </svg>
+      <div class="ctx-fill-note">
+        查證過程中還發現一個叫 Managed Agents 的東西(Session/SessionThread、streaming
+        events、always_allow/always_ask 權限政策)——這不是又一種工具類型,是包在 Messages
+        API 外面、完全不同的一層代管 agent 執行環境。<code>bash</code>/<code>web_search</code>
+        這些名字剛好也出現在它的工具清單裡,但那是「代管環境內部用到的工具」,不是「工具本身的
+        新分類」。查過但刻意不收,不是沒查到。
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION E: 跟 OpenAI 對照 ============ -->
+  <section>
+    <div class="sec-kicker">圖 E · 跟 OpenAI 對照</div>
+    <div class="sec-title">沒有正式分類詞彙,但具體工具幾乎都對得上</div>
+    <p class="sec-sub">
+      OpenAI 沒有像 Anthropic 這樣正式命名「client tools vs server tools」——最接近的是
+      Agents SDK(包裝函式庫,不是核心 API)裡的類似分組。但具體工具幾乎都找得到平行案例。
+    </p>
+
+    <div style="overflow-x:auto">
+    <table class="compare-table">
+      <tr><th>Anthropic</th><th>OpenAI 對應</th><th>上線時間</th><th>執行方式</th></tr>
+      <tr><td><code>web_search</code></td><td><code>web_search</code></td><td>2025-03-11</td><td><span class="exec-badge server">server</span></td></tr>
+      <tr><td><code>code_execution</code></td><td><code>code_interpreter</code></td><td>2025-03-11</td><td><span class="exec-badge server">server</span></td></tr>
+      <tr><td>—(Anthropic 沒有)</td><td><code>file_search</code></td><td>2025-03-11</td><td><span class="exec-badge server">server</span></td></tr>
+      <tr><td><code>tool_search</code></td><td><code>tool_search</code> + <code>defer_loading</code></td><td>gpt-5.4+</td><td><span class="exec-badge dual">兩種模式都有</span></td></tr>
+      <tr><td><code>computer</code></td><td><code>computer-use-preview</code></td><td>2025-03-11</td><td><span class="exec-badge client">client</span></td></tr>
+      <tr><td><code>text_editor</code></td><td><code>apply_patch</code></td><td>隨 GPT-5.1</td><td><span class="exec-badge client">client</span></td></tr>
+      <tr><td><code>bash</code></td><td>Shell tool</td><td>未查到確切日期</td><td><span class="exec-badge dual">雙模式</span></td></tr>
+      <tr><td><code>advisor</code></td><td>沒找到對應</td><td>—</td><td><span class="exec-badge none">無</span></td></tr>
+      <tr><td><code>memory</code></td><td>沒找到對應</td><td>—</td><td><span class="exec-badge none">無</span></td></tr>
+    </table>
+    </div>
+
+    <div class="ctx-box">
+      <div class="ctx-label">兩個值得注意的地方</div>
+      <div class="ctx-fill-note">
+        <strong>三個 server-executed 工具是同一天上線的</strong>——`web_search`/`code_interpreter`/
+        `file_search` 都在 2025-03-11 隨 Responses API 一起推出,不是分批推出,跟 Anthropic
+        這幾個工具各自不同時間點推出的節奏不一樣。<br><br>
+        <strong>OpenAI 的 tool_search 其實橫跨兩種模式</strong>——一種伺服器代管(跟 Anthropic
+        一樣你不用管),另一種是你自己執行搜尋(模型吐 `tool_search_call`,你自己查、自己回
+        `tool_search_output`)。這是 Anthropic 版本沒有的彈性。`advisor` 跟 `memory` 兩個,
+        查完確認業界找不到對照,目前看起來是 Anthropic 獨有。
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">Anthropic 官方部分經 context7 於 2026-07-03 查證;OpenAI 對照部分經一次委派 subagent 的 WebSearch 深度查證,信心等級不如官方一手文檔。</p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">Anthropic 官方</div>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works">how-tool-use-works — client/server tools 核心分類原句</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool">computer-use-tool — computer/text_editor/bash 版本識別碼</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool">memory-tool — memory_20250818</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool">code-execution-tool — server_tool_use JSON 範例</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool">web-search-tool — 版本歷史</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool">advisor-tool — advisor_20260301</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-reference">tool-reference — 工具總覽</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">圖 E · OpenAI 對照</div>
+        <a href="https://developers.openai.com/api/docs/guides/tools-web-search">OpenAI web_search — 2025-03-11</a>
+        <a href="https://developers.openai.com/api/docs/guides/tools-code-interpreter">OpenAI code_interpreter</a>
+        <a href="https://developers.openai.com/api/docs/guides/tools-file-search">OpenAI file_search</a>
+        <a href="https://developers.openai.com/api/docs/guides/tools-tool-search">OpenAI tool_search 的兩種模式</a>
+        <a href="https://developers.openai.com/api/docs/guides/tools-computer-use">OpenAI computer-use-preview</a>
+        <a href="https://developers.openai.com/api/docs/guides/tools-apply-patch">OpenAI apply_patch</a>
+        <a href="https://developers.openai.com/api/docs/guides/tools">OpenAI tools 總覽(Shell tool 雙模式)</a>
+        <a href="https://openai.github.io/openai-agents-python/tools/">OpenAI Agents SDK — 最接近的分類命名</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/2026-07-03-tool-use-client-server-tools.md 為真相來源(經 context7 查證)·
+    最後同步 2026-07-03
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  const MATRIX = {
+    'user-defined': {
+      title: 'User-defined tools', tag: '你定義 schema,你的環境執行',
+      def: '這是 <a href="../101/" style="color:var(--accent)">101 頁</a>一路在講的類型——你決定工具存在、你決定它怎麼執行,Anthropic 只負責「模型判斷要不要呼叫、怎麼填參數」這一段。'
+    },
+    'anthropic-schema': {
+      title: 'Anthropic-schema tools', tag: 'Anthropic 定義 schema,你的環境執行',
+      def: 'bash / text_editor / computer / memory——Anthropic 先把 schema 設計好、訓練模型可靠使用,但執行環境是你自己的。詳見圖 B。'
+    },
+    'server-executed': {
+      title: 'Server-executed tools', tag: 'Anthropic 定義 schema,Anthropic 伺服器執行',
+      def: 'web_search / web_fetch / code_execution / advisor / tool_search——你完全不用執行、不用組 tool_result,結果直接送回模型。詳見圖 C。'
+    }
+  };
+  const panelMatrix = document.getElementById('panelMatrix');
+  const matrixCells = document.querySelectorAll('#matrixGrid .cell:not(.impossible)');
+  matrixCells.forEach(n => n.addEventListener('click', () => {
+    matrixCells.forEach(c => c.classList.toggle('active', c === n));
+    const d = MATRIX[n.dataset.key];
+    panelMatrix.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelMatrix);
+  }));
+
+  const SCHEMA_TOOLS = {
+    bash: { title: 'bash', tag: 'bash_20250124', def: '執行 shell 指令——指令在你自己的機器/容器裡跑,Anthropic 只提供優化過的工具 schema。' },
+    text_editor: { title: 'text_editor', tag: 'text_editor_20250728 · str_replace_based_edit_tool', def: '檔案讀寫,一樣你自己執行。更早的版本是 text_editor_20250124,工具名 str_replace_editor。' },
+    computer: { title: 'computer', tag: 'computer_20251124', def: '「Computer Use」的核心,操控螢幕/滑鼠/鍵盤,需要 computer-use-2025-11-24 這個 beta header 才能用。常跟 bash/text_editor 一起出現,湊成一個能操控整台電腦的 agent。' },
+    memory: { title: 'memory', tag: 'memory_20250818', def: '讓 Claude 讀寫檔案系統做長期記憶,能跟 context editing 整合維持長對話的狀態。這個概念其實跟 agent-anatomy 主題的記憶層是同一個問題,只是這裡是 Anthropic 官方給的具體實作。' }
+  };
+  const panelSchema = document.getElementById('panelSchema');
+  const schemaZonesFixed = Array.from(document.querySelectorAll('.zone')).filter(z => SCHEMA_TOOLS[z.dataset.key]);
+  schemaZonesFixed.forEach(n => n.addEventListener('click', () => {
+    schemaZonesFixed.forEach(c => c.classList.toggle('active', c === n));
+    const d = SCHEMA_TOOLS[n.dataset.key];
+    panelSchema.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelSchema);
+  }));
+
+  const SERVER_TOOLS = {
+    web_search: { title: 'web_search', tag: '20250305 → 20260209 → 20260318', def: '讓 Claude 搜尋網路——伺服器執行,新版支援動態過濾跟回應內容控制。' },
+    web_fetch: { title: 'web_fetch', tag: '20260209 / 20260318', def: '抓取指定 URL 的內容——伺服器執行,不用你自己架爬蟲。' },
+    code_execution: { title: 'code_execution(獨立身分)', tag: '跟 Programmatic Tool Calling 不是同一件事', def: '單純執行一段程式碼、拿 stdout/stderr 回來,不牽涉呼叫其他工具。跟 <a href="../advanced-tool-use/" style="color:var(--accent)">advanced-tool-use 頁</a>裡當「開關」用的 code_execution_20250825 是同一個底層工具類型,但這裡是它自己作為獨立 server tool 的角色。' },
+    advisor: { title: 'advisor ★ 性質特別', tag: 'advisor_20260301', def: '其他三個都是「幫你碰外部世界」,這個是反過來幫你的 agent 自我審查——抓工具描述寫得不清楚、prompt 跟工具能力對不上這類問題。主線程(worker model)遇到不確定的 tool-use 決策時可以呼叫它把關,有自己獨立的 max_tokens 跟 caching。' }
+  };
+  const panelServer = document.getElementById('panelServer');
+  const serverZones = Array.from(document.querySelectorAll('.zone')).filter(z => SERVER_TOOLS[z.dataset.key]);
+  serverZones.forEach(n => n.addEventListener('click', () => {
+    serverZones.forEach(c => c.classList.toggle('active', c === n));
+    const d = SERVER_TOOLS[n.dataset.key];
+    panelServer.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelServer);
+  }));
+</script>
+</body>
+</html>

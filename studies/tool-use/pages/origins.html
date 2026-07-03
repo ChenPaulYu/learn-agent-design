@@ -1,0 +1,537 @@
+---
+title: Tool Use 的身世 — 互動圖解
+summary: 五張互動圖:2021-2023 學術先驅期時間軸、三家廠商官方機制搶跑對照、function calling 先於 structured output 上線的方向反轉、Perplexity 不等官方機制自己土法煉鋼上線的案例、現在原生訓練取代 prompt 教格式。
+date: 2026-07-03
+tags:
+  - tool-use
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Tool Use 的身世:五張互動圖解。可長期回看的教學頁(pages/ genre,發布於
+  /tool-use/origins/),不是 disposable mockup。101 之外的歷史主題,寫的是這個機制怎麼
+  從好幾條各自獨立的研究線收斂成官方機制,不是 API 細節(101)也不是概念定義(101 開頭
+  也有講,兩者不重複——那邊是概念,這邊是時間軸)。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-03-tool-use-origins.md
+  Last synced: 2026-07-03 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(學術先驅期)— WebGPT → SayCan → MRKL → ReAct → Toolformer → Gorilla/ToolLLM 六個
+      節點,點節點看精確日期、機制、信心等級(VERIFIED)。
+    圖 B(廠商搶跑對照)— OpenAI/Anthropic(beta+GA)/Google 四筆時間點的長條圖,點列看細節,
+      三家公告都沒有互相點名。
+    圖 C(反轉洞察)— Function Calling(2023-06,無 schema 保證)→ JSON mode(2023-11,語法
+      合法但不保證 schema)→ Structured Outputs(2024-08,完全保證 schema)三階段流程,點
+      卡片看每階段的保證等級,重點是「專用先出現,通用後出現」這個反直覺的方向。
+    圖 D(Perplexity 案例)— 靜態說明卡,2022-12 不等官方機制自己上線產品的案例。
+    圖 E(模型怎麼學會格式,三段式弧線)— 切換 WebGPT(窄且訓練)→ ReAct(廣但要教)→
+      現在(廣且訓練),SVG 場景圖:左邊人形手上焊死一個瀏覽器圖示(WebGPT)換成舉小抄 +
+      問號(ReAct)再換成空手站著、旁邊工具圖示自然待著(現在),右邊 BFCL 考官只在
+      「現在」狀態出現、打分數,底下一個「宣告工具清單還是要做」的誠實澄清。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Tool Use 的身世 — 互動圖解</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .row{display:flex;align-items:stretch;gap:8px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:14px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:13px 11px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .node-icon{display:block;margin-bottom:6px}
+  .node .idx{font-family:var(--mono);font-size:10px;color:var(--faint)}
+  .node h3{font-size:12.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:6px;font-size:11px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:100px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .badge{display:inline-block;margin-top:10px;font-family:var(--mono);font-size:10.5px;
+    padding:3px 8px;border-radius:6px;background:rgba(12,122,89,.1);color:var(--green)}
+  .panel .badge.likely{background:rgba(154,107,46,.1);color:var(--accent)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:150px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .flow-row{display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .flow-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 13px;
+    font-size:12.5px;font-weight:600;box-shadow:var(--shadow)}
+  .flow-box.model{border-color:var(--blue);color:var(--blue)}
+  .flow-box.tool{border-color:var(--rose);color:var(--rose)}
+  .flow-box.sandbox{border-color:var(--green);color:var(--green)}
+  .flow-arrow{color:var(--faint);font-size:13px}
+
+  .toggle-row{display:flex;gap:10px;margin-top:22px}
+  .toggle-btn{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    padding:12px 16px;cursor:pointer;font-size:13.5px;font-weight:650;color:var(--muted);
+    transition:all .16s ease;text-align:center}
+  .toggle-btn.active{border-color:var(--green);color:var(--green);background:rgba(12,122,89,.06)}
+  .toggle-btn.active.bad{border-color:var(--rose);color:var(--rose);background:rgba(176,74,106,.06)}
+
+  .scene-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}
+  .pass-state{transition:opacity .18s ease}
+  .scene-label{font-size:10.5px;fill:var(--muted);font-family:var(--sans)}
+
+  .bar-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+  .bar-row{display:flex;align-items:center;gap:12px}
+  .bar-label{flex:0 0 220px;font-size:12.5px;font-weight:600}
+  .bar-track{flex:1;background:var(--line-soft);border-radius:6px;height:22px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;
+    padding-right:8px;color:#fff;font-family:var(--mono);font-size:10.5px;transition:width .4s ease}
+  .bar-fill.openai{background:var(--accent)}
+  .bar-fill.anthropic{background:var(--blue)}
+  .bar-fill.google{background:var(--green)}
+  .reg-row{cursor:pointer;border-radius:8px;padding:4px 6px;margin:-4px -6px;transition:background .15s ease}
+  .reg-row:hover{background:var(--line-soft)}
+  .reg-row.active{background:rgba(154,107,46,.08)}
+  .reg-row.active .bar-label{color:var(--accent);font-weight:700}
+
+  .ctx-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px}
+  .ctx-label{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .ctx-fill-note{margin-top:10px;font-size:12.5px;color:var(--muted)}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+    .flow-row{flex-direction:column;align-items:stretch}
+    .flow-arrow{transform:rotate(90deg);align-self:center}
+    .bar-label{flex:0 0 auto}
+    .bar-row{flex-direction:column;align-items:stretch;gap:4px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← Tool Use 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · Tool Use 的身世</div>
+    <h1>Tool Use 的身世 — 官方機制出現前,好幾條線各自逼近同一個答案</h1>
+    <p class="tagline">
+      四張圖。圖 A 是學術先驅期的時間軸,圖 B 是三家廠商官方機制搶跑對照,圖 C 是一個查證
+      過程中修正過方向的反轉洞察,圖 D 是 Perplexity 不等官方機制自己上線的案例。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 學術先驅期 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 2021-2023,四條各自獨立的線</div>
+    <div class="sec-title">ReAct 不是最早的,是第一個「通用化」的</div>
+    <p class="sec-sub">
+      點節點看精確日期跟機制——WebGPT 比 ReAct 早了快 10 個月,ReAct 後來最常被引用,是因為
+      它免微調、能套在任意工具上,不是因為它真的最早。
+    </p>
+
+    <div class="row" id="preRow">
+      <div class="node" data-key="webgpt">
+        <svg class="node-icon" width="30" height="30" viewBox="0 0 30 30"><rect x="3" y="5" width="24" height="20" rx="2" fill="none" stroke="#8a7d6e" stroke-width="2"/><line x1="3" y1="11" x2="27" y2="11" stroke="#8a7d6e" stroke-width="2"/><circle cx="7" cy="8" r="1" fill="#8a7d6e"/></svg>
+        <div class="idx">2021-12</div><h3>WebGPT</h3><div class="q">微調操作瀏覽器</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="saycan">
+        <svg class="node-icon" width="30" height="30" viewBox="0 0 30 30"><rect x="4" y="4" width="22" height="22" rx="2" fill="none" stroke="#8a7d6e" stroke-width="2"/><line x1="9" y1="11" x2="21" y2="11" stroke="#8a7d6e" stroke-width="1.8"/><line x1="9" y1="15" x2="21" y2="15" stroke="#8a7d6e" stroke-width="1.8"/><path d="M9,20 l2,2 l4,-4" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="idx">2022-04</div><h3>SayCan</h3><div class="q">從固定清單選技能</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="mrkl">
+        <svg class="node-icon" width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="4" fill="none" stroke="#8a7d6e" stroke-width="2"/><line x1="15" y1="11" x2="15" y2="6" stroke="#8a7d6e" stroke-width="1.8"/><line x1="18.5" y1="17" x2="23" y2="20" stroke="#8a7d6e" stroke-width="1.8"/><line x1="11.5" y1="17" x2="7" y2="20" stroke="#8a7d6e" stroke-width="1.8"/><circle cx="15" cy="5" r="2.2" fill="none" stroke="#8a7d6e" stroke-width="1.6"/><circle cx="24" cy="21" r="2.2" fill="none" stroke="#8a7d6e" stroke-width="1.6"/><circle cx="6" cy="21" r="2.2" fill="none" stroke="#8a7d6e" stroke-width="1.6"/></svg>
+        <div class="idx">2022-05</div><h3>MRKL</h3><div class="q">LLM 當路由器</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="react">
+        <svg class="node-icon" width="30" height="30" viewBox="0 0 30 30"><circle cx="9" cy="10" r="5" fill="none" stroke="#8a7d6e" stroke-width="1.8"/><circle cx="4" cy="17" r="1.3" fill="#8a7d6e"/><circle cx="6.3" cy="20" r="0.9" fill="#8a7d6e"/><path d="M13,13 Q19,15 21,20" fill="none" stroke="#8a7d6e" stroke-width="1.8" marker-end="url(#reactArrow)"/><rect x="18" y="20" width="8" height="6" rx="1.5" fill="none" stroke="#8a7d6e" stroke-width="1.6"/><defs><marker id="reactArrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0L8,4L0,8Z" fill="#8a7d6e"/></marker></defs></svg>
+        <div class="idx">2022-10</div><h3>ReAct</h3><div class="q">免微調通用技巧</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="toolformer">
+        <svg class="node-icon" width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="9" fill="none" stroke="#8a7d6e" stroke-width="2"/><path d="M10,12 a5,5 0 1,1 0,7" fill="none" stroke="#8a7d6e" stroke-width="1.6" marker-end="url(#selfArrow)"/><defs><marker id="selfArrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0L8,4L0,8Z" fill="#8a7d6e"/></marker></defs></svg>
+        <div class="idx">2023-02</div><h3>Toolformer</h3><div class="q">訓練模型自己學</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="gorilla">
+        <svg class="node-icon" width="30" height="30" viewBox="0 0 30 30"><circle cx="9" cy="9" r="5" fill="none" stroke="#8a7d6e" stroke-width="2"/><circle cx="9" cy="9" r="2" fill="none" stroke="#8a7d6e" stroke-width="1.6"/><line x1="12.5" y1="12.5" x2="23" y2="23" stroke="#8a7d6e" stroke-width="3" stroke-linecap="round"/></svg>
+        <div class="idx">2023-05/07</div><h3>Gorilla/ToolLLM</h3><div class="q">微調開源模型</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelPre">
+      <p class="placeholder">↑ 點上面任一個節點看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: 廠商搶跑 ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 是誰讓土法煉鋼時代結束的</div>
+    <div class="sec-title">OpenAI 把「各自發明暗號」收編成「官方統一表單」</div>
+    <p class="sec-sub">
+      圖 A 那些各自獨立的研究線,沒有一套是官方、通用的標準——每個開發者想做「LLM 呼叫工具」,
+      得自己選一套暗號、自己寫解析程式碼。<strong>結束這個時代的不是某篇論文,是 2023-06-13
+      OpenAI 上線 Function Calling</strong> 這件事本身:那天之後,呼叫工具不用再自己發明暗號,直接
+      用 API 內建的 tools 參數。長條代表距離這一天的月數,點列看每一筆的來源跟信心等級——
+      沒有查到任何一家的公告提到「因為對手先做了,所以我們也做」這種話。
+    </p>
+
+    <div class="bar-box" id="vendorBars">
+      <div class="bar-row reg-row" data-key="openai">
+        <div class="bar-label">OpenAI · Function Calling</div>
+        <div class="bar-track"><div class="bar-fill openai" style="width:8%">首發</div></div>
+      </div>
+      <div class="bar-row reg-row" data-key="anthropic-beta">
+        <div class="bar-label">Anthropic · Tool Use(beta)</div>
+        <div class="bar-track"><div class="bar-fill anthropic" style="width:43%">+5 個月</div></div>
+      </div>
+      <div class="bar-row reg-row" data-key="google">
+        <div class="bar-label">Google · Gemini API</div>
+        <div class="bar-track"><div class="bar-fill google" style="width:52%">+6 個月</div></div>
+      </div>
+      <div class="bar-row reg-row" data-key="anthropic-ga">
+        <div class="bar-label">Anthropic · Tool Use(GA)</div>
+        <div class="bar-track"><div class="bar-fill anthropic" style="width:100%">+11.5 個月</div></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelVendor">
+      <p class="placeholder">↑ 點上面任一列看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: 反轉洞察 ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 一個方向反轉的洞察</div>
+    <div class="sec-title">專用機制先出現,通用機制 14 個月後才長出來</div>
+    <p class="sec-sub">
+      原本以為 structured output 是更通用的底層技術、function calling 是它的特例——這個查證
+      過程一開始也這樣猜,後來發現方向是反的。點卡片看每個階段的保證等級。
+    </p>
+
+    <div class="flow-row">
+      <span class="flow-box tool">Function Calling</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box model">JSON mode</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-box sandbox">Structured Outputs</span>
+    </div>
+
+    <div class="chips" id="revChips">
+      <div class="chip" data-key="fc"><h4>2023-06-13</h4><div class="sub">Function Calling</div></div>
+      <div class="chip" data-key="json"><h4>2023-11-06</h4><div class="sub">JSON mode</div></div>
+      <div class="chip" data-key="so"><h4>2024-08-06</h4><div class="sub">Structured Outputs</div></div>
+    </div>
+
+    <div class="panel" id="panelRev">
+      <p class="placeholder">↑ 點上面任一張卡片看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION D: Perplexity ============ -->
+  <section>
+    <div class="sec-kicker">圖 D · 不等官方機制的案例</div>
+    <div class="sec-title">Perplexity:概念比官方機制早,產品也比官方機制早</div>
+    <p class="sec-sub">跟 WebGPT/MRKL 那類學術先驅同一種故事,只是這次是拿去做成真正上線的消費產品。</p>
+    <div class="ctx-box">
+      <div class="ctx-label">2022-12-07 · Perplexity Ask 上線</div>
+      <div class="ctx-fill-note">
+        比 OpenAI 官方 Function Calling(2023-06)還早半年——用的是自己客製的 RAG pipeline
+        (LLM + 自製搜尋/檢索),完全不依賴任何廠商的官方 tool-use API。不用等廠商把機制做成
+        標準,自己就能土法煉鋼湊出一個堪用的版本先上線。
+        <span class="panel-badge" style="display:inline-block;margin-top:8px;font-family:var(--mono);font-size:10.5px;padding:3px 8px;border-radius:6px;background:rgba(154,107,46,.1);color:var(--accent)">LIKELY — 多個第三方來源一致,未直接抓到 2022 年當下的官方原文</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION E: 現在,原生訓練 ============ -->
+  <section>
+    <div class="sec-kicker">圖 E · 模型怎麼「學會」格式,走的是三段式弧線</div>
+    <div class="sec-title">窄且訓練 → 廣但要教 → 廣且訓練</div>
+    <p class="sec-sub">
+      容易漏掉的地方:ReAct 不是「訓練 vs prompt」這條線的起點——WebGPT 更早,而且本身就是
+      訓練出來的,只是很窄(只認瀏覽器)。切換三個時代看差在哪。
+    </p>
+
+    <div class="toggle-row" id="trainToggle">
+      <div class="toggle-btn active" data-key="webgpt">WebGPT · 窄且訓練</div>
+      <div class="toggle-btn bad" data-key="react">ReAct · 廣但要教</div>
+      <div class="toggle-btn" data-key="native">現在 · 廣且訓練</div>
+    </div>
+
+    <div class="scene-box">
+      <svg viewBox="0 0 780 220" style="width:100%;height:auto;display:block">
+        <!-- 模型(左側人形) -->
+        <circle cx="130" cy="70" r="14" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="130" y1="84" x2="130" y2="122" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="130" y1="122" x2="110" y2="155" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="130" y1="122" x2="150" y2="155" stroke="#8a7d6e" stroke-width="2.5"/>
+        <text x="130" y="185" text-anchor="middle" class="scene-label">模型</text>
+
+        <!-- WebGPT 狀態:一手焊死一個瀏覽器工具,不會別的 -->
+        <g id="trainWebgpt" class="pass-state">
+          <line x1="130" y1="95" x2="185" y2="82" stroke="#8a7d6e" stroke-width="3"/>
+          <rect x="183" y="62" width="50" height="36" rx="3" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
+          <line x1="183" y1="70" x2="233" y2="70" stroke="var(--accent)" stroke-width="1.8"/>
+          <circle cx="190" cy="66" r="1.4" fill="var(--accent)"/>
+          <g transform="translate(208,48)">
+            <rect x="-6" y="2" width="12" height="9" rx="1.5" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.6"/>
+            <path d="M -4,2 v-3 a4,4 0 0,1 8,0 v3" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+          </g>
+          <line x1="130" y1="95" x2="98" y2="112" stroke="#8a7d6e" stroke-width="2.5"/>
+          <text x="130" y="205" text-anchor="middle" font-size="10" fill="var(--accent)">已經是訓練出來的,但焊死只認這一種工具</text>
+
+          <g opacity=".38">
+            <circle cx="560" cy="80" r="13" fill="none" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+            <line x1="560" y1="93" x2="560" y2="122" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+            <line x1="560" y1="122" x2="544" y2="150" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+            <line x1="560" y1="122" x2="576" y2="150" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+            <rect x="595" y="70" width="52" height="38" rx="4" fill="none" stroke="#8a7d6e" stroke-width="1.6" stroke-dasharray="3 3"/>
+            <line x1="560" y1="100" x2="595" y2="90" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+            <text x="590" y="188" text-anchor="middle" font-size="10" fill="var(--faint)">BFCL 還沒出現</text>
+          </g>
+        </g>
+
+        <!-- ReAct 狀態:一手舉小抄,頭上一個問號 -->
+        <g id="trainReact" class="pass-state" style="display:none">
+          <line x1="130" y1="95" x2="185" y2="80" stroke="#8a7d6e" stroke-width="2.5"/>
+          <rect x="185" y="58" width="54" height="40" rx="4" fill="rgba(176,74,106,.08)" stroke="var(--rose)" stroke-width="1.8" stroke-dasharray="4 3"/>
+          <path d="M 194,70 L 220,66 M 194,80 L 228,78 M 194,90 L 212,88" stroke="var(--rose)" stroke-width="1.5" stroke-linecap="round"/>
+          <text x="130" y="38" text-anchor="middle" font-size="20" font-weight="700" fill="var(--rose)">?</text>
+          <line x1="130" y1="95" x2="98" y2="112" stroke="#8a7d6e" stroke-width="2.5"/>
+          <text x="130" y="205" text-anchor="middle" font-size="10" fill="var(--rose)">每次呼叫都要在 prompt 裡塞範例教格式</text>
+
+          <g opacity=".38">
+            <circle cx="560" cy="80" r="13" fill="none" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+            <line x1="560" y1="93" x2="560" y2="122" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+            <line x1="560" y1="122" x2="544" y2="150" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+            <line x1="560" y1="122" x2="576" y2="150" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+            <rect x="595" y="70" width="52" height="38" rx="4" fill="none" stroke="#8a7d6e" stroke-width="1.6" stroke-dasharray="3 3"/>
+            <line x1="560" y1="100" x2="595" y2="90" stroke="#8a7d6e" stroke-width="2" stroke-dasharray="3 3"/>
+            <text x="590" y="188" text-anchor="middle" font-size="10" fill="var(--faint)">BFCL 還沒出現</text>
+          </g>
+        </g>
+
+        <!-- Native 狀態:空手站著,旁邊小工具圖示自然待著,右邊 BFCL 考官打分數 -->
+        <g id="trainNative" class="pass-state" style="display:none">
+          <g transform="translate(200,110)">
+            <circle r="10" fill="none" stroke="var(--green)" stroke-width="2"/>
+            <circle r="3.5" fill="none" stroke="var(--green)" stroke-width="2"/>
+            <g stroke="var(--green)" stroke-width="2">
+              <line x1="0" y1="-10" x2="0" y2="-14"/><line x1="0" y1="10" x2="0" y2="14"/>
+              <line x1="-10" y1="0" x2="-14" y2="0"/><line x1="10" y1="0" x2="14" y2="0"/>
+            </g>
+          </g>
+          <ellipse cx="170" cy="150" rx="9" ry="7" fill="none" stroke="var(--green)" stroke-width="2"/>
+          <ellipse cx="183" cy="147" rx="11" ry="8.5" fill="none" stroke="var(--green)" stroke-width="2"/>
+          <path d="M 128,60 C 150,50 158,58 152,66" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-dasharray="2 3"/>
+          <text x="130" y="205" text-anchor="middle" font-size="10" fill="var(--green)">格式已經寫進權重,不用再教</text>
+
+          <g>
+            <circle cx="560" cy="80" r="14" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <line x1="560" y1="94" x2="560" y2="128" stroke="#8a7d6e" stroke-width="2.5"/>
+            <line x1="560" y1="128" x2="542" y2="158" stroke="#8a7d6e" stroke-width="2.5"/>
+            <line x1="560" y1="128" x2="578" y2="158" stroke="#8a7d6e" stroke-width="2.5"/>
+            <line x1="560" y1="105" x2="600" y2="95" stroke="#8a7d6e" stroke-width="2.5"/>
+            <rect x="600" y="65" width="56" height="42" rx="4" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
+            <line x1="608" y1="76" x2="648" y2="76" stroke="var(--line)" stroke-width="2"/>
+            <line x1="608" y1="86" x2="648" y2="86" stroke="var(--line)" stroke-width="2"/>
+            <line x1="608" y1="96" x2="632" y2="96" stroke="var(--line)" stroke-width="2"/>
+            <path d="M 636,58 L 644,66 L 660,46" fill="none" stroke="var(--green)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="590" y="188" text-anchor="middle" font-size="10" font-weight="660" fill="#3a3128">BFCL 打分數</text>
+            <text x="590" y="202" text-anchor="middle" font-size="9.5" fill="var(--muted)">2024-02 · Gorilla 團隊</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="panel" id="panelTrain"></div>
+
+    <div class="ctx-box" style="margin-top:18px">
+      <div class="ctx-label">但有一個地方不能講得太滿</div>
+      <div class="ctx-fill-note">
+        格式不用教了,不代表完全不用給任何輸入——「宣告有哪些工具可以用」這件事還是要做,
+        `tools` 參數(name/description/schema)還是得送進 API 請求裡,只是這不算傳統意義的
+        prompt(不是自由文字、不是 few-shot 範例),是結構化的 API 參數。
+      </div>
+      <span style="display:inline-block;margin-top:10px;font-family:var(--mono);font-size:10.5px;padding:3px 8px;border-radius:6px;background:rgba(154,107,46,.1);color:var(--accent)">誠實聲明 — Anthropic/OpenAI/Google 都沒有公開揭露訓練 tool use 的確切配方,這是研究社群的方法論共識,不是廠商官方揭露</span>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">兩輪 WebSearch + 一次委派 subagent 深度查證,2026-07-03。信心等級標示沿用查證報告原本的分級,VERIFIED 代表讀到官方一手來源,LIKELY 代表多個第三方來源一致但未直接抓到官方原文。</p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">學術先驅期(arXiv)</div>
+        <a href="https://arxiv.org/abs/2112.09332">WebGPT — arXiv:2112.09332</a>
+        <a href="https://arxiv.org/abs/2204.01691">SayCan — arXiv:2204.01691</a>
+        <a href="https://arxiv.org/abs/2205.00445">MRKL Systems — arXiv:2205.00445</a>
+        <a href="https://arxiv.org/abs/2302.04761">Toolformer — arXiv:2302.04761</a>
+        <a href="https://arxiv.org/abs/2305.15334">Gorilla — arXiv:2305.15334</a>
+        <a href="https://arxiv.org/abs/2307.16789">ToolLLM — arXiv:2307.16789</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">廠商官方公告</div>
+        <a href="https://www.anthropic.com/news/claude-2-1">Anthropic — Claude 2.1(tool use beta 隨附發布)</a>
+        <a href="https://openai.com/index/introducing-structured-outputs-in-the-api/">OpenAI — Introducing Structured Outputs in the API</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">Perplexity</div>
+        <a href="https://research.perplexity.ai/articles/architecting-and-evaluating-an-ai-first-search-api">Perplexity — 架構回顧文章(事後撰寫,非 2022 年當下公告)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">原生訓練(研究社群方法論)</div>
+        <a href="https://arxiv.org/abs/2508.05118">RL for Function Calling — arXiv:2508.05118</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/2026-07-03-tool-use-origins.md 為真相來源(經 WebSearch + subagent 查證)·
+    最後同步 2026-07-03
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  const PRE = {
+    webgpt: { title: 'WebGPT(OpenAI)', tag: '2021-12-17 · VERIFIED', def: '微調 GPT-3,用固定指令集(搜尋/點擊/引用)操作一個文字版瀏覽器環境,靠模仿學習 + RLHF 訓練——查得到、有論文的最早案例。' },
+    saycan: { title: 'SayCan(Google)', tag: '2022-04-04 · VERIFIED', def: 'LLM 對一份固定的機器人技能清單(約 551 個)打分數,跟一個學到的可行性函數相乘去挑動作——是「選」不是「生成呼叫」。' },
+    mrkl: { title: 'MRKL Systems(AI21)', tag: '2022-05-01 · VERIFIED', def: 'LLM 當路由器,把問題分派給專家模組,而且真的做出來了——AI21 自己的實作叫 Jurassic-X。' },
+    react: { title: 'ReAct(Princeton/Google)', tag: '2022-10 · VERIFIED', def: '第一個免微調、套在任意工具上都行的技巧:交替生成 Thought 跟 Action,自由文字,外部程式碼自己解析。因為通用,後來被引用最多,常被誤當成「起點」——但它不是最早的。' },
+    toolformer: { title: 'Toolformer', tag: '2023-02-09 · VERIFIED', def: '換個方向解問題:不靠 prompting 技巧,直接訓練模型自己學會吐工具呼叫格式。' },
+    gorilla: { title: 'Gorilla / ToolLLM', tag: '2023-05-24 / 2023-07-31 · VERIFIED', def: '微調開源模型取得呼叫能力,ToolLLM 走同一條路線但用更大規模的工具集。' }
+  };
+  const panelPre = document.getElementById('panelPre');
+  const preNodes = document.querySelectorAll('#preRow .node');
+  preNodes.forEach(n => n.addEventListener('click', () => {
+    preNodes.forEach(c => c.classList.toggle('active', c === n));
+    const d = PRE[n.dataset.key];
+    panelPre.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelPre);
+  }));
+
+  const VENDOR = {
+    'openai': { title: 'OpenAI · Function Calling', tag: '2023-06-13', def: '業界第一個官方 tool-use 機制,也是終結「土法煉鋼時代」的那一天——在這之前,LLM 呼叫工具靠的是每個團隊各自發明的暗號(ReAct 的 Thought/Action 格式、WebGPT 的專用微調),互不相容;這天之後,收斂成一套內建在 API 裡、任何開發者都能直接用的 tools 參數。官方原文連結目前被 403 擋下無法直接抓取,靠獨立第三方(含 Simon Willison 部落格、TechCrunch)同日報導交叉確認日期。', badge: 'VERIFIED(交叉確認)' },
+    'anthropic-beta': { title: 'Anthropic · Tool Use(beta)', tag: '2023-11-21', def: '隨 Claude 2.1 一起發布,直接讀到 anthropic.com/news/claude-2-1 原文——比 OpenAI 晚約 5 個月。', badge: 'VERIFIED' },
+    'google': { title: 'Google · Gemini API', tag: '2023-12-13', def: 'Gemini Pro API 上線公告明講「with function calling」,直接讀到 blog.google 原文——比 OpenAI 晚約 6 個月。', badge: 'VERIFIED' },
+    'anthropic-ga': { title: 'Anthropic · Tool Use(GA)', tag: '2024-05-30', def: '從 beta 轉正式 GA,涵蓋 Claude 3 全系列 + API/Bedrock/Vertex AI——來源是搜尋摘要 + 同日官方推特,沒有直接抓到 blog 原文。', badge: 'LIKELY', likely: true }
+  };
+  const panelVendor = document.getElementById('panelVendor');
+  const vendorRows = document.querySelectorAll('#vendorBars .reg-row');
+  vendorRows.forEach(n => n.addEventListener('click', () => {
+    vendorRows.forEach(c => c.classList.toggle('active', c === n));
+    const d = VENDOR[n.dataset.key];
+    panelVendor.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div><span class="badge${d.likely ? ' likely' : ''}">${d.badge}</span>`;
+    fadeIn(panelVendor);
+  }));
+
+  const REV = {
+    fc: { title: 'Function Calling', tag: '2023-06-13 · 無 schema 強制保證', def: '模型自己決定要不要呼叫、填什麼參數,格式偶爾還是會錯——這是最早的機制,專門為了「觸發工具呼叫」而生,不是通用的結構化輸出功能。' },
+    json: { title: 'JSON mode', tag: '2023-11-06 · LIKELY', def: '保證輸出「語法上合法的 JSON」,但不保證符合你指定的 schema——介於兩者之間的過渡功能,社群與文檔交叉確認,沒有抓到專屬公告原文。' },
+    so: { title: 'Structured Outputs', tag: '2024-08-06 · VERIFIED', def: '保證輸出完全符合你指定的 JSON Schema(官方 evals 測出 100%),同時套用在「工具呼叫的參數」跟「一般回答格式」兩種情境——這才是真正通用化的版本,比 Function Calling 晚了 14 個月。方向是「專用先出現,通用後出現」,不是反過來。' }
+  };
+  const panelRev = document.getElementById('panelRev');
+  const revChips = document.querySelectorAll('#revChips .chip');
+  revChips.forEach(n => n.addEventListener('click', () => {
+    revChips.forEach(c => c.classList.toggle('active', c === n));
+    const d = REV[n.dataset.key];
+    panelRev.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelRev);
+  }));
+
+  const TRAIN = {
+    webgpt: {
+      title: 'WebGPT(2021-12)· 窄且訓練', tag: '訓練出來的,但只認一種工具',
+      def: 'WebGPT 本身就是訓練出來的(微調 GPT-3 + RLHF),不是靠 prompt 教格式——這點跟現在很像。差別在廣度:訓練出來的能力焊死在瀏覽器這一種工具上,想換一種工具就得整個重新訓練一次,不像現在的原生 function calling 能套用在任意工具上。'
+    },
+    react: {
+      title: 'ReAct(2022-10)· 廣但要教', tag: '2022',
+      def: '走完全相反的路線:不訓練,但廣——免微調、套在任意工具上都行,代價是模型沒被訓練過這個格式,得靠 few-shot prompting 在對話裡教它,每次呼叫都要在 prompt 裡塞幾個範例,而且還沒有一個共同標準去量測「教得好不好」。'
+    },
+    native: {
+      title: '現在(2026)· 廣且訓練', tag: 'Native Function Calling + BFCL',
+      def: '把前兩條路線的優點合在一起:模型在訓練階段(SFT,越來越多加上 RL)直接餵大量「工具呼叫軌跡」(問題→推理→呼叫→結果→答案),學到的不是「認識瀏覽器」這種窄技能,是「看到任何一份工具 schema,就知道怎麼填」這種通用技能。這件事的種子是 2023-02 的 Toolformer,2026 年已經是所有前沿模型的標準做法。訓練得好不好,現在有 BFCL(2024-02,Gorilla 團隊做的)當共同量尺,不是廠商自己說了算。'
+    }
+  };
+  const panelTrain = document.getElementById('panelTrain');
+  const trainBtns = document.querySelectorAll('#trainToggle .toggle-btn');
+  const trainScenes = {
+    webgpt: document.getElementById('trainWebgpt'),
+    react: document.getElementById('trainReact'),
+    native: document.getElementById('trainNative')
+  };
+  function renderTrain(mode){
+    trainBtns.forEach(b => b.classList.toggle('active', b.dataset.key === mode));
+    Object.keys(trainScenes).forEach(key => { trainScenes[key].style.display = key === mode ? '' : 'none'; });
+    const d = TRAIN[mode];
+    panelTrain.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelTrain);
+  }
+  trainBtns.forEach(b => b.addEventListener('click', () => renderTrain(b.dataset.key)));
+  renderTrain('webgpt');
+</script>
+</body>
+</html>

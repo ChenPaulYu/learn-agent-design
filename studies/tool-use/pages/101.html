@@ -1,6 +1,6 @@
 ---
 title: Tool Use 101 — 互動圖解
-summary: 三張互動圖:三段式流程(定義/呼叫/回結果)、多輪迴圈怎麼接+錯誤處理、tool_choice 四種模式與 extended thinking 的坑。
+summary: 六張互動圖:沒有 tool use 之前 agent 怎麼「假裝」做事、agent 推理-行動迴圈裡 tool use 補的是哪一格、跟 structured output 的關係與何時該用工具、三段式流程(定義/呼叫/回結果)、多輪迴圈怎麼接+錯誤處理、tool_choice 四種模式與 extended thinking 的坑。
 date: 2026-07-03
 tags:
   - tool-use
@@ -10,17 +10,28 @@ render_with_liquid: false
 ---
 <!DOCTYPE html>
 <!--
-  INTERACTIVE — Tool Use 101:三張互動圖解。可長期回看的教學頁(pages/ genre,發布於
-  /tool-use/101/),不是 disposable mockup。
+  INTERACTIVE — Tool Use 101:六張互動圖解。可長期回看的教學頁(pages/ genre,發布於
+  /tool-use/101/),不是 disposable mockup。這是這個主題唯一的「先讀這篇」入口——先講概念
+  (是什麼、為什麼),再講 API 機制細節,兩者原本拆成 overview + 101 兩頁,後來發現這個切法
+  比 MCP 101 / agent-skills-overview 的既有慣例更細(那兩篇都是「概念 + 核心機制」放同一
+  頁),沒有站得住腳的理由,所以合併回一頁——跟 origins.html 那種「證據類型不同」(有日期、
+  信心分級)才拆的理由不一樣。
   Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
     ../docs/2026-07-03-tool-use-basics.md
   Last synced: 2026-07-03 — docs 大改時回來更新這頁,並更新這個日期。
   What it is:
-    圖 A(三段式流程)— 定義工具 → tool_use → tool_result,流程圖 + 點卡片看每段的 JSON
+    圖 A(沒有 tool use 會怎樣)— 切換「沒有 tool use」vs「有 tool use」,看「行動」這一步
+      從自由文字 + 外部猜測,變成結構化物件 + 直接執行,搭配一張房間遞紙條/表單的 SVG 場景圖。
+    圖 B(agent 的推理-行動迴圈)— 感知→推理→行動→觀察 四個節點排成一圈,點節點看細節,
+      行動節點特別標出 tool use 補的正是這一格。
+    圖 C(跟 structured output 的關係 + 何時該用工具)— 同一張表單分別指向「回答使用者」
+      跟「觸發系統動作」兩種用途,底下一個何時用工具/何時用文字的判準清單。
+    圖 D(三段式流程)— 定義工具 → tool_use → tool_result,流程圖 + 點卡片看每段的 JSON
       長什麼樣。
-    圖 B(多輪迴圈)— 切換「成功」vs「失敗(is_error)」兩條路徑,看迴圈怎麼接下去。
-    圖 C(控制選項)— tool_choice 四種模式(auto/any/tool/none)+ 平行呼叫開關,以及跟
-      extended thinking 疊用時的坑。
+    圖 E(多輪迴圈)— 切換「成功」vs「失敗(is_error)」兩條路徑,看迴圈怎麼接下去。
+    圖 F(控制選項)— tool_choice 四種模式(auto/any/tool/none)+ 平行呼叫開關,以及跟
+      extended thinking 疊用時的坑。點卡片時,一排工具卡片會跟著切換「可拿/鎖住」,把四種
+      模式視覺化成「模型可以伸手拿哪些工具」。
 -->
 <html lang="zh-Hant">
 <head>
@@ -90,6 +101,28 @@ render_with_liquid: false
     box-shadow:var(--shadow);padding:20px 22px}
   .ctx-label{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
   .ctx-fill-note{margin-top:10px;font-size:12.5px;color:var(--muted)}
+  .checklist{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+  .checklist div{font-size:13px;padding:6px 10px;border-radius:7px}
+  .checklist div.yes{background:rgba(12,122,89,.08);color:var(--green)}
+  .checklist div.no{background:rgba(176,74,106,.08);color:var(--rose)}
+
+  .scene-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}
+  .pass-state{transition:opacity .18s ease}
+  .scene-label{font-size:10.5px;fill:var(--muted);font-family:var(--sans)}
+
+  .zone{cursor:pointer}
+  .zone .st{transition:stroke .15s ease}
+  .zone .stf{transition:fill .15s ease}
+  .zone:hover .st,.zone.active .st{stroke:currentColor}
+  .zone:hover .stf,.zone.active .stf{fill:currentColor}
+  .zone:hover .fillable,.zone.active .fillable{fill:color-mix(in srgb,currentColor 10%,var(--panel))}
+  .zone.active text{fill:currentColor}
+  .zone.spotlight .st{stroke:var(--green)}
+  .zone.spotlight text{fill:var(--green)}
+
+  .slot{transition:opacity .2s ease}
+  .slot.locked{opacity:.32}
+  .slot.available .slot-bg{stroke:var(--green);stroke-width:2.5}
 
   .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
   .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
@@ -126,16 +159,205 @@ render_with_liquid: false
   </div>
   <header>
     <div class="kicker">Interactive · Tool Use 101</div>
-    <h1>Tool Use 101 — LLM 怎麼決定要呼叫一個工具</h1>
+    <h1>Tool Use 101 — 是什麼、為什麼,以及怎麼運作</h1>
     <p class="tagline">
-      三張圖。圖 A 是三段式流程:定義、呼叫、回結果。圖 B 是多輪怎麼接、失敗怎麼辦。圖 C 是
-      你能插手的控制選項,跟一個容易踩的坑。點任何卡片看細節。
+      六張圖。圖 A-C 是概念:沒有這個機制之前的樣子、它在 agent 迴圈裡補的是哪一格、跟
+      structured output 的關係。圖 D-F 是 API 機制:三段式流程、多輪迴圈、控制選項。
     </p>
   </header>
 
-  <!-- ============ SECTION A: 三段式流程 ============ -->
+  <!-- ============ SECTION A: 沒有 tool use 會怎樣 ============ -->
   <section>
-    <div class="sec-kicker">圖 A · 一輪工具呼叫,分三段</div>
+    <div class="sec-kicker">圖 A · 「行動」這一步怎麼被做出來</div>
+    <div class="sec-title">從手寫紙條,到固定欄位的表單</div>
+    <p class="sec-sub">
+      一個關在房間裡的聰明人只能從門縫遞紙條——外面的人得自己讀懂紙條上寫的是什麼。切換下面
+      看這件事在「沒有 tool use」和「有 tool use」時分別怎麼發生。
+    </p>
+
+    <div class="toggle-row" id="woToggle">
+      <div class="toggle-btn active bad" data-mode="without">沒有 tool use</div>
+      <div class="toggle-btn" data-mode="with">有 tool use</div>
+    </div>
+
+    <div class="scene-box">
+      <svg viewBox="0 0 760 200" style="width:100%;height:auto;display:block">
+        <!-- 房間(模型) -->
+        <rect x="20" y="20" width="260" height="160" rx="14" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+        <rect x="277" y="83" width="6" height="34" fill="var(--panel)"/>
+        <circle cx="150" cy="78" r="14" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="150" y1="92" x2="150" y2="128" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="150" y1="105" x2="200" y2="96" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="150" y1="105" x2="120" y2="112" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="150" y1="128" x2="132" y2="158" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="150" y1="128" x2="166" y2="158" stroke="#8a7d6e" stroke-width="2.5"/>
+        <text x="150" y="188" text-anchor="middle" class="scene-label">房間裡的模型</text>
+
+        <!-- 外部世界(程式 / 使用者) -->
+        <rect x="480" y="20" width="260" height="160" rx="14" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+        <rect x="477" y="83" width="6" height="34" fill="var(--panel)"/>
+        <circle cx="610" cy="78" r="14" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="610" y1="92" x2="610" y2="128" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="610" y1="105" x2="560" y2="96" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="610" y1="105" x2="640" y2="112" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="610" y1="128" x2="592" y2="158" stroke="#8a7d6e" stroke-width="2.5"/>
+        <line x1="610" y1="128" x2="626" y2="158" stroke="#8a7d6e" stroke-width="2.5"/>
+        <text x="610" y="188" text-anchor="middle" class="scene-label">外部程式 / 世界</text>
+
+        <!-- 中間傳遞的東西:切換兩種狀態 -->
+        <g id="passWithout" class="pass-state">
+          <path d="M 320 68 L 400 62 L 430 78 L 412 108 L 335 112 L 318 90 Z"
+                fill="rgba(176,74,106,.10)" stroke="var(--rose)" stroke-width="1.8" stroke-dasharray="4 3"/>
+          <path d="M 335 78 L 355 74 M 345 88 L 400 82 M 340 98 L 385 96" stroke="var(--rose)" stroke-width="1.6" stroke-linecap="round"/>
+          <text x="574" y="52" font-size="22" font-weight="700" fill="var(--rose)">?</text>
+          <text x="375" y="132" text-anchor="middle" font-size="10" fill="var(--rose)">格式不固定,靠猜</text>
+        </g>
+        <g id="passWith" class="pass-state" style="display:none">
+          <rect x="325" y="66" width="110" height="52" rx="6" fill="var(--panel)" stroke="var(--green)" stroke-width="2"/>
+          <line x1="335" y1="80" x2="425" y2="80" stroke="var(--line)" stroke-width="2.5"/>
+          <line x1="335" y1="92" x2="425" y2="92" stroke="var(--line)" stroke-width="2.5"/>
+          <line x1="335" y1="104" x2="400" y2="104" stroke="var(--line)" stroke-width="2.5"/>
+          <path d="M 566 62 L 574 72 L 590 50" fill="none" stroke="var(--green)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="380" y="132" text-anchor="middle" font-size="10" fill="var(--green)">固定欄位,可驗證</text>
+        </g>
+
+        <line x1="286" y1="98" x2="472" y2="98" stroke="#c9bfae" stroke-width="1.5" stroke-dasharray="3 4"/>
+      </svg>
+    </div>
+
+    <div class="ctx-box" id="woBox"></div>
+  </section>
+
+  <!-- ============ SECTION B: 推理-行動迴圈 ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · Agent 的核心結構</div>
+    <div class="sec-title">推理與行動反覆橫跳,tool use 補的是「行動」這一格</div>
+    <p class="sec-sub">
+      這個迴圈本身不是新概念——新的是「行動」這一步怎麼被可靠地做出來。點節點看每一步在做
+      什麼,綠色邊框那個是 tool use 真正動手術的地方。
+    </p>
+
+    <div class="scene-box" id="loopScene">
+      <svg viewBox="0 0 600 340" style="width:100%;height:auto;display:block">
+        <circle cx="300" cy="175" r="128" fill="none" stroke="#c9bfae" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <text x="300" y="170" text-anchor="middle" font-size="10.5" fill="var(--faint)">反覆進行</text>
+        <text x="300" y="184" text-anchor="middle" font-size="10.5" fill="var(--faint)">直到任務完成</text>
+
+        <text x="216" y="98" text-anchor="middle" font-size="17" fill="var(--faint)">↗</text>
+        <text x="384" y="98" text-anchor="middle" font-size="17" fill="var(--faint)">↘</text>
+        <text x="384" y="258" text-anchor="middle" font-size="17" fill="var(--faint)">↙</text>
+        <text x="216" y="258" text-anchor="middle" font-size="17" fill="var(--faint)">↖</text>
+
+        <g class="zone" data-key="perceive" style="color:#8a7d6e">
+          <circle cx="172" cy="175" r="44" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <text x="172" y="171" text-anchor="middle" font-size="13" font-weight="660" fill="#3a3128">感知</text>
+          <text x="172" y="188" text-anchor="middle" font-size="9" fill="var(--muted)">01</text>
+        </g>
+        <g class="zone" data-key="reason" style="color:#8a7d6e">
+          <circle cx="300" cy="65" r="44" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <text x="300" y="61" text-anchor="middle" font-size="13" font-weight="660" fill="#3a3128">推理</text>
+          <text x="300" y="78" text-anchor="middle" font-size="9" fill="var(--muted)">02</text>
+        </g>
+        <g class="zone spotlight" data-key="act" style="color:#0c7a59">
+          <circle cx="428" cy="175" r="48" class="st fillable" fill="var(--panel)" stroke="var(--green)" stroke-width="3"/>
+          <text x="428" y="171" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--green)">行動 ★</text>
+          <text x="428" y="188" text-anchor="middle" font-size="9" fill="var(--green)">03 · tool use</text>
+        </g>
+        <g class="zone" data-key="observe" style="color:#8a7d6e">
+          <circle cx="300" cy="285" r="44" class="st fillable" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2.5"/>
+          <text x="300" y="281" text-anchor="middle" font-size="13" font-weight="660" fill="#3a3128">觀察</text>
+          <text x="300" y="298" text-anchor="middle" font-size="9" fill="var(--muted)">04</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="panel" id="panelLoop">
+      <p class="placeholder">↑ 點上面任一個節點看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: structured output 關係 + 何時該用 ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 跟 structured output 的關係</div>
+    <div class="sec-title">同一個技術,不同的用途</div>
+    <p class="sec-sub">
+      這裡只講概念上的關係(A 是 B 的一種特定用法),不牽涉「誰先上線」——上線時間先後反而
+      跟直覺相反,寫在 origins 那篇裡。
+    </p>
+
+    <div class="scene-box" id="soScene">
+      <svg viewBox="0 0 700 220" style="width:100%;height:auto;display:block">
+        <!-- 中間:同一張表單(呼應圖 A 的「有 tool use」狀態) -->
+        <rect x="300" y="80" width="100" height="56" rx="6" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+        <line x1="310" y1="94" x2="390" y2="94" stroke="var(--line)" stroke-width="2.5"/>
+        <line x1="310" y1="106" x2="390" y2="106" stroke="var(--line)" stroke-width="2.5"/>
+        <line x1="310" y1="118" x2="365" y2="118" stroke="var(--line)" stroke-width="2.5"/>
+        <text x="350" y="150" text-anchor="middle" font-size="10" fill="var(--faint)">同一張表單</text>
+
+        <!-- 左:回答使用者 -->
+        <g class="zone" data-key="general" style="color:#2f6f9e">
+          <rect x="20" y="45" width="200" height="155" rx="12" class="fillable" fill="transparent" pointer-events="all"/>
+          <path d="M 295 100 L 165 100" class="st" fill="none" stroke="#c9bfae" stroke-width="2" marker-end="url(#arrGeneral)"/>
+          <circle cx="110" cy="86" r="13" class="st" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+          <line x1="110" y1="99" x2="110" y2="124" class="st" stroke="#8a7d6e" stroke-width="2.5"/>
+          <line x1="110" y1="108" x2="92" y2="116" class="st" stroke="#8a7d6e" stroke-width="2.5"/>
+          <line x1="110" y1="108" x2="128" y2="116" class="st" stroke="#8a7d6e" stroke-width="2.5"/>
+          <line x1="110" y1="124" x2="96" y2="148" class="st" stroke="#8a7d6e" stroke-width="2.5"/>
+          <line x1="110" y1="124" x2="124" y2="148" class="st" stroke="#8a7d6e" stroke-width="2.5"/>
+          <text x="110" y="172" text-anchor="middle" font-size="10.5" font-weight="660" fill="#3a3128">一般 Structured Output</text>
+          <text x="110" y="186" text-anchor="middle" font-size="9.5" fill="var(--muted)">回答使用者</text>
+        </g>
+
+        <!-- 右:觸發系統動作 -->
+        <g class="zone" data-key="tool" style="color:#9a6b2e">
+          <rect x="480" y="45" width="200" height="155" rx="12" class="fillable" fill="transparent" pointer-events="all"/>
+          <path d="M 405 100 L 535 100" class="st" fill="none" stroke="#c9bfae" stroke-width="2" marker-end="url(#arrTool)"/>
+          <g transform="translate(590,96)">
+            <circle r="17" class="st" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <circle r="6" class="st" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <g class="st" stroke="#8a7d6e" stroke-width="2.5">
+              <line x1="0" y1="-17" x2="0" y2="-24"/>
+              <line x1="0" y1="17" x2="0" y2="24"/>
+              <line x1="-17" y1="0" x2="-24" y2="0"/>
+              <line x1="17" y1="0" x2="24" y2="0"/>
+              <line x1="-12" y1="-12" x2="-17" y2="-17"/>
+              <line x1="12" y1="-12" x2="17" y2="-17"/>
+              <line x1="-12" y1="12" x2="-17" y2="17"/>
+              <line x1="12" y1="12" x2="17" y2="17"/>
+            </g>
+          </g>
+          <text x="590" y="172" text-anchor="middle" font-size="10.5" font-weight="660" fill="#3a3128">Function Calling</text>
+          <text x="590" y="186" text-anchor="middle" font-size="9.5" fill="var(--muted)">觸發系統動作</text>
+        </g>
+
+        <defs>
+          <marker id="arrGeneral" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c9bfae"/>
+          </marker>
+          <marker id="arrTool" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#c9bfae"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="panel" id="panelSO">
+      <p class="placeholder">↑ 點上面任一張卡片看細節。</p>
+    </div>
+
+    <div class="sec-sub" style="margin-top:30px">官方判準:什麼時候該用工具,什麼時候該用文字</div>
+    <div class="ctx-box">
+      <div class="ctx-label">When to use tools (and when not to)</div>
+      <div class="checklist">
+        <div class="yes">✓ 結構化資料檢索、計算、跟外部系統互動——適合工具</div>
+        <div class="no">✗ 創意寫作、摘要、一般對話——文字反而更自然、成本更低</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION D: 三段式流程 ============ -->
+  <section>
+    <div class="sec-kicker">圖 D · 一輪工具呼叫,分三段</div>
     <div class="sec-title">定義 → 呼叫 → 回結果</div>
     <p class="sec-sub">
       response 的 content 陣列不保證 tool_use 排第一個(文字說明可能先出現)——要掃描整個
@@ -161,9 +383,9 @@ render_with_liquid: false
     </div>
   </section>
 
-  <!-- ============ SECTION B: 多輪迴圈 ============ -->
+  <!-- ============ SECTION E: 多輪迴圈 ============ -->
   <section>
-    <div class="sec-kicker">圖 B · 多輪對話怎麼接</div>
+    <div class="sec-kicker">圖 E · 多輪對話怎麼接</div>
     <div class="sec-title">一個 while 迴圈,兩條可能的路徑</div>
     <p class="sec-sub">
       只要 stop_reason 還是 tool_use,就繼續執行、繼續送結果回去——切換下面看「成功」跟
@@ -177,19 +399,65 @@ render_with_liquid: false
     <div class="ctx-box" id="loopBox"></div>
   </section>
 
-  <!-- ============ SECTION C: 控制選項 ============ -->
+  <!-- ============ SECTION F: 控制選項 ============ -->
   <section>
-    <div class="sec-kicker">圖 C · 你能插手的控制選項</div>
+    <div class="sec-kicker">圖 F · 你能插手的控制選項</div>
     <div class="sec-title">tool_choice,還有一個容易踩的坑</div>
     <p class="sec-sub">
       預設是模型自己決定要不要用工具,但你可以強制。點卡片看四種模式。
     </p>
 
     <div class="chips" id="choiceChips">
-      <div class="chip" data-key="auto"><h4>auto</h4><div class="sub">模型自己決定(預設)</div></div>
+      <div class="chip active" data-key="auto"><h4>auto</h4><div class="sub">模型自己決定(預設)</div></div>
       <div class="chip" data-key="any"><h4>any</h4><div class="sub">一定要用某個工具</div></div>
       <div class="chip" data-key="tool"><h4>tool</h4><div class="sub">一定要用指定的工具</div></div>
       <div class="chip" data-key="none"><h4>none</h4><div class="sub">這輪不准用工具</div></div>
+    </div>
+
+    <div class="scene-box" id="choiceScene">
+      <svg viewBox="0 0 700 145" style="width:100%;height:auto;display:block">
+        <g class="slot" data-slot="a">
+          <rect x="30" y="15" width="140" height="115" rx="10" class="slot-bg" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <g transform="translate(100,58)">
+            <circle r="12" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <circle r="4" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <g stroke="#8a7d6e" stroke-width="2.5">
+              <line x1="0" y1="-12" x2="0" y2="-17"/><line x1="0" y1="12" x2="0" y2="17"/>
+              <line x1="-12" y1="0" x2="-17" y2="0"/><line x1="12" y1="0" x2="17" y2="0"/>
+            </g>
+          </g>
+          <text x="100" y="110" text-anchor="middle" font-size="11" font-weight="640" fill="#3a3128">Tool A</text>
+        </g>
+        <g class="slot" data-slot="weather">
+          <rect x="200" y="15" width="140" height="115" rx="10" class="slot-bg" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <g transform="translate(270,56)">
+            <ellipse cx="-8" cy="4" rx="10" ry="8" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <ellipse cx="6" cy="0" rx="13" ry="10" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <ellipse cx="18" cy="6" rx="9" ry="7" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+          </g>
+          <text x="270" y="110" text-anchor="middle" font-size="11" font-weight="640" fill="#3a3128">get_weather</text>
+        </g>
+        <g class="slot" data-slot="c">
+          <rect x="370" y="15" width="140" height="115" rx="10" class="slot-bg" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <g transform="translate(440,58)">
+            <rect x="-16" y="-4" width="32" height="22" rx="3" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <path d="M -8,-4 a8,8 0 0,1 16,0" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <line x1="-16" y1="6" x2="16" y2="6" stroke="#8a7d6e" stroke-width="2"/>
+          </g>
+          <text x="440" y="110" text-anchor="middle" font-size="11" font-weight="640" fill="#3a3128">Tool C</text>
+        </g>
+        <g class="slot" data-slot="prose">
+          <rect x="540" y="15" width="140" height="115" rx="10" class="slot-bg" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <g transform="translate(610,54)">
+            <rect x="-20" y="-14" width="40" height="26" rx="6" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <path d="M -8,12 L -14,20 L -2,12 Z" fill="none" stroke="#8a7d6e" stroke-width="2.5"/>
+            <line x1="-12" y1="-6" x2="12" y2="-6" stroke="var(--line)" stroke-width="2"/>
+            <line x1="-12" y1="2" x2="6" y2="2" stroke="var(--line)" stroke-width="2"/>
+          </g>
+          <text x="610" y="110" text-anchor="middle" font-size="11" font-weight="640" fill="#3a3128">純文字回答</text>
+        </g>
+      </svg>
+      <div class="ctx-fill-note" id="slotCaption" style="text-align:center;margin-top:2px"></div>
     </div>
 
     <div class="panel" id="panelChoice">
@@ -209,12 +477,14 @@ render_with_liquid: false
   <section>
     <div class="sec-kicker">References · 參考資料</div>
     <div class="sec-title">這一頁的內容查證自哪裡</div>
-    <p class="sec-sub">全部經 context7 於 2026-07-03 查證,官方文檔。</p>
+    <p class="sec-sub">全部經 context7 於 2026-07-03 查證,官方文檔。比喻與敘事框架是筆記自己的推導,已在 docs 裡標註。</p>
     <div class="refs">
       <div class="ref-group">
         <div class="ref-head">Anthropic 官方文檔</div>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool">tool-search-tool — 「structured JSON object」核心定義原句</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works">how-tool-use-works — 何時該用工具、何時用文字的官方判準</a>
         <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools">define-tools — 工具定義格式、tool_choice 四種模式</a>
-        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/build-a-tool-using-agent">build-a-tool-using-agent — 完整 while 迴圈範例</a>
+        <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/build-a-tool-using-agent">build-a-tool-using-agent — agentic loop 的官方描述、完整 while 迴圈範例</a>
         <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls">handle-tool-calls — is_error 錯誤處理格式</a>
         <a href="https://platform.claude.com/docs/en/build-with-claude/extended-thinking">extended-thinking — thinking block 要跟 tool_use 一起傳回去的規則</a>
       </div>
@@ -229,6 +499,65 @@ render_with_liquid: false
 
 <script>
   function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  const WO = {
+    without: {
+      label: '沒有 tool use', tag: '自由文字 + 外部猜測',
+      note: '模型只能在自由文字裡暗示意圖(例如自己約定「Thought: ... Action: get_weather(city="Paris")」這種格式),外部程式碼用字串解析去猜這段文字裡藏的是不是一個動作、參數是什麼。格式漂移、參數亂填、意圖模糊(模型只是在討論要不要打這通 API,還是真的要打)都是常態——這正是 tool use 正式上線前那個「土法煉鋼時代」的真實樣貌。'
+    },
+    with: {
+      label: '有 tool use', tag: '結構化物件 + 直接執行',
+      note: '模型原生吐出一個 schema 驗證過的 tool_use 物件(工具名稱 + 參數),外部程式碼直接照著執行,不用再猜格式。這是一張固定欄位的表單,不是一張手寫紙條——迴圈本身沒變,只是「行動」這一格從不可靠變成可靠。'
+    }
+  };
+  const woBox = document.getElementById('woBox');
+  const woBtns = document.querySelectorAll('#woToggle .toggle-btn');
+  const passWithout = document.getElementById('passWithout');
+  const passWith = document.getElementById('passWith');
+  function renderWO(mode){
+    woBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    passWithout.style.display = mode === 'without' ? '' : 'none';
+    passWith.style.display = mode === 'with' ? '' : 'none';
+    const d = WO[mode];
+    woBox.innerHTML = `<div class="ctx-label">${d.tag}</div><div class="ctx-fill-note">${d.note}</div>`;
+    fadeIn(woBox);
+  }
+  woBtns.forEach(b => b.addEventListener('click', () => renderWO(b.dataset.mode)));
+  renderWO('without');
+
+  const LOOP = {
+    perceive: { title: '01 · 感知', tag: 'Perceive', def: '看目前的情況——使用者說了什麼、上一輪工具結果是什麼。這一步跟 tool use 沒有直接關係,是迴圈的輸入端。' },
+    reason: { title: '02 · 推理', tag: 'Reason', def: '模型想一下:這個情況需要做點什麼嗎?需要的話要做什麼?這一步輸出的是「決定」,不是「動作本身」。' },
+    act: { title: '03 · 行動 ★ tool use 補的就是這一格', tag: 'Act', def: '把「決定」變成真正的動作。沒有 tool use 之前,這一步只能靠自由文字暗示、外部程式碼硬解析;有了 tool use,模型直接吐一個 schema 驗證過的 tool_use 物件,外部照著執行——迴圈能穩定跑下去,靠的就是這一格從不可靠變可靠。' },
+    observe: { title: '04 · 觀察', tag: 'Observe', def: '看行動的結果(tool_result),回饋進下一輪的推理——迴圈從這裡繞回「推理」,重複到任務完成。' }
+  };
+  const panelLoop = document.getElementById('panelLoop');
+  const loopNodes = document.querySelectorAll('#loopScene .zone');
+  loopNodes.forEach(n => n.addEventListener('click', () => {
+    loopNodes.forEach(c => c.classList.toggle('active', c === n));
+    const d = LOOP[n.dataset.key];
+    panelLoop.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelLoop);
+  }));
+
+  const SO = {
+    general: {
+      title: '一般 Structured Output', tag: '對象:使用者',
+      def: '讓模型輸出符合某個 schema 的格式,用途是回答使用者——例如叫模型用固定 JSON 格式回一份履歷摘要。輸出的東西本身就是「答案」,給人看或給下游程式直接消費。'
+    },
+    tool: {
+      title: 'Function Calling(Tool Use)', tag: '對象:外部系統',
+      def: 'Structured output 技術的一種特定用法——輸出的結構化物件不是拿來回答使用者的,是拿來觸發外部系統執行一個動作的,多了一層「這是一個決策,不是一個答案」的語意。技術底層是同一套(schema 約束生成),差在用途。'
+    }
+  };
+  const panelSO = document.getElementById('panelSO');
+  const soChips = document.querySelectorAll('#soScene .zone');
+  soChips.forEach(n => n.addEventListener('click', () => {
+    soChips.forEach(c => c.classList.toggle('active', c === n));
+    const d = SO[n.dataset.key];
+    panelSO.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelSO);
+  }));
 
   const FLOW = {
     define: {
@@ -296,6 +625,30 @@ render_with_liquid: false
     tool: { title: 'tool', tag: 'tool_choice', def: '一定要用指定的工具——`{"type": "tool", "name": "get_weather"}` 這種寫法,強制模型呼叫這一個。' },
     none: { title: 'none', tag: 'tool_choice', def: '這輪完全不准用工具,就算模型判斷需要也不行——想讓模型純粹用文字回應時用這個。另外還有 disable_parallel_tool_use 旗標,設成 true 會限制模型一次最多只能呼叫一個工具(預設可以一次回傳好幾個 tool_use block)。' }
   };
+  const SLOT_AVAILABLE = {
+    auto: ['a', 'weather', 'c', 'prose'],
+    any: ['a', 'weather', 'c'],
+    tool: ['weather'],
+    none: ['prose']
+  };
+  const SLOT_CAPTION = {
+    auto: '四張都拿得到——模型自己決定要不要伸手、伸向哪一張。',
+    any: '三個工具都拿得到,但「純文字回答」被鎖住——一定要挑一個工具。',
+    tool: '只有 get_weather 拿得到,其他三張全部鎖住——強制呼叫這一個。',
+    none: '只有「純文字回答」拿得到,三個工具全部鎖住——這輪不准用工具。'
+  };
+  const slots = document.querySelectorAll('#choiceScene .slot');
+  const slotCaption = document.getElementById('slotCaption');
+  function updateSlots(mode){
+    const available = SLOT_AVAILABLE[mode];
+    slots.forEach(s => {
+      const isAvailable = available.includes(s.dataset.slot);
+      s.classList.toggle('available', isAvailable);
+      s.classList.toggle('locked', !isAvailable);
+    });
+    if (slotCaption) slotCaption.textContent = SLOT_CAPTION[mode];
+  }
+
   const panelChoice = document.getElementById('panelChoice');
   const chipsChoice = document.querySelectorAll('#choiceChips .chip');
   chipsChoice.forEach(n => n.addEventListener('click', () => {
@@ -303,7 +656,9 @@ render_with_liquid: false
     const d = CHOICE[n.dataset.key];
     panelChoice.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
     fadeIn(panelChoice);
+    updateSlots(n.dataset.key);
   }));
+  updateSlots('auto');
 </script>
 </body>
 </html>

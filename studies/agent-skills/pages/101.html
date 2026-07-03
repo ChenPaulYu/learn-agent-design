@@ -1,7 +1,7 @@
 ---
 title: Agent Skills 101 — 互動圖解
-summary: 三張互動圖:三層 progressive disclosure 載入模型(手冊場景比喻)、血緣脈絡(1995 UX 原則 → system prompt 天花板 → 推出 → 開放成標準)、跟 Tool Search Tool / Subagent / Hook 的邊界。
-date: 2026-07-02
+summary: 三張互動圖:三層 progressive disclosure 載入模型(手冊場景比喻)、血緣脈絡(1995 UX 原則 → system prompt 天花板 → 推出 → 開放成標準)、跟 Tool Search Tool / Tool Use Examples / Subagent / Hook 的邊界。
+date: 2026-07-03
 tags:
   - agent-skills
   - interactive
@@ -14,7 +14,7 @@ render_with_liquid: false
   發布於 /agent-skills/101/),不是 disposable mockup。
   Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
     ../docs/2026-07-02-agent-skills-overview.md
-  Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
+  Last synced: 2026-07-03 — docs 大改時回來更新這頁,並更新這個日期。
   What it is:
     圖 A(三層載入)— 手冊場景(資料夾標籤/翻開的正文/後面沒翻到的參考頁)+ 卡片,對應
       Metadata(永遠載入)/ Instructions(觸發時載入)/ 更深參考資料(需要時才載入),點場景
@@ -22,7 +22,8 @@ render_with_liquid: false
     圖 B(血緣)— 1995 UX 原則(Nielsen)→ system prompt 天花板(~10 個能力)→ 推出
       (2025-10)→ 開放成標準(2025-12),點「推出」節點看借了什麼/解決了什麼/新開放了什麼。
     圖 C(邊界)— 跟 Tool Search Tool(同原理、順序反直覺,Skills 反而先推出)、跟
-      Subagent/Hook(不同源,三條獨立判斷軸)兩組對照。
+      Tool Use Examples(不是延遲載入的比較,是「給範例」這個手法本身的比較,顆粒度差一個
+      量級)、跟 Subagent/Hook(不同源,三條獨立判斷軸)三組對照。
 -->
 <html lang="zh-Hant">
 <head>
@@ -278,7 +279,7 @@ render_with_liquid: false
     <div class="sec-kicker">圖 C · 邊界</div>
     <div class="sec-title">跟看起來很像的東西,具體差在哪</div>
     <p class="sec-sub">
-      兩組容易混在一起、但查證後發現不是同一件事的比較。
+      三組容易混在一起、但查證後發現不是同一件事的比較。
     </p>
 
     <div class="row" id="toolSearchRow">
@@ -296,6 +297,27 @@ render_with_liquid: false
     </div>
     <div class="panel" id="panelToolSearch">
       <p class="placeholder">↑ 點任一邊看細節——注意順序跟直覺相反。</p>
+    </div>
+
+    <div class="sec-sub" style="margin-top:30px">
+      還有一組不是比「延遲載入」,是比「給範例」這個手法本身——同樣精神,顆粒度差一個量級。
+    </div>
+
+    <div class="row" id="toolExamplesRow">
+      <div class="node" data-key="skills-examples">
+        <div class="idx">Skills · Examples / examples.md</div>
+        <h3>一整個任務怎麼跑</h3>
+        <div class="q">progressive disclosure 最後一層,判斷需要才讀</div>
+      </div>
+      <div class="arrow">↔</div>
+      <div class="node" data-key="tool-use-examples">
+        <div class="idx">Tool Use Examples · input_examples</div>
+        <h3>一次函式呼叫的參數</h3>
+        <div class="q">工具定義的一部分,每次都跟著送</div>
+      </div>
+    </div>
+    <div class="panel" id="panelToolExamples">
+      <p class="placeholder">↑ 點任一邊看細節——注意顆粒度跟載入時機都不一樣。</p>
     </div>
 
     <div class="sec-sub" style="margin-top:30px">
@@ -388,6 +410,7 @@ render_with_liquid: false
         <a href="https://www.nngroup.com/articles/progressive-disclosure/">NN/g, "Progressive Disclosure" — Jakob Nielsen 1995 年提出的原始出處</a>
         <a href="https://www.anthropic.com/engineering/advanced-tool-use">advanced-tool-use — Tool Search Tool 的官方版本識別碼與 beta header,確認上線日期</a>
         <a href="https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more">Steering Claude Code — Skill/Subagent/Hook 的官方分類與選用判準</a>
+        <a href="../../tool-use/advanced-tool-use/">tool-use 主題 · advanced-tool-use 頁 — Tool Use Examples 完整說明,這裡只講跟 Skills 的邊界</a>
       </div>
     </div>
   </section>
@@ -539,6 +562,33 @@ render_with_liquid: false
     fadeIn(panelToolSearch);
   }
   nodesToolSearch.forEach(n => n.addEventListener('click', () => renderToolSearch(n.dataset.key)));
+
+  const TOOLEXAMPLES = {
+    'skills-examples': {
+      title: 'Skills · Examples / examples.md', tag: '範圍:一整個任務/流程',
+      def: 'SKILL.md 固定有一個「## Examples」段落,細節還能再拆到獨立的 examples.md 附屬檔案——解決的是「instructions 只講步驟,沒講做起來長什麼樣」。',
+      example: '不是自動跟著送——是三層 progressive disclosure 的最後一層,判斷這個 Skill 相關、讀了 instructions 之後,才會視需要再去讀。'
+    },
+    'tool-use-examples': {
+      title: 'Tool Use Examples · input_examples', tag: '範圍:一次函式呼叫的參數',
+      def: '工具定義裡加一個 input_examples 陣列,給幾組具體範例——解決的是「schema 只講型別,沒講怎麼填」。',
+      example: '是工具定義的一部分,只要這個工具出現在 tools 陣列裡,範例就跟著送進去,每次都在——跟 Skills 的「判斷需要才讀」完全相反。這條邊界比的是「給範例」這個手法本身,跟上面「跟 Tool Search Tool 的邊界」比的「延遲載入」機制是不同的軸,不要混在一起。'
+    }
+  };
+  const panelToolExamples = document.getElementById('panelToolExamples');
+  const nodesToolExamples = document.querySelectorAll('#toolExamplesRow .node');
+  function renderToolExamples(key){
+    const d = TOOLEXAMPLES[key];
+    nodesToolExamples.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelToolExamples.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      <div class="ex">${d.example}</div>
+    `;
+    fadeIn(panelToolExamples);
+  }
+  nodesToolExamples.forEach(n => n.addEventListener('click', () => renderToolExamples(n.dataset.key)));
 
   const STEERING = {
     skill: {

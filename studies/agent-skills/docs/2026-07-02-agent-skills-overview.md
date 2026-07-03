@@ -148,6 +148,21 @@ Skills 晚了超過一個月。Tool Search Tool 不是 Skills 的前身——如
 了 B」的因果關係本身也還沒有查到官方明確承認,更保守的講法是:**同一個 context 預算問題,被
 分兩次、套在兩種不同內容上解決,不是一個線性演變的故事。**
 
+## 跟 Tool Use Examples 的邊界——同樣是「給範例」,但顆粒度差一個量級
+
+`SKILL.md` 裡固定有一個「## Examples」段落,細節還能再拆到獨立的 `examples.md` 附屬檔案——
+這解決的問題,跟 tool-use 主題裡 `advanced-tool-use.md` 的 **Tool Use Examples**
+(`input_examples`)其實是同一種精神:**光看抽象規格,不知道實際上怎麼用,靠具體範例補上這個
+缺口**。Tool Use Examples 補的是「schema 只講型別,沒講怎麼填」;Skills 的 Examples 補的是
+「instructions 只講步驟,沒講做起來長什麼樣」——都是「抽象規格 + 具體案例」這個組合。
+
+但**顆粒度差一個量級,載入方式也不一樣**:Tool Use Examples 範圍只到「一次函式呼叫的參數」,
+而且是**工具定義的一部分**,只要這個工具出現在 `tools` 陣列裡,範例就跟著送進去,每次都在;
+Skills 的 `examples.md` 範圍是「一整個任務/流程怎麼跑」,而且**不是自動跟著送**,是三層
+progressive disclosure 裡的最後一層——判斷這個 Skill 相關、讀了 instructions 之後,才會視
+需要再去讀。這條邊界線跟上面「跟 Tool Search Tool 的邊界」比的是不同的軸:那條比的是
+「延遲載入」這個機制本身,這條比的是「給範例」這個手法本身,兩條線都存在,不要混在一起。
+
 ## 跟 Subagent/Hook 的邊界——不同源,是刻意設計成互斥的三個答案
 
 容易誤會成「Skills、Subagent、Hook 都是 Claude Code 的擴充機制,應該是同一套底層東西」——查證
