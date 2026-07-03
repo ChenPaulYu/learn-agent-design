@@ -11,7 +11,7 @@ groups:
   - label: 延伸
     note: 三篇各自獨立,不用照順序讀——基礎機制不夠用時的三個 beta 功能(含業界對照)、這個機制怎麼從研究收斂成官方標準的時間軸、工具不是只有你自己定義的那一種。
     parallel: true
-    pages: [advanced-tool-use, origins, client-server-tools]
+    pages: [origins, advanced-tool-use, client-server-tools]
 ---
 
 Anthropic Claude API 的 Tool Use——LLM 怎麼決定要呼叫外部工具、怎麼把結果接回對話。

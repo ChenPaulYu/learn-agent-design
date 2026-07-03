@@ -10,9 +10,10 @@ tags:
 > Anthropic Claude API 的 Tool Use:LLM 怎麼決定要呼叫外部工具、怎麼把結果接回對話。先懂
 > 概念(是什麼、為什麼、跟 structured output 的關係),再看 API 機制細節(定義工具、
 > `tool_use`/`tool_result`、多輪迴圈)——這兩塊原本拆成兩篇,後來發現比既有慣例(MCP
-> 101、agent-skills-overview 都是概念 + 機制放同一份)切得更細,合併回一篇。再往上疊
-> advanced tool use 的三個 beta 功能,另外獨立一篇講這個機制的身世(學術先驅期 + 廠商官方
-> 搶跑時間軸)——身世那篇拆開是因為證據類型不同(有日期、有信心分級),跟合併的理由不衝突。
+> 101、agent-skills-overview 都是概念 + 機制放同一份)切得更細,合併回一篇。接著先看這個
+> 機制的身世(學術先驅期 + 廠商官方搶跑時間軸)——身世那篇拆開是因為證據類型不同(有日期、
+> 有信心分級),跟合併的理由不衝突;再往上疊 advanced tool use 的三個 beta 功能;最後補
+> client/server tools 這塊之前完全沒寫過的缺口。
 
 ## 文件
 
@@ -22,6 +23,12 @@ tags:
   `tool_use`/`tool_result` content block、多輪對話的 `while` 迴圈、`is_error` 錯誤處理、
   `tool_choice`(auto/any/tool/none)+ 平行呼叫開關、跟 extended thinking 疊用時 thinking
   block 要一起傳回去的坑
+- [tool-use-origins](docs/2026-07-03-tool-use-origins.md) —
+  學術先驅期時間軸(WebGPT → SayCan → MRKL → ReAct → Toolformer → Gorilla/ToolLLM)、是
+  OpenAI 的 Function Calling 讓這個「土法煉鋼時代」收斂成官方機制、三家廠商搶跑對照、
+  function calling 先於 structured output 上線的方向反轉、Perplexity 不等官方機制自己
+  上線的案例、現在(2026)原生訓練(SFT+RL 餵工具呼叫軌跡)取代了 prompt 教格式,但宣告
+  工具清單這件事還是要做
 - [advanced-tool-use](docs/2026-07-03-advanced-tool-use.md) —
   基礎機制會出問題的三個地方,各自對應一個 2025-11 推出的 beta 功能:Tool Search Tool
   (`defer_loading`,最多省 95% context)、Programmatic Tool Calling(`allowed_callers`,
@@ -29,12 +36,6 @@ tags:
   三者疊在一起用各省不同的東西,加上業界對照總表:三個功能放到整個產業去看,普及程度差很多
   (Tool Search Tool 是業界共識、Programmatic Tool Calling 有平行案例如 Cloudflare Code
   Mode、Tool Use Examples 目前是 Anthropic 獨創)
-- [tool-use-origins](docs/2026-07-03-tool-use-origins.md) —
-  學術先驅期時間軸(WebGPT → SayCan → MRKL → ReAct → Toolformer → Gorilla/ToolLLM)、是
-  OpenAI 的 Function Calling 讓這個「土法煉鋼時代」收斂成官方機制、三家廠商搶跑對照、
-  function calling 先於 structured output 上線的方向反轉、Perplexity 不等官方機制自己
-  上線的案例、現在(2026)原生訓練(SFT+RL 餵工具呼叫軌跡)取代了 prompt 教格式,但宣告
-  工具清單這件事還是要做
 - [pages/101](pages/101.html) —
   互動版 Tool Use 101,六張圖:圖 A 沒有 tool use 會怎樣、圖 B agent 推理-行動迴圈、圖 C
   跟 structured output 的關係 + 何時該用工具、圖 D 三段式流程(定義/呼叫/回結果)、圖 E
