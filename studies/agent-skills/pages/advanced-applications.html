@@ -1,0 +1,246 @@
+---
+title: Agent Skills 研究前沿 — 互動圖解
+summary: 兩張互動圖:學徒筆記本比喻(self-evolving skill,CODESKILL 實測數字)、圖書館比喻(modular/hierarchical skill,扁平 vs 樹狀+DAG 編排的實測差距)。
+date: 2026-07-03
+tags:
+  - agent-skills
+  - advanced
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Agent Skills 研究前沿:兩張互動圖解。可長期回看的教學頁(pages/ genre,
+  發布於 /agent-skills/advanced-applications/),不是 disposable mockup。查證對象是 arXiv
+  preprint(2026 年最新研究,未必經同行審查)。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-03-agent-skills-advanced-applications.md
+  Last synced: 2026-07-03 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(時間軸/self-evolving)— 學徒筆記本比喻,切換「沒有 skill」vs「CODESKILL 自己進化後」
+      看實測 pass rate 數字。
+    圖 B(結構軸/modular-hierarchical)— 圖書館比喻,場景切換「扁平堆放」vs「樹狀分類 + 依賴
+      關係圖」,看 AgentSkillOS/Graph-of-Skills 的實測數字。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Agent Skills 研究前沿 — 互動圖解</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+  .stale{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:6px 12px;
+    background:rgba(176,74,106,.08);border:1px dashed var(--rose);border-radius:999px;
+    font-size:12px;color:var(--rose);font-weight:600}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+
+  .toggle-row{display:flex;gap:10px;margin-top:22px}
+  .toggle-btn{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    padding:12px 16px;cursor:pointer;font-size:13.5px;font-weight:650;color:var(--muted);
+    transition:all .16s ease;text-align:center}
+  .toggle-btn.active{border-color:var(--rose);color:var(--rose);background:rgba(176,74,106,.06)}
+  .toggle-btn.active.good{border-color:var(--green);color:var(--green);background:rgba(12,122,89,.06)}
+  .ctx-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px}
+  .ctx-label{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .ctx-fill-note{margin-top:10px;font-size:12.5px;color:var(--muted)}
+  .checklist{margin-top:6px;display:flex;flex-direction:column;gap:6px}
+  .checklist div{font-size:13px;padding:6px 10px;border-radius:7px}
+  .checklist div.yes{background:rgba(12,122,89,.08);color:var(--green)}
+  .checklist div.no{background:rgba(176,74,106,.08);color:var(--rose)}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}
+  .zone{cursor:pointer}
+  .zone .st{transition:stroke .15s ease}
+  .zone .stf{transition:fill .15s ease}
+  .zone:hover .st,.zone.active .st{stroke:currentColor}
+  .zone:hover .stf,.zone.active .stf{fill:currentColor}
+  .zone.active .fillable{fill:color-mix(in srgb,currentColor 8%,var(--panel))}
+  .zone.active text{fill:currentColor}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:100px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← Agent Skills 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · Agent Skills 研究前沿</div>
+    <h1>會進化的 Skill,跟一堆 Skill 該怎麼組織</h1>
+    <p class="tagline">
+      兩條不同的軸。圖 A 是時間軸——同一個 skill 用久了會不會自己變聰明。圖 B 是結構軸——一堆
+      skill 之間該怎麼組織關係。跟「現況與缺陷」那頁不一樣,這頁問的是研究前沿在往哪走。
+    </p>
+    <div class="stale">⚠ 引用的論文都是 2026 年才發表的 preprint,未必經過同行審查</div>
+  </header>
+
+  <!-- ============ SECTION A: 學徒筆記本 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 時間軸</div>
+    <div class="sec-title">學徒自己更新筆記本</div>
+    <p class="sec-sub">
+      最意外的發現不是某個功能,是一個只上線 9 個月的功能,已經有正式學術研究在追。CODESKILL
+      讓 agent 自己從執行紀錄裡萃取、演化技能——切換下面看實測的通過率差多少。
+    </p>
+
+    <div class="toggle-row" id="evolveToggle">
+      <div class="toggle-btn active" data-mode="baseline">完全不用 Skill</div>
+      <div class="toggle-btn good" data-mode="codeskill">CODESKILL 自己演化技能庫後</div>
+    </div>
+    <div class="ctx-box" id="evolveBox"></div>
+  </section>
+
+  <!-- ============ SECTION B: 圖書館 ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 結構軸</div>
+    <div class="sec-title">一堆 Skill 堆在一起,還是整理成圖書館</div>
+    <p class="sec-sub">
+      官方故意保持扁平(甚至建議不要做太深的巢狀參考結構)。但學術界已經示範:規模一大,扁平會
+      出問題。切換下面看差在哪。
+    </p>
+
+    <div class="toggle-row" id="libraryToggle">
+      <div class="toggle-btn active" data-mode="flat">扁平堆放</div>
+      <div class="toggle-btn good" data-mode="tree">樹狀分類 + 依賴關係圖</div>
+    </div>
+    <div class="ctx-box" id="libraryBox"></div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容查證自哪裡</div>
+    <p class="sec-sub">全部經 WebSearch 於 2026-07-03 查證,查證對象是 arXiv preprint,不是官方文檔。</p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">時間軸(Self-Evolving)</div>
+        <a href="https://arxiv.org/abs/2605.25430">CODESKILL(arXiv 2605.25430)— self-evolving skill 機制、三個測試集的實測數字</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">結構軸(Modular / Hierarchical)</div>
+        <a href="https://arxiv.org/abs/2603.02176">AgentSkillOS(arXiv 2603.02176)— capability tree + DAG 兩階段架構、200~200,000 規模測試</a>
+        <a href="https://arxiv.org/abs/2604.05333">Graph-of-Skills(arXiv 2604.05333)— prerequisite gap 問題、依賴感知檢索、省最多 56 倍 token</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 內容以 docs/2026-07-03-agent-skills-advanced-applications.md 為真相來源
+    (經 WebSearch 查證,查證對象是 arXiv preprint)· 最後同步 2026-07-03
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  const evolveBox = document.getElementById('evolveBox');
+  const evolveBtns = document.querySelectorAll('#evolveToggle .toggle-btn');
+  function renderEvolve(mode){
+    evolveBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    if (mode === 'baseline') {
+      evolveBox.innerHTML = `
+        <div class="ctx-label">沒有 Skill 的基準線</div>
+        <div class="ctx-fill-note">每次任務都從零開始推導,不會記住上次怎麼做、哪裡出錯。</div>
+      `;
+    } else {
+      evolveBox.innerHTML = `
+        <div class="ctx-label">CODESKILL — 自動萃取、演化技能庫</div>
+        <div class="checklist">
+          <div class="yes">✓ 比完全不用 Skill 的基準線,平均通過率高 9.69 個百分點</div>
+          <div class="yes">✓ 比最強的 prompt-based 或記憶型基準線,還高 4.01 個百分點</div>
+          <div class="yes">✓ 技能庫大小維持穩定,不會隨使用次數無限膨脹</div>
+        </div>
+        <div class="ctx-fill-note">在 EnvBench、SWE-Bench Verified、Terminal-Bench 2 三個測試集上量出來的數字——用強化學習訓練,結合密集的規則式技能品質回饋跟稀疏的可驗證執行回饋。</div>
+      `;
+    }
+    fadeIn(evolveBox);
+  }
+  evolveBtns.forEach(b => b.addEventListener('click', () => renderEvolve(b.dataset.mode)));
+  renderEvolve('baseline');
+
+  const libraryBox = document.getElementById('libraryBox');
+  const libraryBtns = document.querySelectorAll('#libraryToggle .toggle-btn');
+  function renderLibrary(mode){
+    libraryBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    if (mode === 'flat') {
+      libraryBox.innerHTML = `
+        <div class="ctx-label">扁平堆放 — 官方目前的做法</div>
+        <div class="checklist">
+          <div class="no">✕ 語意檢索可能挑到「主題相關」的 skill,但漏掉它偷偷依賴的其他 skill</div>
+          <div class="no">✕ 拿到手上的那包東西,執行到一半才發現少了一塊,跑不完整(prerequisite gap)</div>
+          <div class="no">✕ 規模一大(20 萬個級別),扁平找法逼近隨機亂猜</div>
+        </div>
+        <div class="ctx-fill-note">官方明確建議避免深層巢狀參考(超過一層,Claude 可能只讀到部分內容)——在小規模下這是對的簡化,但沒有解決「大規模會亂」的問題,只是還沒撞到那個規模。</div>
+      `;
+    } else {
+      libraryBox.innerHTML = `
+        <div class="ctx-label">樹狀分類 + 依賴關係圖 — 研究前沿的做法</div>
+        <div class="checklist">
+          <div class="yes">✓ AgentSkillOS:capability tree 分類,200,000 個 skill 規模下依然逼近理論最佳選擇</div>
+          <div class="yes">✓ 同樣一組 skill,DAG 編排的表現明顯贏過原生扁平呼叫</div>
+          <div class="yes">✓ Graph-of-Skills:離線建「可執行的 skill 圖」,線上檢索時一次撈出有考慮依賴的完整組合</div>
+          <div class="yes">✓ 在 SkillsBench/ALFWorld 上,每個模型都拿到最高分,輸入 token 數最多省到 56 倍</div>
+        </div>
+        <div class="ctx-fill-note">跟 MCP registry「10 個月長到 4 萬多個」是同一種節奏——規模一旦上去,原本簡單的設計會被迫長出更複雜的結構,不是設計者想把事情搞複雜,是規模逼出來的。</div>
+      `;
+    }
+    fadeIn(libraryBox);
+  }
+  libraryBtns.forEach(b => b.addEventListener('click', () => renderLibrary(b.dataset.mode)));
+  renderLibrary('flat');
+</script>
+</body>
+</html>

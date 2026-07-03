@@ -1,6 +1,6 @@
 ---
 title: Agent Skills 生態與缺陷 — 互動圖解
-summary: 三張互動圖:變形(食譜卡比喻,純指示型 vs 可執行型)、進階應用(學徒自己更新筆記本,CODESKILL 實測數字)、現況與缺陷(品質分數長條圖、精簡效果、安全漏洞分布)。
+summary: 三張互動圖:變形(食譜卡比喻,純指示型 vs 可執行型)、現況與缺陷(品質分數長條圖、精簡效果、安全漏洞分布)、跨廠商採用時間線(開放標準後 48 小時內 Microsoft/OpenAI 跟進)。
 date: 2026-07-03
 tags:
   - agent-skills
@@ -19,10 +19,12 @@ render_with_liquid: false
   Last synced: 2026-07-03 — docs 大改時回來更新這頁,並更新這個日期。
   What it is:
     圖 A(變形)— 食譜卡比喻,純指示型 vs 可執行型(scripts/),點卡片看差在哪。
-    圖 B(進階應用)— 學徒筆記本比喻,切換「沒有 skill」vs「CODESKILL 自己進化後」看實測
-      pass rate 數字。
-    圖 C(現況與缺陷)— 品質分數長條圖(生態平均 vs benchmark 平均)、精簡效果三種 skill
+    圖 B(現況與缺陷)— 品質分數長條圖(生態平均 vs benchmark 平均)、精簡效果三種 skill
       形狀對照、安全漏洞分布 checklist。
+    圖 C(跨廠商採用)— 開放成標準 → 48 小時內 Microsoft/OpenAI 跟進 → 2026-03 16+ 工具
+      支援,時間軸點節點看細節。
+  進階應用(self-evolving、modular/hierarchical)拆到另一頁 pages/advanced-applications.html,
+  性質是「研究前沿」不是「現況」,不在這頁範圍內。
 -->
 <html lang="zh-Hant">
 <head>
@@ -63,6 +65,23 @@ render_with_liquid: false
   .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
   .chip h4{font-size:13.5px;font-weight:660}
   .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+    .bar-label{flex-basis:120px}
+  }
 
   .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
     box-shadow:var(--shadow);padding:22px 24px;min-height:100px}
@@ -129,10 +148,6 @@ render_with_liquid: false
   .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
     color:var(--muted);text-decoration:none;transition:color .15s ease}
   .page-nav a:hover{color:var(--accent)}
-
-  @media (max-width: 700px){
-    .bar-label{flex-basis:120px}
-  }
 </style>
 </head>
 <body>
@@ -169,29 +184,13 @@ render_with_liquid: false
     </div>
   </section>
 
-  <!-- ============ SECTION B: 進階應用 ============ -->
+  <!-- ============ SECTION B: 現況與缺陷 ============ -->
   <section>
-    <div class="sec-kicker">圖 B · 會自己進化的 Skill</div>
-    <div class="sec-title">學徒自己更新筆記本</div>
-    <p class="sec-sub">
-      最意外的發現不是某個功能,是一個只上線 9 個月的功能,已經有正式學術研究在追。CODESKILL
-      讓 agent 自己從執行紀錄裡萃取、演化技能——切換下面看實測的通過率差多少。
-    </p>
-
-    <div class="toggle-row" id="evolveToggle">
-      <div class="toggle-btn active" data-mode="baseline">完全不用 Skill</div>
-      <div class="toggle-btn good" data-mode="codeskill">CODESKILL 自己演化技能庫後</div>
-    </div>
-    <div class="ctx-box" id="evolveBox"></div>
-  </section>
-
-  <!-- ============ SECTION C: 現況與缺陷 ============ -->
-  <section>
-    <div class="sec-kicker">圖 C · 生態規模,跟品質參差不齊同時發生</div>
+    <div class="sec-kicker">圖 B · 生態規模,跟品質參差不齊同時發生</div>
     <div class="sec-title">實測數字告訴你的現況</div>
     <p class="sec-sub">
-      一份研究從兩個 marketplace 收集了 42,447 個 skill、分析了 31,132 個——生態規模夠大,但
-      品質分數說明另一件事。
+      2025 年 12 月(推出後約兩個月),一份研究從兩個 marketplace 收集了 42,447 個 skill、
+      分析了 31,132 個——生態規模夠大,但品質分數說明另一件事。
     </p>
 
     <div class="bar-box">
@@ -233,27 +232,61 @@ render_with_liquid: false
     </div>
   </section>
 
+  <!-- ============ SECTION C: 跨廠商採用 ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 開放成標準後,真的有廠商跟進</div>
+    <div class="sec-title">48 小時,不是一年多</div>
+    <p class="sec-sub">
+      MCP 當初捐給獨立基金會、其他廠商才跟進,花了一年多。Skills 開放成標準之後,速度完全不同
+      量級——點時間軸看細節。
+    </p>
+
+    <div class="row" id="adoptionRow">
+      <div class="node" data-key="open">
+        <div class="idx">2025-12-18</div>
+        <h3>開放成標準</h3>
+        <div class="q">規格 + SDK 發布在 agentskills.io</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="48h">
+        <div class="idx">+48 小時</div>
+        <h3>Microsoft、OpenAI 跟進</h3>
+        <div class="q">VS Code、ChatGPT、Codex CLI</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="march">
+        <div class="idx">2026-03</div>
+        <h3>16+ 主要工具支援</h3>
+        <div class="q">跨廠商採用,不只是理論開放</div>
+      </div>
+    </div>
+    <div class="panel" id="panelAdoption">
+      <p class="placeholder">↑ 點一個節點看細節。</p>
+    </div>
+  </section>
+
   <!-- ============ REFERENCES ============ -->
   <section>
     <div class="sec-kicker">References · 參考資料</div>
     <div class="sec-title">這一頁的內容查證自哪裡</div>
-    <p class="sec-sub">全部經 WebSearch 於 2026-07-03 查證,查證對象是 arXiv preprint,不是官方文檔。</p>
+    <p class="sec-sub">變形/現況/缺陷經 WebSearch 查證 arXiv preprint;跨廠商採用經 WebSearch 查證第三方報導,均非官方單一權威公告。查證於 2026-07-03。</p>
     <div class="refs">
-      <div class="ref-group">
-        <div class="ref-head">進階應用</div>
-        <a href="https://arxiv.org/abs/2605.25430">CODESKILL(arXiv 2605.25430)— self-evolving skill 機制、三個測試集的實測數字</a>
-      </div>
       <div class="ref-group">
         <div class="ref-head">現況與缺陷</div>
         <a href="https://arxiv.org/abs/2601.10338">Agent Skills in the Wild(arXiv 2601.10338)— 42,447 收集、31,132 分析、漏洞分布</a>
         <a href="https://arxiv.org/abs/2602.12670">SkillsBench(arXiv 2602.12670)— 品質分數對照、精簡效果的具體百分點</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">生態圈 / 跨廠商採用</div>
+        <a href="https://github.com/anthropics/skills">anthropics/skills — 官方精選 skill 目錄</a>
+        <a href="https://agentskills.io">agentskills.io — 開放標準的規格 + SDK</a>
       </div>
     </div>
   </section>
 
   <footer>
     互動教學頁 · 內容以 docs/2026-07-03-agent-skills-ecosystem-and-limitations.md 為真相來源
-    (經 WebSearch 查證,查證對象是 arXiv preprint)· 最後同步 2026-07-03
+    (經 WebSearch 查證,arXiv preprint + 第三方報導)· 最後同步 2026-07-03
   </footer>
 </div>
 
@@ -281,30 +314,37 @@ render_with_liquid: false
     fadeIn(panelA);
   }));
 
-  const evolveBox = document.getElementById('evolveBox');
-  const evolveBtns = document.querySelectorAll('#evolveToggle .toggle-btn');
-  function renderEvolve(mode){
-    evolveBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-    if (mode === 'baseline') {
-      evolveBox.innerHTML = `
-        <div class="ctx-label">沒有 Skill 的基準線</div>
-        <div class="ctx-fill-note">每次任務都從零開始推導,不會記住上次怎麼做、哪裡出錯。</div>
-      `;
-    } else {
-      evolveBox.innerHTML = `
-        <div class="ctx-label">CODESKILL — 自動萃取、演化技能庫</div>
-        <div class="checklist">
-          <div class="yes">✓ 比完全不用 Skill 的基準線,平均通過率高 9.69 個百分點</div>
-          <div class="yes">✓ 比最強的 prompt-based 或記憶型基準線,還高 4.01 個百分點</div>
-          <div class="yes">✓ 技能庫大小維持穩定,不會隨使用次數無限膨脹</div>
-        </div>
-        <div class="ctx-fill-note">在 EnvBench、SWE-Bench Verified、Terminal-Bench 2 三個測試集上量出來的數字——用強化學習訓練,結合密集的規則式技能品質回饋跟稀疏的可驗證執行回饋。</div>
-      `;
+  const ADOPTION = {
+    open: {
+      title: '開放成標準', tag: '2025-12-18',
+      def: 'Anthropic 把 Agent Skills 開放成跨平台/跨產品可重用的開放標準,規格 + SDK 發布在 agentskills.io,任何 AI 平台都能採用。',
+      example: '跟 MCP 當初的路徑很像(先當自家功能推出,再開放成標準),但 Skills 從推出到開放只花兩個月,MCP 走了一年多。'
+    },
+    '48h': {
+      title: 'Microsoft、OpenAI 跟進', tag: '+48 小時',
+      def: '開放後 48 小時內,Microsoft 就把它整合進 VS Code,OpenAI 把「結構相同的架構」加進 ChatGPT 跟 Codex CLI。',
+      example: '官方 GitHub repo 星數衝過 2 萬——不是理論上開放沒人理,是真的有大廠馬上動手接。'
+    },
+    march: {
+      title: '16+ 主要工具支援', tag: '2026-03',
+      def: '確認支援 SKILL.md 格式的包括 Claude Code(Anthropic)、Codex CLI(OpenAI)、Gemini CLI(Google)、GitHub Copilot(透過 VS Code agent skills)、Cursor(手動放置),還有社群工具 Cline、Windsurf、OpenCode。',
+      example: '差別可能在於 Skills 本身格式簡單(一個資料夾 + YAML frontmatter + Markdown),比 MCP 的 wire protocol 採用門檻低很多。'
     }
-    fadeIn(evolveBox);
+  };
+  const panelAdoption = document.getElementById('panelAdoption');
+  const nodesAdoption = document.querySelectorAll('#adoptionRow .node');
+  function renderAdoption(key){
+    const d = ADOPTION[key];
+    nodesAdoption.forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelAdoption.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>一句話定義</b><span>${d.def}</span></div>
+      <div class="ex">${d.example}</div>
+    `;
+    fadeIn(panelAdoption);
   }
-  evolveBtns.forEach(b => b.addEventListener('click', () => renderEvolve(b.dataset.mode)));
-  renderEvolve('baseline');
+  nodesAdoption.forEach(n => n.addEventListener('click', () => renderAdoption(n.dataset.key)));
 
   const CONCISE = {
     detailed: {
