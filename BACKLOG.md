@@ -26,3 +26,15 @@ out (and delete its line here) once its own topic/note exists.
   Hook 是片場固定規矩(觸發了就一定發生,不看導演當下怎麼想)。MCP 不屬於這個比喻的同一層——
   它是劇組跟外面廠商借道具的窗口,回答的是「碰外部世界」,不是「內部怎麼組織」,是垂直的
   另一個維度。
+
+## 歸屬待重新檢視(不是候選主題,是既有內容的範圍疑慮)
+
+- **`agent-skills-advanced-applications.md` 的兩塊,可能根本不屬於 Skills** ——
+  self-evolving(CODESKILL)問的其實是「agent 怎麼從經驗裡自己學習」,更接近
+  `agent-anatomy` 的 Runtime state/記憶層,只是這批論文剛好挑 skill 當載體;
+  modular/hierarchical(AgentSkillOS、Graph-of-Skills)問的是「一大堆能力/知識怎麼組織、
+  怎麼檢索」,根本跟 `mcp-tool-scaling-problem.md` 的 Progressive Tool Discovery 是同一個
+  問題,只是多加了依賴關係這個維度。現在份量都還不到能獨立開主題(各自才 1-3 篇論文撐著),
+  先留在 `agent-skills` 底下沒問題——但等哪天真的要擴充其中一塊,**先重新想一次歸屬,不要
+  預設就是留在 Skills 底下**,免得因為「論文剛好研究的是 skill」就把一個更廣的問題釘死在
+  一個過窄的主題裡,犯了跟「因為方便就照來源分類」一樣的錯,只是方向相反。
