@@ -8,19 +8,19 @@ groups:
   - label: 先讀這篇
     note: Level 1 核心迴圈——文字怎麼一步步變回文字。讀完就能完整回答「LLM 怎麼運作」。
     pages: ["101"]
-  - label: 核心機制詳解(任意順序)
-    note: 101 核心迴圈五站,各自的完整版本跟延伸細節——彼此獨立,讀完 101 之後想先看哪個都可以。
+  - label: 核心機制(任意順序)
+    note: 都只依賴 101,彼此互相獨立,讀完 101 之後想先看哪個都可以。
     parallel: true
-    pages: [transformer-self-attention, positional-encoding, tokenizer-schemes-and-weight-tying, next-token-prediction, cross-entropy-teacher-forcing, decoding-strategies, in-context-learning]
-  - label: 為什麼這樣就夠
-    note: 規模、資料、算力怎麼換算成表現——emergent abilities mirage 的量化延伸。
-    pages: [scaling-laws]
-  - label: 是不是必須(任意順序)
-    note: Transformer/autoregressive 是不是必須的反事實測試,以及對 agent 相關能力的影響。
+    pages: [transformer-self-attention, next-token-prediction, in-context-learning, beyond-transformer-architectures]
+  - label: 機制延伸(任意順序)
+    note: 各自只延伸核心機制裡的某一篇,彼此不互相依賴。
     parallel: true
-    pages: [beyond-transformer-architectures, autoregressive-vs-nonautoregressive, in-context-learning-under-diffusion]
-  - label: 後訓練(獨立於核心迴圈)
-    note: 接龍練完只是雜學高手,這篇講怎麼變成會對話的助理——假設核心迴圈已經存在,疊在上面的另一個階段。
+    pages: [positional-encoding, tokenizer-schemes-and-weight-tying, cross-entropy-teacher-forcing, decoding-strategies, scaling-laws]
+  - label: 匯流
+    note: 各自需要先讀過兩篇以上——autoregressive-vs-nonautoregressive 建議先讀完核心機制,in-context-learning-under-diffusion 再建議接著讀完 autoregressive-vs-nonautoregressive。
+    pages: [autoregressive-vs-nonautoregressive, in-context-learning-under-diffusion]
+  - label: 後訓練
+    note: 下一個真實階段,不是更難——pretraining 到這裡結束,講的是 base model 怎麼變成會對話的助理。
     pages: [post-training-sft-rlhf]
 ---
 
