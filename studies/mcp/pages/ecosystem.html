@@ -1,7 +1,7 @@
 ---
 title: MCP 生態現況 — 互動圖解
-summary: 四張互動圖:採用時間線(OpenAI 到捐給基金會)、Platinum 會員名單(競爭對手同桌)、三個 registry 是誰在營運跟收書規則、registry 收錄門檻 vs 大家以為的信任缺口。
-date: 2026-07-02
+summary: 五張互動圖:採用時間線(OpenAI 到捐給基金會)、Platinum 會員名單(競爭對手同桌)、三個 registry 是誰在營運跟收書規則、registry 收錄門檻 vs 大家以為的信任缺口、MCP/A2A/ACP/ANP 四個協定各自站在哪一層 + 收斂進 Linux Foundation 治理傘下的現況。
+date: 2026-07-06
 tags:
   - mcp
   - ecosystem
@@ -16,7 +16,8 @@ render_with_liquid: false
   (WebSearch),不是規格文件——內容比其他 MCP 頁面更容易過期,頁面上有特別標注。
   Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
     ../docs/2026-07-02-mcp-ecosystem-reality.md
-  Last synced: 2026-07-02 — docs 大改時回來更新這頁,並更新這個日期。
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。圖 E 是 2026-07-06 新增,
+    其餘圖仍是 2026-07-02 查證的內容,尚未逐條重新核對。
   What it is:
     圖 A(採用時間線)— OpenAI 2025-03 官方採用 → 2025-09 ChatGPT apps → 2025-12 捐給
       Agentic AI Foundation,點每個節點看細節。
@@ -24,6 +25,10 @@ render_with_liquid: false
     圖 C(Registry 是什麼)— 長條圖對照三個來源的數字,點每一條看那座「圖書館」是誰在營運、
       收書規則是什麼——數字不一樣不是算錯,是收書規則本來就不一樣。
     圖 D(信任缺口)— 切換「你以為 registry 做了什麼」跟「實際只做了什麼」。
+    圖 E(不只 MCP)— MCP/A2A/ACP/ANP 四個協定各自站在哪一層(chip 切換看各自定位),
+      Linux Foundation 現在同時治理前三個、成立專門的 Interop/Security 工作小組、目標
+      2026 Q3 出第一份聯合互通規格——但這是「已承諾」不是「已完成」;ANP 走完全去中心化
+      路線(W3C DID),還沒到生態成熟的階段。誠實提醒卡引用一篇質疑三個協定治理縫隙的論文。
 -->
 <html lang="zh-Hant">
 <head>
@@ -260,11 +265,58 @@ render_with_liquid: false
     <div class="ctx-box" id="trustBox"></div>
   </section>
 
+  <!-- ============ SECTION E: 不只 MCP,協定版圖 ============ -->
+  <section>
+    <div class="sec-kicker">圖 E · 2026-07-06 新增</div>
+    <div class="sec-title">不只 MCP——四個協定各自站在哪一層</div>
+    <p class="sec-sub">
+      MCP 之外,同樣被歸類成「agent 互通協定」的還有 A2A、ACP、ANP——常被誤會成互相競爭,
+      實際上是分工不同層。點下面任一個看它管的是什麼、誰在推。
+    </p>
+
+    <div class="chips" id="protoChips">
+      <div class="chip active" data-key="mcp"><h4>MCP</h4><div class="sub">Anthropic · 已上線</div></div>
+      <div class="chip" data-key="a2a"><h4>A2A</h4><div class="sub">Google · 已上線</div></div>
+      <div class="chip" data-key="acp"><h4>ACP</h4><div class="sub">IBM · 已上線</div></div>
+      <div class="chip" data-key="anp"><h4>ANP</h4><div class="sub">社群 · 未成熟</div></div>
+    </div>
+
+    <div class="panel" id="panelE">
+      <p class="placeholder">↑ 點一個協定看它的定位。</p>
+    </div>
+
+    <div class="ctx-box" style="margin-top:18px">
+      <div class="ctx-label">收斂中,但還沒收斂完</div>
+      <p style="margin-top:8px;font-size:13.5px;color:var(--ink)">
+        MCP、A2A、ACP 現在<b>都是 Linux Foundation 底下的專案</b>(MCP 掛在旗下的 Agentic AI
+        Foundation,A2A/ACP 是平行的 LF 專案),並且已經成立跨專案的技術指導委員會(TSC,成員
+        含 Google/Anthropic/Microsoft/Salesforce/SAP)、互通工作小組(Interop WG,專門處理
+        A2A 跟 MCP 之間的介接)、安全工作小組(Security WG)。目標是 <b>2026 Q3 出第一份聯合
+        互通規格</b>——但查到的說法都是「已承諾要做」,不是「已經做出來」,這篇筆記按規矩不
+        當作已完成的事實引用。ANP 走的是完全不同的路線(不靠中立基金會協調,靠 W3C 去中心化
+        身分 DID 讓 agent 互相驗證,不用信任任何中介方),技術上很有意思但生態還沒跟上。
+      </p>
+    </div>
+
+    <div class="exclusions" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);border-radius:10px;padding:11px 14px;font-size:12.5px">
+        <b style="color:var(--rose)">不是所有人都覺得這樣就夠了</b> — 一篇 2026 年的論文
+        《Governance Gaps in Agent Interoperability Protocols: What MCP, A2A, and ACP Cannot
+        Express》直接指出,現在這三個協定的規格,都沒辦法表達某些治理層級的東西(例如：跨組織
+        的責任歸屬、細粒度的權限委派)——協定版圖收斂,不代表這些協定「表達能力」上的縫隙已經
+        補完。
+      </div>
+    </div>
+  </section>
+
   <!-- ============ REFERENCES ============ -->
   <section>
     <div class="sec-kicker">References · 參考資料</div>
     <div class="sec-title">這一頁的內容查證自哪裡</div>
-    <p class="sec-sub">全部經 WebSearch 於 2026-07-02 查證(不是規格文件,是新聞/公告/社群分析)。</p>
+    <p class="sec-sub">
+      圖 A-D 經 WebSearch 於 2026-07-02 查證,圖 E 經 WebSearch 於 2026-07-06 查證(都不是規格
+      文件本身,是新聞/公告/社群分析——信心等級見各條標註)。
+    </p>
     <div class="refs">
       <div class="ref-group">
         <div class="ref-head">基金會 / 捐贈</div>
@@ -281,12 +333,23 @@ render_with_liquid: false
         <a href="https://glama.ai/mcp">Glama — 創辦人、上線日期、自稱 superset 的定位</a>
         <a href="https://github.com/chatmcp/mcpso">MCP.so(chatmcp/mcpso)— 社群開源目錄專案</a>
       </div>
+      <div class="ref-group">
+        <div class="ref-head">圖 E · 協定版圖(2026-07-06 新增)— VERIFIED</div>
+        <a href="https://www.linuxfoundation.org/press/a2a-protocol-surpasses-150-organizations-lands-in-major-cloud-platforms-and-sees-enterprise-production-use-in-first-year">Linux Foundation 公告 — A2A 滿一年,150+ 組織支持、TSC/Interop WG/Security WG 治理結構、2026 Q3 聯合互通規格目標</a>
+        <a href="https://www.ibm.com/think/topics/agent-communication-protocol">IBM — ACP 官方說明(BeeAI 團隊發起,REST + OpenAPI,2025 年捐進 Linux Foundation AI & Data 專案)</a>
+        <a href="https://agentnetworkprotocol.com/en/">Agent Network Protocol 官網 — ANP 的 did:wba 身分機制、三層架構</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">圖 E · 誠實提醒(2026-07-06 新增)— LIKELY(來源多為技術部落格/二手分析,未逐篇核對原始規格文件)</div>
+        <a href="https://arxiv.org/html/2606.31498v1">Governance Gaps in Agent Interoperability Protocols — 質疑 MCP/A2A/ACP 治理表達能力的論文</a>
+        <a href="https://zylos.ai/research/2026-03-26-agent-interoperability-protocols-mcp-a2a-acp-convergence/">Zylos Research — 四協定分層對照(非頂會來源,僅供交叉參考)</a>
+      </div>
     </div>
   </section>
 
   <footer>
     互動教學頁 · 內容以 docs/2026-07-02-mcp-ecosystem-reality.md 為真相來源(經 WebSearch 查證,
-    非規格文件,容易過期)· 最後同步 2026-07-02
+    非規格文件,容易過期)· 圖 A-D 最後同步 2026-07-02,圖 E 最後同步 2026-07-06
   </footer>
 </div>
 
@@ -383,6 +446,34 @@ render_with_liquid: false
   }
   trustBtns.forEach(b => b.addEventListener('click', () => renderTrust(b.dataset.mode)));
   renderTrust('assume');
+
+  const PROTOCOL = {
+    mcp: {
+      title: 'MCP(Model Context Protocol)', tag: 'Anthropic · 2024-11 發表',
+      def: '管的是「agent 怎麼碰工具/資料」——無狀態的單次呼叫,一個 agent 對一個外部系統。這頁前面四張圖講的都是這個協定本身的生態現況。'
+    },
+    a2a: {
+      title: 'A2A(Agent2Agent)', tag: 'Google · 現屬 Linux Foundation',
+      def: '管的是「agent 跟 agent 之間怎麼溝通、協作」——有狀態的協作任務,常見情境是跨組織、跨技術棧的多 agent 系統。滿一年時已有 150+ 組織支持,深度整合進 Google/Microsoft/AWS 的雲端平台,是這幾個協定裡採用最廣的一個。'
+    },
+    acp: {
+      title: 'ACP(Agent Communication Protocol)', tag: 'IBM(BeeAI 團隊)· 現屬 Linux Foundation',
+      def: '2025 年由 IBM Research 的 BeeAI 平台發起,同一年捐進 Linux Foundation。技術上是 RESTful API + OpenAPI + JSON,主打「local-first」——強調安全的本地端編排、內建 discovery、狀態管理,以及用 MIME type 支援多模態內容(文字/圖片/影片)。定位比較像「MCP 跟 A2A 的中間地帶」:agent-to-agent、agent-to-application、agent-to-human 都涵蓋。'
+    },
+    anp: {
+      title: 'ANP(Agent Network Protocol)', tag: '社群開源 · 未被任何基金會收編',
+      def: '目標是當「agent 互聯網時代的 HTTP」,走的是完全去中心化路線:用 W3C 的去中心化身分(DID,具體是 did:wba 方法)讓任兩個 agent 互相驗證身分,不需要信任任何中間人或中央機構。三層架構含身分/加密通訊層、跟一個讓 agent 之間協商用哪種協定溝通的「meta-protocol 層」。技術上很有企圖心,但目前查到的評價是「技術上引人注目,生態還沒跟上」——沒有大公司背書,也不在 Linux Foundation 這波收斂裡。'
+    }
+  };
+  const panelE = document.getElementById('panelE');
+  const chipsE = document.querySelectorAll('#protoChips .chip');
+  chipsE.forEach(n => n.addEventListener('click', () => {
+    chipsE.forEach(x => x.classList.toggle('active', x === n));
+    const d = PROTOCOL[n.dataset.key];
+    panelE.innerHTML = `<div class="ph">${d.tag}</div><h2>${d.title}</h2><div class="ex">${d.def}</div>`;
+    fadeIn(panelE);
+  }));
+  panelE.innerHTML = `<div class="ph">${PROTOCOL.mcp.tag}</div><h2>${PROTOCOL.mcp.title}</h2><div class="ex">${PROTOCOL.mcp.def}</div>`;
 </script>
 </body>
 </html>
