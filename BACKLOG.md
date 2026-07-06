@@ -72,6 +72,18 @@ out (and delete its line here) once its own topic/note exists.
   - 自主程度:被動等指令,還是主動幫使用者做決定/採取行動
   - 現在是不是已經有一個公認的「personal agent」架構範式,還是各家做法差異很大,仍在摸索期
 
+- **Role-playing / persona agent** —— **跟上面「Personal agent」要畫清界線,不要合併**:
+  Personal agent 問的是「怎麼幫你做事」,role-playing agent 問的是「怎麼扮演一個角色/人格」
+  ——後者甚至不一定要「有幫助」,companionship、遊戲 NPC、模擬訓練(練習困難對話)都屬於這個
+  範疇,問題本身不是同一件事。**跟 Memory design 也有交叉引用**:`agent-anatomy` 已經引用過
+  的 Generative Agents(Smallville,25 個帶人格的 agent 互動模擬)是這個題目的經典案例,技術上
+  (人格一致性、長期記憶)會跟 Memory design 重疊,但不是同一個主題。候選角度:
+  - 人格一致性怎麼維持:system prompt 寫死 vs fine-tuning 進權重 vs 檢索角色背景設定(跟 RAG
+    候選重疊,開篇前確認分工)
+  - 跟 Personal agent 的軸到底差在哪:是「有沒有實用目的」,還是更根本的「扮演 vs 服務」這種
+    姿態差異
+  - 具體案例:Generative Agents / Smallville、Character.AI 這類產品、遊戲 NPC 的角色扮演系統
+
 - **怎麼 evaluate / 測試 agent 的能力(evaluation、benchmark 都算)** —— 上面幾個候選主題都在問
   「agent 怎麼設計」,這個問的是「怎麼知道一個 agent 做得好不好」,是完全不同的問題。**已經有一個
   相關的具體案例**:`tool-use-origins.md` 提過 BFCL(Berkeley Function-Calling Leaderboard),
