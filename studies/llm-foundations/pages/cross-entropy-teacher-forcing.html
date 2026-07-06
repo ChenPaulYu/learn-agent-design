@@ -1,0 +1,485 @@
+---
+title: 訓練怎麼打分 — Cross-Entropy 與 Teacher Forcing
+summary: 互動圖解:四個位置同時攤開的 teacher forcing 卡片(點位置看「餵的歷史／要猜的下一張」)、cross-entropy loss 長條(分數低的位置扣分重,標紅標出)、有/無 teacher forcing 切換示範一個小錯怎麼一路累積成整句歪掉(exposure bias)。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — 訓練怎麼打分:cross-entropy 與 teacher forcing。可長期回看的教學頁
+  (pages/ genre,發布於 /llm-foundations/cross-entropy-teacher-forcing/),不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-06-cross-entropy-teacher-forcing.md
+    ../docs/2026-07-04-next-token-prediction.md(對牌庫打分的前置概念)
+    ../docs/2026-07-04-transformer-self-attention.md(「整排一起看」跟 teacher forcing 卡榫的伏筆)
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(Teacher forcing)— 沿用示範句「今天天氣很好」拆成四個位置,同時攤開每個位置
+      「餵進去的歷史(真實答案)/ 要猜的下一張」,點卡片看細節;特別標出位置 3 看到的歷史
+      是真實的「今天、天氣」,不是位置 2 自己可能猜錯的東西。因為輸入內容寫死不用等前一格,
+      四個位置可以同時算、同時打分。
+    圖 B(Cross-entropy loss)— .bars 呈現四個位置模型當初對「正確答案」打了多少機率,
+      loss = -log(機率);分數低的位置用玫瑰色標出「這裡扣比較多分」,呈現非線性放大的性質。
+      權重/機率數字為教學示意,非真實模型輸出。
+    圖 C(Exposure bias)— .chips 切換「有 teacher forcing(訓練模式,每步看真實歷史)」vs
+      「沒有 teacher forcing(模擬推論,每步吃自己接出來的歷史)」,同一組位置卡片跟著切換,
+      示範沒有 teacher forcing 時,位置 1 一個小猜錯,怎麼讓後面全部位置在歪掉的歷史上越滾越遠。
+      連結 Bengio et al. 2015(scheduled sampling)與 Ranzato et al. 2016(exposure bias 命名)。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>訓練怎麼打分 — Cross-Entropy 與 Teacher Forcing</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+  .tagline a{color:var(--accent)}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+  .sec-sub a{color:var(--accent)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+  .node.wrong{border-color:var(--rose)}
+  .node.wrong .idx{color:var(--rose)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:220px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:8px;text-align:center}
+
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:74px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:650;padding:7px 14px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s ease}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .round-caption{margin-top:12px;padding:10px 14px;background:var(--bg);border-left:3px solid var(--rose);
+    border-radius:0 10px 10px 0;font-size:13px}
+
+  .bars{display:flex;flex-direction:column;gap:9px;margin-top:20px;max-width:560px}
+  .bar-row{display:grid;grid-template-columns:52px 1fr 46px 92px;align-items:center;gap:12px;
+    cursor:pointer;border-radius:9px;padding:5px 8px;transition:background .12s ease}
+  .bar-row:hover{background:var(--line-soft)}
+  .bar-row.picked{background:rgba(154,107,46,.10)}
+  .bar-row .tok{font-family:var(--mono);font-size:13.5px;text-align:right}
+  .bar-track{background:var(--line-soft);border-radius:999px;height:13px;overflow:hidden;border:1px solid var(--line)}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--accent));border-radius:999px 0 0 999px}
+  .bar-fill.low{background:linear-gradient(90deg,var(--rose),#d98a9e)}
+  .bar-row .pct{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .bar-row .loss{font-family:var(--mono);font-size:11.5px;text-align:right;color:var(--muted)}
+  .bar-row .loss.high{color:var(--rose);font-weight:700}
+  .loss-summary{margin-top:14px;font-size:13px;color:var(--muted);max-width:560px}
+  .loss-summary b{color:var(--ink)}
+
+  .stepper{margin-top:22px;padding:20px;border-radius:14px;background:var(--panel);border:1px solid var(--line);
+    box-shadow:var(--shadow);text-align:center}
+  .sentence{font-family:var(--mono);font-size:21px;letter-spacing:.01em;min-height:30px}
+  .sentence .grown{color:var(--accent);font-weight:700}
+  .sentence .grown.wrong{color:var(--rose)}
+  .controls{margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .runnote{font-size:12.5px;color:var(--muted);margin-top:10px;min-height:20px}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+    .bar-row{grid-template-columns:44px 1fr 40px 70px;gap:8px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations</div>
+    <h1>訓練怎麼打分 — Cross-Entropy 與 Teacher Forcing</h1>
+    <p class="tagline">
+      模型怎麼從「猜下一個字」練成聰明的東西?這頁講訓練迴路本身。
+      <a href="../docs/2026-07-04-next-token-prediction.md">對牌庫打分</a>這件事,訓練時是
+      <b>四個位置同時攤開來算</b>的(teacher forcing),打分打得準不準,則靠 <b>cross-entropy</b>
+      變成一個可以拿去調參數的數字;最後也誠實揭露這套訓練方式的代價——<b>exposure bias</b>。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: Teacher forcing ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · Teacher Forcing</div>
+    <div class="sec-title">四個位置同時攤開,每個都餵「真實歷史」</div>
+    <p class="sec-sub">
+      示範句「今天天氣很好」拆成四張字牌:<b>今天 / 天氣 / 很 / 好</b>。因為整句正確答案本來就是
+      訓練語料本身,每個位置該餵的歷史在資料寫死那一刻就已經確定——不用等前一個位置先猜完,
+      四個位置<b>可以同時算、同時打分</b>。點下面任一張卡片看細節。
+    </p>
+
+    <div class="row" id="tfRow">
+      <div class="node" data-p="0">
+        <div class="idx">位置 1</div>
+        <h3>(句首) → 今天</h3>
+        <div class="q">開局沒有歷史,直接猜第一張</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-p="1">
+        <div class="idx">位置 2</div>
+        <h3>今天 → 天氣</h3>
+        <div class="q">歷史是真實的「今天」</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-p="2">
+        <div class="idx">位置 3</div>
+        <h3>今天、天氣 → 很</h3>
+        <div class="q">歷史是真實的「今天、天氣」</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-p="3">
+        <div class="idx">位置 4</div>
+        <h3>今天、天氣、很 → 好</h3>
+        <div class="q">歷史是真實的「今天、天氣、很」</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelTF">
+      <p class="placeholder">↑ 點一張卡片,看這個位置餵的歷史是什麼、為什麼不用排隊等。</p>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>跟「整排一起看」卡榫卡準</b> — 整排一起看(self-attention)提供
+      「同時處理每個位置」的能力,teacher forcing 提供「每個位置的輸入不需要等前一位置生成完」
+      的前提,兩者疊在一起,訓練才能被推到大規模、平行運算。</div>
+      <div class="exclusion"><b>位置 3 看到的是真實答案</b> — 就算位置 2 那一次模型自己猜錯了,
+      位置 3 拿到的輸入依然是真實的「今天、天氣」,不會被前一格的錯誤污染。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: Cross-entropy loss ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · Cross-Entropy Loss</div>
+    <div class="sec-title">打分打得準不準,怎麼變成一個要縮小的數字</div>
+    <p class="sec-sub">
+      每個位置模型都會<a href="../docs/2026-07-04-next-token-prediction.md">對牌庫打分</a>——
+      給正確答案那張牌一個機率。<b>Cross-entropy loss = -log(正確答案的機率)</b>:機率越低,
+      loss 越高,而且是<b>非線性放大</b>的——越接近「完全猜錯」,懲罰越不成比例地重。
+      點下面的長條看每個位置當初打了多少分、扣了多少分(機率與 loss 皆為教學示意,非真實模型輸出)。
+    </p>
+
+    <div class="bars" id="ceBars"></div>
+    <p class="loss-summary" id="lossSummary"></p>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>非線性怎麼看出來</b> — 機率從 0.9 掉到 0.5,loss 只增加一點;
+      但機率從 0.1 掉到 0.01,loss 會飆升得快很多。這逼著模型「有把握」的地方要真的有把握,
+      不能含糊地把機率平均攤開。</div>
+      <div class="exclusion"><b>整句 loss 怎麼算</b> — 把四個位置各自的 loss 取平均,就是這句話
+      (或這個訓練批次)要拿去反向傳播、調整參數的數字——teacher forcing 負責「每個位置該餵
+      什麼」,cross-entropy 負責「猜測該怎麼變成數字」,兩者合起來才是完整的訓練迴路。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: Exposure bias ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · Exposure Bias</div>
+    <div class="sec-title">誠實揭露的限制 — 訓練看真實歷史,推論吃自己接的</div>
+    <p class="sec-sub">
+      Teacher forcing 有一個結構性的代價:<b>訓練時模型永遠看真實歷史,推論時卻沒有真實歷史可
+      餵</b>——推論時每一步的「歷史」都是自己剛剛接出來的東西,一旦某一步接錯,下一步就是在一段
+      訓練時從沒見過的「歪掉的歷史」上運作。切換下面的模式,看同一組位置卡片怎麼跟著變。
+    </p>
+
+    <div class="chips" id="ebChips">
+      <div class="chip active" data-tf="on"><h4>有 Teacher Forcing</h4><div class="sub">訓練模式 · 每步看真實歷史</div></div>
+      <div class="chip" data-tf="off"><h4>沒有 Teacher Forcing</h4><div class="sub">模擬推論 · 每步吃自己接出來的歷史</div></div>
+    </div>
+
+    <div class="row" id="ebRow"></div>
+    <div class="panel" id="panelEB">
+      <p class="placeholder">↑ 點一張卡片,看這個位置實際餵的歷史是什麼。</p>
+    </div>
+
+    <div class="stepper">
+      <div class="sentence" id="ebSentence"></div>
+      <div class="runnote" id="ebNote"></div>
+    </div>
+
+    <div class="round-caption" id="ebCaption"></div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>示意腳本,非真實模型輸出</b> — 「沒有 teacher forcing」那組猜測
+      是為了說明「錯誤一步步累積放大」手編的教學劇本,不是任何真實模型的推論紀錄。</div>
+      <div class="exclusion"><b>現代 LLM 幾乎不緩解這個代價</b> — GPT 系列一路到現在訓練時幾乎
+      清一色只用純 teacher forcing,不套用 scheduled sampling 這類緩解手法——換取可平行化訓練
+      的效率,是已知但被業界普遍接受的權衡,不是已解決的問題。</div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      完整技術筆記見 <a href="../docs/2026-07-06-cross-entropy-teacher-forcing.md">docs/2026-07-06-cross-entropy-teacher-forcing.md</a>;
+      下面是筆記引用的原始論文。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">原始論文</div>
+        <a href="https://arxiv.org/abs/1506.03099">Bengio, Vinyals, Jaitly & Shazeer, 2015 — Scheduled Sampling for Sequence Prediction with Recurrent Neural Networks(NeurIPS 2015;最早系統性提出訓練/推論分佈不一致問題,並提出 scheduled sampling 緩解手法)</a>
+        <a href="https://michaelauli.github.io/papers/iclr2016_mixer.pdf">Ranzato, Chopra, Auli & Zaremba, 2016 — Sequence Level Training with Recurrent Neural Networks(ICLR 2016;正式提出「exposure bias」這個名詞,並提出 MIXER 演算法緩解)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">同主題延伸</div>
+        <a href="../docs/2026-07-04-next-token-prediction.md">next-token-prediction.md — 「對牌庫打分」這個機制本身</a>
+        <a href="../docs/2026-07-04-transformer-self-attention.md">transformer-self-attention.md — 「整排一起看」跟 teacher forcing 卡榫的伏筆</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 圖 A:Teacher forcing 四張卡片 ============ */
+  const TF_DETAIL = [
+    {
+      tag: '位置 1', title: '(句首) → 今天',
+      history: '沒有歷史(句首)', target: '今天',
+      note: '開局沒有前文可看,直接對牌庫打分,猜第一張牌。'
+    },
+    {
+      tag: '位置 2', title: '今天 → 天氣',
+      history: '今天(真實答案,不是模型自己猜的東西)', target: '天氣',
+      note: '不管模型在位置 1 猜得對不對,位置 2 看到的歷史永遠是訓練語料裡的真實答案「今天」。'
+    },
+    {
+      tag: '位置 3', title: '今天、天氣 → 很',
+      history: '今天、天氣(真實答案)', target: '很',
+      note: '就算位置 2 那次模型自己猜錯了,位置 3 拿到的輸入依然是真實的「今天、天氣」——不會被前一格的錯誤污染。這正是 teacher forcing 名字裡「forcing」的意思:老師逐字念標準答案給學生抄。'
+    },
+    {
+      tag: '位置 4', title: '今天、天氣、很 → 好',
+      history: '今天、天氣、很(真實答案)', target: '好',
+      note: '四個位置的輸入內容在訓練資料寫死的那一刻就已經確定,不需要等前一個位置先跑完——可以同時算、同時打分,這是訓練能平行化的關鍵前提。'
+    }
+  ];
+  const panelTF = document.getElementById('panelTF');
+  function renderTF(i){
+    document.querySelectorAll('#tfRow .node').forEach(n => n.classList.toggle('active', +n.dataset.p === i));
+    const d = TF_DETAIL[i];
+    panelTF.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta">
+        <b>餵的歷史</b><span>${d.history}</span>
+        <b>要猜的下一張</b><span>${d.target}</span>
+      </div>
+      <div class="ex">${d.note}</div>
+    `;
+    fadeIn(panelTF);
+  }
+  document.querySelectorAll('#tfRow .node').forEach(n => n.addEventListener('click', () => renderTF(+n.dataset.p)));
+
+  /* ============ 圖 B:Cross-entropy 長條 ============ */
+  const CE = [
+    {tok:'今天', p:0.72},
+    {tok:'天氣', p:0.90},
+    {tok:'很',   p:0.35},
+    {tok:'好',   p:0.15}
+  ];
+  const ceBars = document.getElementById('ceBars');
+  const lossSummary = document.getElementById('lossSummary');
+  let totalLoss = 0;
+  CE.forEach((c, i) => {
+    const loss = -Math.log(c.p);
+    totalLoss += loss;
+    const pct = Math.round(c.p * 100);
+    const isLow = c.p < 0.5;
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML = `<div class="tok">${c.tok}</div>
+      <div class="bar-track"><div class="bar-fill${isLow ? ' low' : ''}" style="width:${pct}%"></div></div>
+      <div class="pct">${pct}%</div>
+      <div class="loss${isLow ? ' high' : ''}">loss ${loss.toFixed(2)}</div>`;
+    row.addEventListener('click', () => {
+      document.querySelectorAll('#ceBars .bar-row').forEach(r => r.classList.remove('picked'));
+      row.classList.add('picked');
+      lossSummary.innerHTML = `位置對應「<b>${c.tok}</b>」:模型給正確答案打了 <b>${pct}%</b> 的機率,
+        loss = -log(${c.p}) ≈ <b>${loss.toFixed(2)}</b>。${isLow ? '這裡機率打得低,扣分重。' : '機率打得高,幾乎不扣分。'}`;
+    });
+    ceBars.appendChild(row);
+  });
+  const avgLoss = totalLoss / CE.length;
+  lossSummary.innerHTML = `四個位置平均 loss ≈ <b>${avgLoss.toFixed(2)}</b>(點任一長條看單一位置怎麼算)——
+    這個數字就是拿去反向傳播、調整模型參數的目標:訓練的目的就是讓它一路變小。`;
+
+  /* ============ 圖 C:Exposure bias 切換 ============ */
+  const EB = {
+    on: [
+      {tag:'位置 1', history:'(句首)', target:'今天', guess:'今天', wrong:false, note:'歷史是真實的句首,猜對猜錯都不影響下一步——下一步照樣餵真實答案。'},
+      {tag:'位置 2', history:'今天', target:'天氣', guess:'天氣', wrong:false, note:'歷史永遠是真實的「今天」,跟模型自己在位置 1 猜得準不準無關。'},
+      {tag:'位置 3', history:'今天、天氣', target:'很', guess:'很', wrong:false, note:'歷史是真實的「今天、天氣」,即使前一步猜錯也不會被污染。'},
+      {tag:'位置 4', history:'今天、天氣、很', target:'好', guess:'好', wrong:false, note:'四步都在乾淨的真實歷史上學習——這是訓練時的世界。'}
+    ],
+    off: [
+      {tag:'位置 1', history:'(句首)', target:'今天', guess:'明天', wrong:true, note:'沒有真實歷史可餵,模型自己猜——這次猜成「明天」,已經偏離訓練目標「今天」。'},
+      {tag:'位置 2', history:'明天(自己接出來、已經錯的)', target:'天氣', guess:'會', wrong:true, note:'歷史已經是錯的「明天」,模型基於這個錯歷史往下接,猜出「會」——跟訓練目標「天氣」完全不同軌道了。'},
+      {tag:'位置 3', history:'明天、會', target:'很', guess:'下雨', wrong:true, note:'錯誤持續累積,歷史離訓練時見過的樣子越來越遠,猜出「下雨」。'},
+      {tag:'位置 4', history:'明天、會、下雨', target:'好', guess:'嗎', wrong:true, note:'最終接出「明天會下雨嗎」——一句本身讀起來還算通順的話,但已經跟訓練目標「今天天氣很好」完全不是同一句。'}
+    ]
+  };
+  const ebRow = document.getElementById('ebRow');
+  const panelEB = document.getElementById('panelEB');
+  const ebSentence = document.getElementById('ebSentence');
+  const ebNote = document.getElementById('ebNote');
+  const ebCaption = document.getElementById('ebCaption');
+  let ebMode = 'on';
+  let ebFocus = null;
+
+  function renderEBRow(){
+    const list = EB[ebMode];
+    ebRow.innerHTML = list.map((d, i) => `
+      <div class="node${d.wrong ? ' wrong' : ''}" data-p="${i}">
+        <div class="idx">${d.tag}</div>
+        <h3>${d.history} → ${d.guess}</h3>
+        <div class="q">${d.wrong ? '⚠ 跟真實答案「' + d.target + '」不同軌道' : '對照真實答案「' + d.target + '」'}</div>
+      </div>
+      ${i < list.length - 1 ? '<div class="arrow">→</div>' : ''}
+    `).join('');
+    document.querySelectorAll('#ebRow .node').forEach(n => n.addEventListener('click', () => {
+      ebFocus = +n.dataset.p;
+      renderEBDetail();
+    }));
+    if(ebFocus !== null) renderEBDetail(); else {
+      panelEB.innerHTML = '<p class="placeholder">↑ 點一張卡片,看這個位置實際餵的歷史是什麼。</p>';
+    }
+  }
+  function renderEBDetail(){
+    const d = EB[ebMode][ebFocus];
+    document.querySelectorAll('#ebRow .node').forEach(n => n.classList.toggle('active', +n.dataset.p === ebFocus));
+    panelEB.innerHTML = `
+      <div class="ph">${d.tag} · ${ebMode === 'on' ? '有 Teacher Forcing' : '沒有 Teacher Forcing'}</div>
+      <h2>實際餵的歷史:${d.history}</h2>
+      <div class="meta">
+        <b>真實答案</b><span>${d.target}</span>
+        <b>模型猜出</b><span>${d.guess}${d.wrong ? '（偏離真實答案）' : '（跟真實答案一致）'}</span>
+      </div>
+      <div class="ex">${d.note}</div>
+    `;
+    fadeIn(panelEB);
+  }
+  function renderEBSentence(){
+    const list = EB[ebMode];
+    const built = list.map(d => d.guess).join('');
+    ebSentence.innerHTML = ebMode === 'on'
+      ? `今天天氣很好 <span style="color:var(--muted);font-size:14px">（訓練目標,四步都猜對）</span>`
+      : `<span class="grown wrong">${built}</span> <span style="color:var(--muted);font-size:14px">（自由生成的結果,對照訓練目標「今天天氣很好」）</span>`;
+    ebNote.textContent = ebMode === 'on'
+      ? '訓練時每一步都在真實歷史上打分,四個位置互不污染。'
+      : '位置 1 一個小猜錯,沒有真實歷史把它拉回來——後面三步全部在歪掉的歷史上越滾越遠。';
+    ebCaption.textContent = ebMode === 'on'
+      ? '這就是訓練時的世界:乾淨、可平行、每步互不干擾。'
+      : 'exposure bias 說的就是這個落差——推論時模型只能吃到這種「自己接出來的」歷史,訓練時卻從沒真正練習過在歪掉的歷史上該怎麼辦。';
+  }
+  document.querySelectorAll('#ebChips .chip').forEach(c => c.addEventListener('click', () => {
+    ebMode = c.dataset.tf;
+    ebFocus = null;
+    document.querySelectorAll('#ebChips .chip').forEach(x => x.classList.toggle('active', x.dataset.tf === ebMode));
+    renderEBRow();
+    renderEBSentence();
+  }));
+
+  /* 初始狀態 */
+  renderTF(2);
+  renderEBRow();
+  renderEBSentence();
+</script>
+</body>
+</html>

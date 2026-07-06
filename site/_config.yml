@@ -63,3 +63,7 @@ defaults:
       path: "studies/tool-use"
     values:
       permalink: "/tool-use/:basename/"
+  - scope:
+      path: "studies/llm-foundations"
+    values:
+      permalink: "/llm-foundations/:basename/"

@@ -1,0 +1,575 @@
+---
+title: 後訓練:接龍高手怎麼變成會對話的助理 — 互動圖解
+summary: LLM Foundations 新第五層。同一個提示詞對照「接龍原始模型」vs「調教後的助理」可能吐出什麼(chips 切換);SFT 資料 vs pretraining 資料的兩張卡對照;RLHF 四步驟節點(蒐集偏好資料→訓練評審模型→PPO→KL 煞車)+ 評審模型幫整段候選回答排序的長條圖;DPO 省掉評審模型與強化學習迴圈的流程對照;誠實提醒 RLHF vs DPO 尚無定論。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - interactive
+  - post-training
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — 後訓練(post-training):接龍高手怎麼變成會對話的助理。這是 LLM Foundations
+  的新第五層(Level 5),獨立於前面 8 篇講 pretraining 技術細節的文章之外——那 8 篇講「接龍怎麼
+  運作、怎麼練出來」,這一頁講「接龍練完之後,還要再經過一個階段,才會變成平常聊天用的助理」。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-06-post-training-sft-rlhf.md
+  Last synced: 2026-07-06 — doc 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(同一個提示詞,兩種模型)— chips 切換「接龍原始模型」vs「調教後的助理」,pill 切換
+      兩個示範提示詞,對照兩種模型可能吐出的東西。全部是教學示意,非真實模型輸出。
+    圖 B(SFT)— 「Pretraining 資料」vs「SFT 資料」兩張卡對照,點卡看訓練目標其實沒變
+      (一樣是 next-token prediction),換的是餵的資料。
+    圖 C(RLHF)— 四步驟節點列(蒐集偏好資料 → 訓練評審模型 → PPO 強化學習 → KL 煞車),
+      點節點看細節;下方 .bars 呈現評審模型幫「整段候選回答」排出的偏好分數——刻意跟
+      101 頁圖 C「牌庫打分」的逐張字牌機率長條做出區隔:這裡排的是整段回答的相對好壞,
+      分數不是機率,不必加總等於 100%。
+    圖 D(DPO)— chips 切換「RLHF 流程」vs「DPO 流程」,看省掉獨立評審模型跟強化學習迴圈
+      之後,步驟怎麼變少;點節點看細節。
+    圖 E(誠實提醒)— RLHF vs DPO 沒有定論,業界依任務混用,這裡不下結論。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>後訓練 — 接龍高手怎麼變成會對話的助理</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:150px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:74px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+
+  /* 圖 A:chat 對照卡 */
+  .chat-box{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px 22px}
+  .chat-prompt{font-family:var(--mono);font-size:13px;color:var(--muted);padding-bottom:12px;
+    border-bottom:1px dashed var(--line);margin-bottom:14px}
+  .chat-prompt b{color:var(--ink);font-weight:650}
+  .chat-tag{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:3px 10px;
+    border-radius:999px;margin-bottom:12px;letter-spacing:.02em}
+  .chat-tag.base{background:rgba(176,74,106,.12);color:var(--rose)}
+  .chat-tag.tuned{background:rgba(12,122,89,.12);color:var(--green)}
+  .chat-reply{font-size:14px;line-height:1.8;white-space:pre-line}
+  .chat-note{margin-top:14px;font-size:13px;color:var(--muted)}
+
+  /* 圖 C:reward 長條(刻意跟 101 頁的機率長條做出區隔——分數非機率,顏色改用 blue/rose) */
+  .bars{display:flex;flex-direction:column;gap:9px;margin-top:20px;max-width:560px}
+  .bar-row{display:grid;grid-template-columns:56px 1fr 52px;align-items:center;gap:12px;
+    cursor:pointer;border-radius:9px;padding:5px 8px;transition:background .12s ease}
+  .bar-row:hover{background:var(--line-soft)}
+  .bar-row.picked{background:rgba(47,111,158,.10)}
+  .bar-row .tok{font-family:var(--mono);font-size:13px;text-align:right;color:var(--muted)}
+  .bar-track{background:var(--line-soft);border-radius:999px;height:13px;overflow:hidden;border:1px solid var(--line)}
+  .reward-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--rose));border-radius:999px 0 0 999px}
+  .bar-row .pct{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;font-family:var(--mono)}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations · Level 5 · 後訓練</div>
+    <h1>後訓練 — 接龍高手怎麼變成會對話的助理</h1>
+    <p class="tagline">
+      前面幾篇講的都是<b>接龍怎麼運作、怎麼練出來</b>(pretraining):海量文字上重複做
+      next-token prediction,練出一個對牌庫裡每張字牌都很會打分的接龍高手。這一頁是新的
+      第五層,講<b>接龍練完之後</b>還要再經過一個階段——先用人工範例做 <b>SFT</b> 教它該有的
+      格式態度,再用 <b>RLHF</b>(訓練一個評審模型 + 強化學習)或更簡化的 <b>DPO</b> 調它往
+      「對使用者有幫助」的方向靠,才會變成平常聊天用的助理。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 同一個提示詞,兩種模型 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · Pretraining vs Post-training</div>
+    <div class="sec-title">同一個提示詞,兩種模型可能吐出什麼</div>
+    <p class="sec-sub">
+      前面 8 篇筆記練出來的,終究只是<b>接龍原始模型(base model)</b>——它唯一被訓練過的能力
+      是「對牌庫打分、抽牌接上去」,沒有被教過「使用者丟一個問題過來,正確反應是回答它」。
+      切換下面的提示詞跟模型,對照兩者可能吐出的東西。<b>下面全部是教學示意,不是真的拿模型
+      跑出來的輸出。</b>
+    </p>
+
+    <div class="ctl-row" id="promptCtl">
+      <span class="ctl-label">提示詞</span>
+      <span class="pill active" data-ex="capital">法國的首都是哪裡？</span>
+      <span class="pill" data-ex="poem">幫我寫一首關於貓的詩</span>
+    </div>
+
+    <div class="chips" id="modelChips">
+      <div class="chip active" data-m="base"><h4>接龍原始模型</h4><div class="sub">Base model · 只做完 pretraining</div></div>
+      <div class="chip" data-m="tuned"><h4>調教後的助理</h4><div class="sub">SFT + RLHF / DPO 之後</div></div>
+    </div>
+
+    <div class="chat-box">
+      <div class="chat-prompt">提示詞 → <b id="chatPrompt">法國的首都是哪裡？</b></div>
+      <div class="chat-tag" id="chatTag">接龍原始模型</div>
+      <div class="chat-reply" id="chatReply"></div>
+      <div class="chat-note" id="chatNote"></div>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>base model 不是「壞掉」</b> — 它做的事情從頭到尾沒變:接得像不像網路上會出現的文字。網路文字裡「問題」後面接的常常是「更多問題」,不一定是「回答」——這正是後訓練要解決的不穩定。</div>
+      <div class="exclusion"><b>這是編的示範,不是真的跑兩個模型</b> — 上面兩段輸出是這篇筆記為了說明機制編的教學例子,不是任何論文或真實模型的紀錄。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: SFT ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · SFT</div>
+    <div class="sec-title">SFT:訓練目標沒變,換的是餵的資料</div>
+    <p class="sec-sub">
+      SFT(監督式微調)一樣是 next-token prediction,差別只在餵給模型的資料,從「網路上刮來
+      的雜文字」換成「人工精心寫的(提示詞, 理想回答)示範」。點兩張卡看差在哪裡。
+    </p>
+
+    <div class="row" id="sftRow">
+      <div class="node" data-key="pre">
+        <div class="idx">Pretraining 資料</div>
+        <h3>網路上刮下來的雜文字</h3>
+        <div class="q">沒人整理過,量體是兆級 token</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="sft">
+        <div class="idx">SFT 資料</div>
+        <h3>人工寫的(提示詞, 理想回答)</h3>
+        <div class="q">InstructGPT 論文用約 1.3 萬筆提示詞</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelB">
+      <p class="placeholder">↑ 點一張卡,看這批資料教會模型什麼。</p>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>SFT 沒有換演算法</b> — 訓練方式跟 pretraining 一樣是 next-token prediction,只是資料換了,不是機制換了。</div>
+      <div class="exclusion"><b>SFT 教的是格式態度,不是新知識</b> — SFT 只告訴模型「正確答案長這樣」(照抄範例),沒有「這個回答比那個好一點」的相對優劣排序訊號——這種更豐富的訊號要靠 RLHF 補上。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: RLHF ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · RLHF</div>
+    <div class="sec-title">RLHF:訓練一個評審模型,再用強化學習把模型往評審偏好的方向調</div>
+    <p class="sec-sub">
+      InstructGPT 論文確立的第二段後訓練,分兩步:先訓練一個獨立的<b>評審模型(reward model)</b>,
+      再用強化學習(論文用 PPO)照評審模型的分數調整原本的模型,並用 <b>KL 懲罰</b>當煞車,
+      避免模型為了騙高分而跑偏。點下面的節點看每一步。
+    </p>
+
+    <div class="row" id="rlhfRow">
+      <div class="node" data-key="gen">
+        <div class="idx">RLHF · 1</div>
+        <h3>生成候選回答</h3>
+        <div class="q">SFT 模型針對同一提示詞生成好幾個回答</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="rank">
+        <div class="idx">RLHF · 2</div>
+        <h3>人類排出偏好順序</h3>
+        <div class="q">標註員排「哪個比較好」,不是打絕對分數</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="reward">
+        <div class="idx">RLHF · 3</div>
+        <h3>訓練評審模型</h3>
+        <div class="q">輸入(提示詞,回答),輸出一個偏好分數</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="ppo">
+        <div class="idx">RLHF · 4</div>
+        <h3>PPO 調整 + KL 煞車</h3>
+        <div class="q">往高分方向調,同時不讓模型跑離 SFT 太遠</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelC">
+      <p class="placeholder">↑ 點一個節點,看這一步在做什麼。</p>
+    </div>
+
+    <p class="sec-sub" style="margin-top:28px">
+      評審模型訓練好之後,拿它幫<b>整段候選回答</b>排出偏好分數——注意這裡排的是「一整段回答的
+      好壞」,跟 101 頁圖 C 那種「牌庫裡每張字牌接下去合不合適」的逐張機率長條,是不同性質的
+      分數:評審分數<b>不是機率</b>,不必加總等於 100%。點下面的長條看候選回答。
+    </p>
+
+    <div class="ctl-row">
+      <span class="ctl-label">提示詞</span>
+      <span class="pill active">幫我寫一封跟主管請假的信</span>
+    </div>
+
+    <div class="bars" id="rewardBars"></div>
+    <div class="panel" id="panelReward" style="margin-top:14px">
+      <p class="placeholder">↑ 點一個候選回答,看評審模型可能給的理由。</p>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>評審分數不是機率</b> — 上面幾個候選的分數不必加總等於任何固定值,單純是評審模型對「這一整段回答」打的相對高低分,跟牌庫打分那種對幾萬個候選字牌算機率分布,是不同的東西。</div>
+      <div class="exclusion"><b>KL 懲罰是煞車,不是額外功能</b> — 沒有這個懲罰,模型很容易找到評審模型的漏洞,用怪異但能騙到高分的方式「作弊」(reward hacking),而不是真的變得更有幫助。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION D: DPO ============ -->
+  <section>
+    <div class="sec-kicker">圖 D · DPO</div>
+    <div class="sec-title">DPO:跳過訓練評審模型、跳過強化學習迴圈</div>
+    <p class="sec-sub">
+      RLHF 有效,但流程重。DPO(Direct Preference Optimization)提出更簡化的替代方案:同樣
+      餵偏好比較資料,但透過數學上的重新參數化,把「先訓練評審模型、再用強化學習迎合它」壓縮成
+      一個可以直接梯度下降的閉式目標。切換下面的 chips,對照兩條路徑的步驟數。
+    </p>
+
+    <div class="chips" id="flowChips">
+      <div class="chip active" data-flow="rlhf"><h4>RLHF 流程</h4><div class="sub">獨立評審模型 + 強化學習迴圈</div></div>
+      <div class="chip" data-flow="dpo"><h4>DPO 流程</h4><div class="sub">直接優化一個閉式目標</div></div>
+    </div>
+
+    <div class="row" id="flowRow"></div>
+
+    <div class="panel" id="panelD">
+      <p class="placeholder">↑ 點一個節點,看這一步在做什麼。</p>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>資料來源相同</b> — DPO 用的偏好比較資料跟 RLHF 第一步是同一種(「這兩個回答,人類比較喜歡哪一個」),差別只在後面怎麼用這批資料。</div>
+      <div class="exclusion"><b>「你的模型其實偷偷就是一個評審模型」</b> — DPO 論文標題想講的是:不用額外練一個評審模型,因為調整中的模型自己的機率分佈,已經隱含了評審模型的角色。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION E: 誠實提醒 ============ -->
+  <section>
+    <div class="sec-kicker">圖 E · 誠實提醒</div>
+    <div class="sec-title">RLHF 跟 DPO 誰比較好,目前沒有定論</div>
+    <div class="panel">
+      <div class="ph">Open question · 沒有結論</div>
+      <h2>業界跟研究社群仍在辯論,依任務混用</h2>
+      <div class="meta">
+        <b>支持 DPO 的證據</b><span>有研究指出 DPO 在某些任務(例如摘要)上能追上甚至超過調得好的 PPO,而且對取樣溫度的變化更穩健。</span>
+        <b>支持 RLHF(PPO)的證據</b><span>也有研究指出 DPO 對訓練資料的泛化能力不如 PPO 式 RLHF,尤其在數學推理這類任務上,DPO 帶來的效益有限甚至可能有負面影響。</span>
+        <b>這篇筆記的立場</b><span>只把兩條路徑的機制講清楚,不對「哪個比較好」下結論——實務上不少團隊依任務性質混用兩種策略。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      機制細節、查證與信心等級的完整版本在對應的技術筆記
+      <code>docs/2026-07-06-post-training-sft-rlhf.md</code>;這裡只列這一頁引用到的原始論文。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">機制講解</div>
+        <a href="https://huggingface.co/blog/rlhf">Hugging Face — Illustrating Reinforcement Learning from Human Feedback (RLHF)(SFT + 評審模型 + PPO 全流程的視覺化講解)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">原始論文</div>
+        <a href="https://arxiv.org/abs/2203.02155">Ouyang et al., 2022 — Training language models to follow instructions with human feedback(InstructGPT:SFT + 評審模型 + PPO 三段式後訓練流程的出處)</a>
+        <a href="https://arxiv.org/abs/2305.18290">Rafailov et al., 2023 — Direct Preference Optimization: Your Language Model is Secretly a Reward Model(NeurIPS 2023;DPO 論文)</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 圖 A:同一提示詞,兩種模型 ============ */
+  const EXAMPLES = {
+    capital: {
+      prompt: '法國的首都是哪裡？',
+      base: '德國的首都是哪裡？義大利的首都是哪裡？西班牙的首都是哪裡？',
+      tuned: '法國的首都是巴黎(Paris)。它也是法國人口最多的城市,座落在塞納河畔。需要我多介紹一點巴黎的資訊嗎？',
+      baseNote: '接龍原始模型在做的事情沒有變——把這串文字接得像網路上會出現的文字。網路上一份考卷題目後面接著的往往是下一題,不一定是答案,所以它接出了更多類似的問題,而不是回答。',
+      tunedNote: '調教後的助理多了 SFT 教的「看到問題就直接回答」的格式態度,以及 RLHF / DPO 調過的「對使用者有幫助」的偏好方向。'
+    },
+    poem: {
+      prompt: '幫我寫一首關於貓的詩',
+      base: '幫我寫一首關於狗的詩\n幫我寫一首關於魚的詩\n幫我寫一段關於貓的故事,兩百字左右',
+      tuned: '當然,這是一首關於貓的小詩:\n\n窗邊曬著陽光的貓,\n尾巴輕輕晃出圈;\n看似慵懶不理人,\n跳上鍵盤討摸摸。\n\n如果想要別的風格(例如俳句),跟我說一聲!',
+      baseNote: '同一個機制:網路上「幫我寫一首關於 X 的詩」這種提示詞後面,常常接的是下一則類似的作業指示或考題,而不是真的寫出一首詩——base model 只是把這個文字形狀接得很像網路上會出現的樣子。',
+      tunedNote: '調教後的助理直接完成任務、用禮貌的開場白收尾,還主動提供進一步選項——這些都是 SFT 範例教的格式,加上 RLHF / DPO 調過「怎麼回答使用者更喜歡」之後長出來的行為。'
+    }
+  };
+  const stateA = { ex:'capital', model:'base' };
+  const chatPrompt = document.getElementById('chatPrompt');
+  const chatTag = document.getElementById('chatTag');
+  const chatReply = document.getElementById('chatReply');
+  const chatNote = document.getElementById('chatNote');
+
+  function renderA(){
+    const d = EXAMPLES[stateA.ex];
+    chatPrompt.textContent = d.prompt;
+    document.querySelectorAll('#promptCtl .pill').forEach(p => p.classList.toggle('active', p.dataset.ex === stateA.ex));
+    document.querySelectorAll('#modelChips .chip').forEach(c => c.classList.toggle('active', c.dataset.m === stateA.model));
+    if(stateA.model === 'base'){
+      chatTag.textContent = '接龍原始模型';
+      chatTag.className = 'chat-tag base';
+      chatReply.textContent = d.base;
+      chatNote.textContent = d.baseNote;
+    } else {
+      chatTag.textContent = '調教後的助理';
+      chatTag.className = 'chat-tag tuned';
+      chatReply.textContent = d.tuned;
+      chatNote.textContent = d.tunedNote;
+    }
+    fadeIn(document.querySelector('.chat-box'));
+  }
+  document.querySelectorAll('#promptCtl .pill').forEach(p => p.addEventListener('click', () => { stateA.ex = p.dataset.ex; renderA(); }));
+  document.querySelectorAll('#modelChips .chip').forEach(c => c.addEventListener('click', () => { stateA.model = c.dataset.m; renderA(); }));
+
+  /* ============ 圖 B:SFT 資料對照 ============ */
+  const SFT_DATA = {
+    pre: {
+      title: '網路上刮下來的雜文字', tag: 'Pretraining 資料',
+      what: '沒有人整理過的海量網路文字——網頁、書籍、程式碼、論壇貼文……什麼都有,量體是兆(trillion)級 token。訓練目標是 next-token prediction:把每個位置的下一個字牌接對。',
+      ex: '這批資料裡當然也混著大量「Q: ……? A: ……」這種問答形狀的段落——這是為什麼光靠接龍,base model 有時候也真的能接出答案。',
+      deeper: '「接得準」這個目標本身沒有「該不該回答、該用什麼態度回答」的概念——那是這批資料學不到的東西,要靠下一步 SFT 才教。'
+    },
+    sft: {
+      title: '人工寫的(提示詞, 理想回答)', tag: 'SFT 資料',
+      what: '找人類標註員,針對各種提示詞親手寫出「這題理想上該怎麼回答」的示範,湊成一批配對資料集。InstructGPT 論文用的標註示範資料集約 1.3 萬筆提示詞——比 pretraining 的兆級 token 小了非常多個數量級。',
+      ex: '訓練方式跟 pretraining 完全一樣,還是 next-token prediction,只是餵的資料從「網路雜文字」換成「人工精心寫的示範」。',
+      deeper: 'SFT 天生的限制:每一條範例都要人類標註員親手寫,產能撐不起海量資料,而且學到的只是「照抄範例」——沒有「這個回答比那個好一點」的相對優劣排序訊號,這種更豐富的訊號要靠 RLHF 補上。'
+    }
+  };
+  const panelB = document.getElementById('panelB');
+  function renderB(key){
+    const d = SFT_DATA[key];
+    document.querySelectorAll('#sftRow .node').forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelB.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>是什麼</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+      <div class="deeper"><b>更深一層</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelB);
+  }
+  document.querySelectorAll('#sftRow .node').forEach(n => n.addEventListener('click', () => renderB(n.dataset.key)));
+
+  /* ============ 圖 C:RLHF 節點 + reward 長條 ============ */
+  const RLHF_STEPS = {
+    gen: {
+      title: '生成候選回答', tag: 'RLHF · 1',
+      what: '讓 SFT 後的模型針對同一個提示詞生成好幾個不同的候選回答——不是只生成一個,是刻意生成一批,才有東西可以比較。',
+      ex: '例如同一句「幫我寫一封請假信」,生成 4 個語氣、格式都不太一樣的版本。',
+      deeper: '這一步只是「生成」,還沒有任何評分或排序——評分在下一步才發生。'
+    },
+    rank: {
+      title: '人類排出偏好順序', tag: 'RLHF · 2',
+      what: '交給人類標註員,把同一批候選回答排出「哪個比較好、哪個比較差」的相對順序——不是打絕對分數,是兩兩比較或整批排序。',
+      ex: '「哪個回答比較好」通常比「手寫一個理想回答」便宜取得,能收集的比較資料量也大得多。',
+      deeper: '這種相對優劣的排序訊號,正是 SFT 補不上的部分:SFT 只告訴模型「正確答案長這樣」,這裡多了「這個回答比那個好一點,但沒有另一個那麼好」的細粒度訊號。'
+    },
+    reward: {
+      title: '訓練評審模型', tag: 'RLHF · 3',
+      what: '用這批比較資料訓練出一個獨立的模型(reward model):輸入一個(提示詞, 回答)配對,吐出一個分數,分數越高代表人類越可能偏好這個回答。',
+      ex: '評審模型訓練好之後,就能對任何新的候選回答打分——不用每次都找人類重新排序。',
+      deeper: '評審模型的分數不是機率,不必加總等於 100%——它排的是整段回答的相對好壞,跟牌庫打分那種「幾萬個候選字牌的機率分布」是不同性質的東西,見下方的長條圖對照。'
+    },
+    ppo: {
+      title: 'PPO 調整 + KL 煞車', tag: 'RLHF · 4',
+      what: '把 SFT 後的模型當成要優化的對象,讓它生成回答、評審模型打分,再用強化學習演算法(InstructGPT 論文用 PPO)照分數的方向調整模型參數,讓它更常生成評審模型會打高分的那種回答。',
+      ex: '每一步都額外算一個跟 SFT 模型的差距懲罰(KL 懲罰)——不讓正在被調整的模型跑得離 SFT 模型太遠。',
+      deeper: '沒有這個煞車,模型很容易找到評審模型的漏洞、用怪異但能騙到高分的方式「作弊」(reward hacking),而不是真的變得更有幫助。InstructGPT 論文報告:調出來的 1.3B 參數模型,人類評估裡的偏好度贏過參數量大上 100 倍的 175B GPT-3 原始模型。'
+    }
+  };
+  const panelC = document.getElementById('panelC');
+  function renderC(key){
+    const d = RLHF_STEPS[key];
+    document.querySelectorAll('#rlhfRow .node').forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelC.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+      <div class="deeper"><b>更深一層</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelC);
+  }
+  document.querySelectorAll('#rlhfRow .node').forEach(n => n.addEventListener('click', () => renderC(n.dataset.key)));
+
+  const REWARD_CANDIDATES = [
+    { tok:'回答 A', score:8.7, text:'格式正式、稱謂正確、理由清楚、禮貌收尾——評審模型判斷最貼近「一封請假信該有的樣子」。' },
+    { tok:'回答 B', score:6.1, text:'內容大致沒錯,但缺少稱謂、用詞偏生硬,少了收尾的禮貌用語。' },
+    { tok:'回答 D', score:4.5, text:'格式正確,但語氣過於隨便,像跟朋友聊天而不是寫給主管的信。' },
+    { tok:'回答 C', score:2.4, text:'文不對題——寫成一篇介紹「請假制度」的說明文,根本沒有請假的內容。' }
+  ];
+  const rewardBars = document.getElementById('rewardBars');
+  const panelReward = document.getElementById('panelReward');
+  REWARD_CANDIDATES.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML = `<div class="tok">${c.tok}</div>
+      <div class="bar-track"><div class="reward-fill" style="width:${c.score*10}%"></div></div>
+      <div class="pct">${c.score.toFixed(1)}</div>`;
+    row.addEventListener('click', () => {
+      document.querySelectorAll('#rewardBars .bar-row').forEach(r => r.classList.remove('picked'));
+      row.classList.add('picked');
+      panelReward.innerHTML = `
+        <div class="ph">評審模型的分數 · 教學示意</div>
+        <h2>${c.tok} — ${c.score.toFixed(1)} 分</h2>
+        <div class="meta"><b>評審可能的理由</b><span>${c.text}</span></div>
+      `;
+      fadeIn(panelReward);
+    });
+    rewardBars.appendChild(row);
+  });
+
+  /* ============ 圖 D:RLHF vs DPO 流程 ============ */
+  const FLOWS = {
+    rlhf: [
+      { key:'data', tag:'RLHF · 1', title:'蒐集偏好比較資料', q:'人類排「哪個回答比較好」',
+        what:'讓 SFT 模型針對同一個提示詞生成好幾個候選回答,交給人類標註員排出相對順序——不是打絕對分數。' },
+      { key:'reward', tag:'RLHF · 2', title:'訓練評審模型', q:'獨立的模型,輸出偏好分數',
+        what:'用這批比較資料訓練出一個獨立的模型:輸入(提示詞, 回答),輸出一個分數,分數越高代表人類越可能偏好這個回答。' },
+      { key:'ppoLoop', tag:'RLHF · 3', title:'強化學習迴圈 + KL 煞車', q:'生成 → 打分 → PPO 更新,反覆跑',
+        what:'讓模型生成、評審模型打分、PPO 依分數調整參數,每一步都算 KL 懲罰不讓模型跑離 SFT 太遠——工程複雜度跟訓練不穩定的風險都不低。' }
+    ],
+    dpo: [
+      { key:'data2', tag:'DPO · 1', title:'同一種偏好比較資料', q:'資料蒐集方式跟 RLHF 第一步相同',
+        what:'一樣是「這兩個候選回答,人類比較喜歡哪一個」的成對偏好資料——這一步跟 RLHF 完全相同,差別在後面怎麼用這批資料。' },
+      { key:'closed', tag:'DPO · 2', title:'直接優化一個閉式目標', q:'不練評審模型、不跑強化學習迴圈',
+        what:'透過數學上的重新參數化,把「理想的評審分數」跟「模型 vs. 原本 SFT 模型的機率比值」直接畫上等號——原本兩步被壓縮成一個閉式的分類目標函式,直接對偏好資料做梯度下降就能優化模型本身,訓練流程更接近一般的監督式訓練。' }
+    ]
+  };
+  const stateD = { flow:'rlhf' };
+  const flowRow = document.getElementById('flowRow');
+  const panelD = document.getElementById('panelD');
+  function renderFlowRow(){
+    const steps = FLOWS[stateD.flow];
+    flowRow.innerHTML = steps.map((s, i) => `
+      ${i > 0 ? '<div class="arrow">→</div>' : ''}
+      <div class="node" data-key="${s.key}">
+        <div class="idx">${s.tag}</div>
+        <h3>${s.title}</h3>
+        <div class="q">${s.q}</div>
+      </div>
+    `).join('');
+    flowRow.querySelectorAll('.node').forEach(n => n.addEventListener('click', () => renderD(n.dataset.key)));
+    panelD.innerHTML = '<p class="placeholder">↑ 點一個節點,看這一步在做什麼。</p>';
+    document.querySelectorAll('#flowChips .chip').forEach(c => c.classList.toggle('active', c.dataset.flow === stateD.flow));
+    fadeIn(flowRow);
+  }
+  function renderD(key){
+    const s = FLOWS[stateD.flow].find(s => s.key === key);
+    flowRow.querySelectorAll('.node').forEach(n => n.classList.toggle('active', n.dataset.key === key));
+    panelD.innerHTML = `
+      <div class="ph">${s.tag}</div>
+      <h2>${s.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${s.what}</span></div>
+    `;
+    fadeIn(panelD);
+  }
+  document.querySelectorAll('#flowChips .chip').forEach(c => c.addEventListener('click', () => { stateD.flow = c.dataset.flow; renderFlowRow(); }));
+
+  /* ============ 初始狀態 ============ */
+  renderA();
+  renderB('pre');
+  renderC('gen');
+  renderFlowRow();
+</script>
+</body>
+</html>

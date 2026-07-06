@@ -19,6 +19,11 @@ out (and delete its line here) once its own topic/note exists.
   它是劇組跟外面廠商借道具的窗口,回答的是「碰外部世界」,不是「內部怎麼組織」,是垂直的
   另一個維度。
 
+- **LLM → Agent 的橋接** —— `llm-foundations` 目前範圍只做「LLM 原理」本身(next-token
+  prediction、in-context learning),刻意沒做「LLM 怎麼被組裝、包裝成一個 Agent」這段橋接。
+  等 `llm-foundations` 的 LLM 原理部分做得夠完整,再回頭決定這段橋接要併進同一個主題,還是
+  獨立開新主題——不要因為問題本來是連著問的就預設答案是「同一個主題」。
+
 ## 歸屬待重新檢視(不是候選主題,是既有內容的範圍疑慮)
 
 - **`agent-skills-advanced-applications.md` 的兩塊,可能根本不屬於 Skills** ——

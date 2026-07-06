@@ -1,0 +1,471 @@
+---
+title: Scaling Laws — 規模、資料、算力怎麼換算(互動圖解)
+summary: 三張小卡片(N/D/C 三個量尺,點卡片看定義)、Kaplan 配方 vs Chinchilla 配方切換 + log-log 示意圖表(四段算力尺度可點,顯示同樣算力下兩種配方的 loss 差距,含 Gopher vs Chinchilla 的真實對照數字)、誠實提醒卡(經驗擬合 vs 理論證明、Chinchilla 係數受過方法學質疑)。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - interactive
+  - scaling-laws
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Scaling Laws:規模、資料、算力怎麼換算。可長期回看的教學頁(pages/ genre,
+  發布於 /llm-foundations/scaling-laws/),不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-06-scaling-laws.md
+    ../docs/2026-07-04-next-token-prediction.md(loss 定義、emergent abilities 錯覺的呼應)
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    區塊 1(三個量尺)— N(參數量)/D(資料量)/C(算力)三張卡片,點卡片看定義與冪律關係
+      L∝N^-α、L∝D^-β、L∝C^-γ。
+    區塊 2(Kaplan vs Chinchilla 配方圖表)— log-log 示意座標(軸上單位是教學示意,不是真實
+      FLOPs/loss 數值),兩條曲線分別代表「Kaplan 配方(偏重堆參數)」跟「Chinchilla 配方
+      (參數/資料等比放大)」——同樣算力下 Kaplan 配方的 loss 較高。可切換 chip 讓其中一條變粗
+      並看該配方的公式與代表模型;可點四段算力尺度(小算力/GPT-3 級/Gopher-Chinchilla 級/
+      外推)看該尺度下兩條線的讀值,Gopher-Chinchilla 那一段是論文裡真的做出來的對照組
+      (70B/1.4T token vs 280B/~300B token,MMLU 67.5% vs 差 7 個百分點以上),其餘尺度標明是
+      教學示意或推論,不是論文原始圖表的精確複現。
+    區塊 3(誠實提醒卡)— 經驗擬合非理論證明、Chinchilla 精確係數受過方法學質疑但方向性結論
+      站得住腳、換任務/資料係數會不同。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Scaling Laws — Kaplan vs Chinchilla:算力該怎麼配</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+  .tagline a{color:var(--accent)}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+  .sec-sub a{color:var(--accent)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:wrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:220px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:220px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .chip.kap.active{border-color:var(--rose);box-shadow:0 0 0 2px rgba(176,74,106,.16),var(--shadow)}
+  .chip.chin.active{border-color:var(--green);box-shadow:0 0 0 2px rgba(12,122,89,.16),var(--shadow)}
+  .swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+
+  .zone{cursor:pointer}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:8px;text-align:center}
+
+  /* controls */
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:74px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+
+  .round-caption{margin-top:12px;padding:10px 14px;background:var(--bg);border-left:3px solid var(--rose);
+    border-radius:0 10px 10px 0;font-size:13px}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations · Scaling Laws</div>
+    <h1>Scaling Laws — 規模、資料、算力怎麼換算</h1>
+    <p class="tagline">
+      模型變大、資料變多、算力變多,表現(loss)不是隨便亂跳,而是呈現平滑的<b>冪律關係</b>
+      ——量尺一路拉大,曲線不會忽然轉彎,是可以外推預測的。這裡量的「表現」就是訓練時的
+      loss(對牌庫打分那一步猜得準不準的量化版本,見
+      <a href="../docs/2026-07-04-next-token-prediction.md">next-token-prediction.md</a>);
+      Kaplan et al. 2020 量出這條曲線很平滑,也呼應同一篇筆記提到的「規模一大能力忽然冒出來,
+      可能只是量尺選擇的錯覺」。但「怎麼分配算力」這件事業界一開始配錯了——Chinchilla / Hoffmann
+      et al. 2022 推翻了 Kaplan 的原始配方。下面用一張示意圖表比較兩種配方。
+    </p>
+  </header>
+
+  <!-- ============ SECTION 1: 三個量尺 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 1 · 先講清楚在量什麼</div>
+    <div class="sec-title">三個可以拉大的量尺:N、D、C</div>
+    <p class="sec-sub">
+      Kaplan et al. 2020 訓練了兩百多個 Transformer,量出:只要另外兩個量尺不是瓶頸,
+      loss 跟這三個量尺各自呈現乾淨的冪律關係。點卡片看每個量尺的定義跟對應的冪律公式。
+    </p>
+
+    <div class="row" id="axesRow">
+      <div class="node" data-key="N">
+        <div class="idx">N · 模型參數量</div>
+        <h3>L ∝ N <span style="font-family:var(--mono)">^-α</span></h3>
+        <div class="q">牌櫃收納位置的總數規模,大致對應模型「能裝多少東西」</div>
+      </div>
+      <div class="node" data-key="D">
+        <div class="idx">D · 訓練資料量</div>
+        <h3>L ∝ D <span style="font-family:var(--mono)">^-β</span></h3>
+        <div class="q">訓練時實際餵過幾次牌局、多少 token</div>
+      </div>
+      <div class="node" data-key="C">
+        <div class="idx">C · 訓練算力</div>
+        <h3>L ∝ C <span style="font-family:var(--mono)">^-γ</span></h3>
+        <div class="q">把 N 跟 D 都跑起來要花多少計算資源(FLOPs)</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelAxes">
+      <p class="placeholder">↑ 點一張卡片,看定義跟這個量尺怎麼影響 loss。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 2: Kaplan vs Chinchilla 圖表 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 2 · 同樣算力,配方對不對差很多</div>
+    <div class="sec-title">Kaplan 配方 vs Chinchilla 配方 — log-log 示意圖</div>
+    <p class="sec-sub">
+      固定一個算力預算 C,要怎麼分給模型大小 N 跟資料量 D 才划算?兩篇論文給出不同答案。
+      <b>Kaplan 配方</b>建議 N 該吃掉大部分預算(`N_optimal ∝ C^0.73`、`D_optimal ∝ C^0.27`),
+      模型盡量做大、資料相對少一點;<b>Chinchilla 配方</b>認為這樣資料餵太少,最划算的配比是
+      <b>N 跟 D 接近等比例一起放大</b>——模型翻倍,資料也該跟著翻倍。下圖橫軸是算力預算、縱軸是
+      loss,兩軸都是 log 座標,<b>但單位是教學示意,不是真實 FLOPs / loss 數值</b>,曲線形狀
+      用來表達「配方錯了,同樣算力會拉開差距」的方向,不是精確複現論文圖表。
+    </p>
+
+    <div class="chips" id="recipeChips">
+      <div class="chip kap active" data-recipe="kaplan">
+        <h4><span class="swatch" style="background:var(--rose)"></span>Kaplan 配方(偏重堆參數)</h4>
+        <div class="sub">N_optimal ∝ C^0.73 · D_optimal ∝ C^0.27</div>
+      </div>
+      <div class="chip chin" data-recipe="chinchilla">
+        <h4><span class="swatch" style="background:var(--green)"></span>Chinchilla 配方(參數/資料等比放大)</h4>
+        <div class="sub">N 跟 D 接近等比例一起放大</div>
+      </div>
+    </div>
+
+    <div class="ctl-row" id="stepCtl">
+      <span class="ctl-label">算力尺度</span>
+      <span class="pill" data-step="0">算力還小</span>
+      <span class="pill" data-step="1">GPT-3 級</span>
+      <span class="pill active" data-step="2">Gopher / Chinchilla 級(論文實測對照組)</span>
+      <span class="pill" data-step="3">再往上一級(外推示意)</span>
+    </div>
+
+    <div class="scene-box" style="margin-top:16px">
+      <div id="chartBox" style="display:flex;justify-content:center"></div>
+      <div class="scene-note">曲線與座標軸單位是教學示意,不是真實復現論文圖表的數值</div>
+    </div>
+
+    <div class="panel" id="panelRecipe"></div>
+    <div class="round-caption" id="stepCaption"></div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>算力小的時候差不了多少</b> — 算力預算還很小時,兩種配方分出來的
+        N/D 配比差異不明顯,loss 差距也小;配方選錯的代價是隨著算力變大才逐漸放大的
+        (這條「差距隨算力擴大」的曲線畫法本身是本頁的教學示意,不是論文量出來的精確斜率)。</div>
+      <div class="exclusion"><b>GPT-3 那一點是推論,不是論文原始對照</b> — GPT-3(175B 参数,約
+        300B token)是照 Kaplan 配方练的代表模型;圖上「换成 Chinchilla 配方理論上能换到更低
+        loss」是順著 Chinchilla 論文結論反推的教學推論,論文並沒有真的重練一個「Chinchilla 版
+        GPT-3」做直接對照。</div>
+      <div class="exclusion"><b>Gopher vs Chinchilla 才是真的實驗對照組</b> — 這一段是 Hoffmann
+        et al. 論文裡真的做出來的比較:同樣算力預算下,Chinchilla(70B / 1.4 兆 token)MMLU
+        平均正確率 67.5%,比 Gopher(280B / 約 300B token)高超過 7 個百分點。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 3: 誠實提醒 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 3 · 誠實提醒</div>
+    <div class="sec-title">這是經驗擬合,不是理論證明</div>
+    <p class="sec-sub">
+      冪律關係跟配方係數是從特定實驗數據擬合出來的,不是從第一性原理推出的必然定律。
+    </p>
+    <div class="exclusions">
+      <div class="exclusion"><b>係數不是永久不變</b> — `α`、`β`、`γ` 以及 Chinchilla 的等比例配方,
+        是對特定一批實驗數據做迴歸的結果,換一種架構、換一種資料組成、換一種評測方式,
+        係數會不一樣,曲線也可能不再是乾淨的直線。</div>
+      <div class="exclusion"><b>Chinchilla 精確係數受過方法學質疑</b> — Besiroglu, Erdil et al.,
+        2024 嘗試重建 Hoffmann et al. 論文圖表背後的數據,指出原論文報的信心區間窄得不合理,
+        懷疑是擬合過程統計瑕疵導致;但重建文章本身也承認,修正後重新擬合,「模型與資料該接近
+        等比例放大」這個<b>方向性結論</b>站得住腳,受質疑的是原論文報告的精確係數與信心區間,
+        不是配方整體的方向。（LIKELY,見下方出處)</div>
+      <div class="exclusion"><b>不能直接套用到別的任務</b> — 這些規律是在語言模型的
+        next-token loss、以網路爬蟲文字為主的語料下量出來的,換到程式碼、多模態、或資料品質
+        差異很大的語料,實際擬合出來的係數會不一樣——不能直接把「70B 配 1.4 兆 token」當成
+        放諸四海皆準的公式硬套。</div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      跟本頁對應的完整技術筆記(含逐條信心等級標記),見
+      <a href="../docs/2026-07-06-scaling-laws.md">2026-07-06-scaling-laws.md</a>。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">原始論文</div>
+        <a href="https://arxiv.org/abs/2001.08361">Kaplan, McCandlish, Henighan et al., 2020 — Scaling Laws for Neural Language Models(原始 scaling laws 論文,N/D/C 三條冪律關係與 N_optimal ∝ C^0.73 / D_optimal ∝ C^0.27 配方的出處)</a>
+        <a href="https://arxiv.org/abs/2203.15556">Hoffmann, Borgeaud, Mensch et al., 2022 — Training Compute-Optimal Large Language Models(Chinchilla 論文,NeurIPS 2022;等比例放大的修正結論、Chinchilla vs Gopher 對照、MMLU 67.5% 出處)</a>
+        <a href="https://arxiv.org/abs/2005.14165">Brown et al., 2020 — Language Models are Few-Shot Learners(GPT-3 論文,175B 参数、約 300B token 訓練資料量的出處)</a>
+        <a href="https://arxiv.org/abs/2404.10102">Besiroglu, Erdil et al., 2024 — Chinchilla Scaling: A replication attempt(對 Hoffmann et al. 原始係數的方法學質疑與重新擬合)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">同主題筆記</div>
+        <a href="../docs/2026-07-04-next-token-prediction.md">next-token-prediction.md(loss 的定義、emergent abilities 錯覺的呼應)</a>
+        <a href="../docs/2026-07-06-scaling-laws.md">2026-07-06-scaling-laws.md(本頁對應的完整筆記,含出處與誠實聲明)</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 區塊 1:N/D/C 三個量尺 ============ */
+  const AXES = {
+    N: {
+      title: 'N · 模型參數量', tag: 'L ∝ N^-α',
+      what: '模型裡可調的權重總數——大致對應「牌櫃」能裝多少東西、能收納多細緻的遠近關係。只要 D 跟 C 不是瓶頸,單獨拉大 N,loss 會沿著一條乾淨的冪律曲線下降。',
+      ex: 'Kaplan et al. 2020 橫跨四個數量級的參數量做實驗,量出這條關係在 log-log 座標上接近一條直線。',
+      deeper: '「單獨拉大 N 有效」不代表「無限拉大 N 最划算」——固定算力 C 下,N 該分到多少預算是另一個問題,見下方 Kaplan vs Chinchilla 配方之爭。'
+    },
+    D: {
+      title: 'D · 訓練資料量', tag: 'L ∝ D^-β',
+      what: '訓練時實際餵過的 token 數量。只要 N 跟 C 不是瓶頸,單獨拉大 D,loss 一樣沿著冪律曲線下降——資料餵得越多,對牌庫打分打得越準。',
+      ex: 'Hoffmann et al. 2022 訓練超過四百個模型,資料量從 5B 到 500B token,重新擬合「同樣算力下 N 跟 D 該怎麼配」這個問題。',
+      deeper: 'Kaplan 配方讓 D 只吃一小部分預算,結果是像 GPT-3 這類模型「模型撐得很大、資料相對餵不夠」——這正是 Chinchilla 論文要修正的地方。'
+    },
+    C: {
+      title: 'C · 訓練算力', tag: 'L ∝ C^-γ',
+      what: '把 N 跟 D 都跑起來要花的計算資源(FLOPs)。C 本身也是一條冪律曲線,但更關鍵的問題是:固定一個 C,該怎麼分給 N 跟 D 才最划算——這才是 Kaplan 跟 Chinchilla 兩篇論文真正的分歧點。',
+      ex: '同樣的 C,Kaplan 配方建議大部分砸進 N;Chinchilla 配方建議 N 跟 D 接近等比例一起放大。',
+      deeper: 'Chinchilla 用一個直接對照組驗證:Chinchilla(70B/1.4T token)跟 Gopher(280B/~300B token)花掉差不多的 C,但配方對的 Chinchilla 全面優於 Gopher。見下方圖表。'
+    }
+  };
+  const panelAxes = document.getElementById('panelAxes');
+  function renderAxes(key){
+    const d = AXES[key];
+    document.querySelectorAll('#axesRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelAxes.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在量什麼</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+      <div class="deeper"><b>更深一層</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelAxes);
+  }
+  document.querySelectorAll('#axesRow .node').forEach(el => el.addEventListener('click', () => renderAxes(el.dataset.key)));
+
+  /* ============ 區塊 2:Kaplan vs Chinchilla 圖表 ============ */
+  const RECIPE = {
+    kaplan: {
+      color: 'var(--rose)',
+      title: 'Kaplan 配方(偏重堆參數)',
+      formula: 'N_optimal ∝ C^0.73 · D_optimal ∝ C^0.27',
+      note: '算力每增加十倍,模型大小該漲得比資料量快得多——背後論證是大模型「樣本效率」更高,同樣資料大模型能榨出更多東西,所以資料相對少一點、甚至提早停止訓練也划算。',
+      example: '代表模型:GPT-3(175B 参数,約 300B token)。'
+    },
+    chinchilla: {
+      color: 'var(--green)',
+      title: 'Chinchilla 配方(參數/資料等比放大)',
+      formula: 'N 跟 D 接近等比例一起放大(模型翻倍,資料也該跟著翻倍)',
+      note: 'Kaplan 配方讓資料餵太少;同樣算力下,把資料量拉高、模型做小一點,可以換到更低的 loss——用四分之一大小的模型,打贏四倍大、資料餵不夠的模型。',
+      example: '代表模型:Chinchilla(70B 参数,1.4 兆 token)。'
+    }
+  };
+  const COMPUTE_STEPS = [
+    {
+      label: '算力還小', kapLabel: '(算力還小,配方差異還不明顯)', chinLabel: '(算力還小,配方差異還不明顯)',
+      caption: '算力預算還小的時候,兩種配方分出來的 N/D 配比差異不明顯,loss 差距也還小——配方選錯的代價,是隨算力變大才逐漸顯現的。'
+    },
+    {
+      label: 'GPT-3 級', kapLabel: 'GPT-3\n175B / ~300B token', chinLabel: '(同算力换配方,教學推論)',
+      caption: 'GPT-3(175B 参数,約 300B token)是照 Kaplan 配方练出來的代表模型,落在 Kaplan 曲線上。「同樣算力换成 Chinchilla 配方理論上能换到更低 loss」是順著 Chinchilla 結論反推的教學推論——論文並沒有真的重練一個「Chinchilla 版 GPT-3」做直接對照。'
+    },
+    {
+      label: 'Gopher / Chinchilla 級(論文實測對照組)', kapLabel: 'Gopher\n280B / ~300B token', chinLabel: 'Chinchilla\n70B / 1.4T token',
+      caption: '這是 Hoffmann et al. 論文裡真的做出來的對照組:同樣算力預算下,Chinchilla(70B 参数,1.4 兆 token)MMLU 平均正確率 67.5%,比 Gopher(280B 参数,約 300B token)高超過 7 個百分點——不是外推,是論文實測結果。'
+    },
+    {
+      label: '再往上一級(外推示意)', kapLabel: '(外推示意)', chinLabel: '(外推示意)',
+      caption: '算力再往上推,這張圖把差距畫得更開,用來表達「配方錯了,代價隨算力擴大」的方向——但這是教學上的外推畫法,不是論文量出來的精確曲線,真實世界係數是否持續這樣需要更多實驗驗證。'
+    }
+  ];
+  const STEP_X = [0.12, 0.48, 0.78, 0.95];
+
+  const state2 = { recipe: 'kaplan', step: 2 };
+
+  const TOP = 46, BOTTOM = 264, X0 = 78, X1 = 600;
+  function chinchillaY(f){ return TOP + Math.pow(f, 0.82) * (BOTTOM - TOP - 46); }
+  function kaplanY(f){ return chinchillaY(f) - f * 68; }
+  function xPix(f){ return X0 + f * (X1 - X0); }
+
+  function pathFor(fn){
+    let d = '';
+    for(let i = 0; i <= 32; i++){
+      const f = i / 32;
+      const x = xPix(f), y = fn(f);
+      d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+    }
+    return d.trim();
+  }
+
+  function chartSVG(){
+    const isKap = state2.recipe === 'kaplan';
+    const f = STEP_X[state2.step];
+    const step = COMPUTE_STEPS[state2.step];
+    const xk = xPix(f), yKap = kaplanY(f), yChin = chinchillaY(f);
+
+    const xTicks = [0, 0.25, 0.5, 0.75, 1].map((t, i) => {
+      const x = xPix(t);
+      return `<line x1="${x}" y1="${BOTTOM}" x2="${x}" y2="${BOTTOM+5}" stroke="var(--faint)" stroke-width="1"/>
+        <text x="${x}" y="${BOTTOM+18}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--faint)">10${'¹²³⁴⁵'[i]}</text>`;
+    }).join('');
+
+    return `<svg width="640" height="300" viewBox="0 0 640 300">
+      <!-- axes -->
+      <line x1="${X0}" y1="${TOP-8}" x2="${X0}" y2="${BOTTOM}" stroke="var(--faint)" stroke-width="1.4"/>
+      <line x1="${X0}" y1="${BOTTOM}" x2="${X1+8}" y2="${BOTTOM}" stroke="var(--faint)" stroke-width="1.4"/>
+      ${xTicks}
+      <text x="${(X0+X1)/2}" y="292" text-anchor="middle" font-size="11.5" fill="var(--muted)">算力預算 C(log 座標,相對尺度,教學示意)→</text>
+      <text x="20" y="${(TOP+BOTTOM)/2}" text-anchor="middle" font-size="11.5" fill="var(--muted)" transform="rotate(-90 20 ${(TOP+BOTTOM)/2})">loss(log 座標,越低越好)</text>
+
+      <!-- curves -->
+      <path d="${pathFor(kaplanY)}" fill="none" stroke="var(--rose)" stroke-width="${isKap ? 3.2 : 1.8}" opacity="${isKap ? 1 : 0.4}" stroke-dasharray="${isKap ? '0' : '5 4'}"/>
+      <path d="${pathFor(chinchillaY)}" fill="none" stroke="var(--green)" stroke-width="${!isKap ? 3.2 : 1.8}" opacity="${!isKap ? 1 : 0.4}" stroke-dasharray="${!isKap ? '0' : '5 4'}"/>
+
+      <!-- reading line -->
+      <line x1="${xk}" y1="${TOP-8}" x2="${xk}" y2="${BOTTOM}" stroke="var(--faint)" stroke-width="1.3" stroke-dasharray="4 4"/>
+      <circle cx="${xk}" cy="${yKap}" r="6" fill="var(--panel)" stroke="var(--rose)" stroke-width="2.4"/>
+      <circle cx="${xk}" cy="${yChin}" r="6" fill="var(--panel)" stroke="var(--green)" stroke-width="2.4"/>
+
+      <!-- labels for markers (multi-line via tspans) -->
+      ${step.kapLabel.split('\n').map((line, i) =>
+        `<text x="${Math.min(xk+12, 640-6)}" y="${yKap - 10 + i*12}" font-size="10.5" font-family="var(--mono)" fill="var(--rose)" text-anchor="${xk > 480 ? 'end' : 'start'}">${line}</text>`
+      ).join('')}
+      ${step.chinLabel.split('\n').map((line, i) =>
+        `<text x="${Math.min(xk+12, 640-6)}" y="${yChin + 20 + i*12}" font-size="10.5" font-family="var(--mono)" fill="var(--green)" text-anchor="${xk > 480 ? 'end' : 'start'}">${line}</text>`
+      ).join('')}
+
+      <text x="${(X0+X1)/2}" y="26" text-anchor="middle" font-size="11.5" fill="var(--faint)">實線=目前選中的配方 · 虛線淡色=另一個配方(同樣算力下的對照)</text>
+    </svg>`;
+  }
+
+  const chartBox = document.getElementById('chartBox');
+  const panelRecipe = document.getElementById('panelRecipe');
+  const stepCaption = document.getElementById('stepCaption');
+
+  function renderChart(){
+    chartBox.innerHTML = chartSVG();
+    fadeIn(chartBox);
+    document.querySelectorAll('#recipeChips .chip').forEach(c => c.classList.toggle('active', c.dataset.recipe === state2.recipe));
+    document.querySelectorAll('#stepCtl .pill').forEach((p, i) => p.classList.toggle('active', i === state2.step));
+
+    const r = RECIPE[state2.recipe];
+    panelRecipe.innerHTML = `
+      <div class="ph">${state2.recipe === 'kaplan' ? 'Kaplan et al. 2020' : 'Hoffmann et al. 2022(Chinchilla)'}</div>
+      <h2 style="color:${r.color}">${r.title}</h2>
+      <div class="meta"><b>配方</b><span style="font-family:var(--mono)">${r.formula}</span></div>
+      <div class="ex">${r.note}</div>
+      <div class="deeper"><b>${r.example}</b></div>
+    `;
+    fadeIn(panelRecipe);
+
+    stepCaption.textContent = COMPUTE_STEPS[state2.step].caption;
+  }
+  document.querySelectorAll('#recipeChips .chip').forEach(c => c.addEventListener('click', () => { state2.recipe = c.dataset.recipe; renderChart(); }));
+  document.querySelectorAll('#stepCtl .pill').forEach((p, i) => p.addEventListener('click', () => { state2.step = i; renderChart(); }));
+
+  /* 初始狀態 */
+  renderAxes('C');
+  renderChart();
+</script>
+</body>
+</html>

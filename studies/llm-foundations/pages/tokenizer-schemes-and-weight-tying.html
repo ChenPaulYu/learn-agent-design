@@ -1,0 +1,444 @@
+---
+title: Tokenizer 進階 — 造牌庫的兩種哲學,與輸入輸出共用一張表(Weight Tying)
+summary: 互動示範 BPE(合併)vs Unigram(篩選)兩種造牌庫哲學的逐步差異——BPE 從字元開始只加不減,Unigram 從一大堆候選開始只減不加、同一個詞可能有多種合法切法；再用靜態對照圖解釋「牌櫃收納位置」表(embedding)跟「對牌庫打分」表為什麼常常是同一份參數(weight tying),以及不是所有模型都這樣做。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - interactive
+  - tokenizer
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Tokenizer 進階:造牌庫的兩種哲學(BPE vs Unigram)+ weight tying。
+  可長期回看的教學頁(pages/ genre),不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-06-tokenizer-schemes-and-weight-tying.md
+    ../docs/2026-07-04-tokenizer-bpe.md
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    區塊 1(造牌庫的兩種哲學)— .chips 切換「BPE(合併)/ Unigram(篩選)」,底下
+      .stepper 逐步示範兩種造牌庫過程:BPE 延用 hug/hugs/pug 例子,由小到大只加;
+      Unigram 反過來示範一大堆候選被機率模型逐輪砍掉,直到剩下目標張數,最後點出
+      同一個詞(unwanted)可能有多種合法切法。底下附一張兩種哲學對照表。
+    區塊 2(weight tying)— 靜態對照圖:輸入端「牌櫃收納位置」表 vs 輸出端「對牌庫
+      打分」表,形狀互為轉置,很多模型共用同一份參數;附誠實提醒——不是所有模型都綁,
+      是設計選擇不是規則。
+    區塊 3(參考資料)— 本頁引用論文與延伸閱讀連結。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Tokenizer 進階 — 造牌庫的兩種哲學 · Weight Tying</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+  .tagline a{color:var(--accent);text-decoration:none;border-bottom:1px dashed var(--accent)}
+  .tagline a:hover{color:var(--rose);border-color:var(--rose)}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+  .sec-sub a{color:var(--accent);text-decoration:none;border-bottom:1px dashed var(--accent)}
+  .sec-sub a:hover{color:var(--rose);border-color:var(--rose)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:150px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .btn{font-family:var(--sans);font-size:13px;font-weight:650;padding:7px 14px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s ease}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  .stepper{margin-top:22px;padding:20px;border-radius:14px;background:var(--panel);border:1px solid var(--line);
+    box-shadow:var(--shadow);text-align:center}
+  .stepper .dir-badge{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--accent);
+    background:rgba(154,107,46,.10);border:1px solid rgba(154,107,46,.3);border-radius:999px;padding:4px 12px;
+    letter-spacing:.02em}
+  .stage{min-height:96px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:16px}
+  .tok-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center}
+  .word-group{display:inline-flex;align-items:center;gap:4px;padding:7px 10px;border-radius:10px;
+    background:var(--bg);border:1px solid var(--line-soft)}
+  .word-group .n{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:4px}
+  .tok-chip{font-family:var(--mono);font-size:13.5px;padding:4px 8px;border-radius:7px;background:var(--panel);
+    border:1px solid var(--line);color:var(--ink);transition:all .2s ease}
+  .tok-chip.new{border-color:var(--accent);background:rgba(154,107,46,.14);color:var(--accent);font-weight:700}
+  .tok-chip.removed{text-decoration:line-through;opacity:.32;border-style:dashed;background:transparent}
+  .tok-chip .sc{font-size:10px;color:var(--faint);margin-left:5px}
+  .stage-plus{color:var(--faint);font-size:13px;margin:0 2px}
+  .controls{margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .step-caption{margin-top:14px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px;text-align:left}
+  .step-idx{margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--faint)}
+
+  .cmp-table-wrap{margin-top:20px;overflow-x:auto}
+  table.cmp-table{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+  table.cmp-table th,table.cmp-table td{padding:10px 14px;border-bottom:1px solid var(--line-soft);text-align:left;vertical-align:top}
+  table.cmp-table th{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;
+    background:var(--bg)}
+  table.cmp-table td:first-child,table.cmp-table th:first-child{font-family:var(--mono);color:var(--accent);white-space:nowrap}
+
+  .tie-diagram{margin-top:22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:center}
+  .tie-box{flex:1;min-width:220px;max-width:320px;background:var(--bg);border:1px solid var(--line-soft);
+    border-radius:12px;padding:16px 18px;text-align:center}
+  .tie-box .tb-h{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em}
+  .tie-box .tb-t{font-size:14.5px;font-weight:660;margin-top:6px}
+  .tie-box .tb-s{font-family:var(--mono);font-size:13px;color:var(--accent);margin-top:8px}
+  .tie-mid{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto;min-width:150px}
+  .tie-mid .arrow2{font-size:22px;color:var(--rose)}
+  .tie-mid .tie-note{font-size:11.5px;color:var(--muted);text-align:center;max-width:170px}
+
+  .why-row{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
+  .why{flex:1;min-width:240px;background:rgba(12,122,89,.06);border:1px solid rgba(12,122,89,.22);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .why b{color:var(--green)}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+  .ref-group .tag{display:inline-block;font-family:var(--mono);font-size:9.5px;padding:1px 6px;border-radius:5px;
+    margin-left:6px;vertical-align:middle}
+  .tag.verified{background:rgba(12,122,89,.14);color:var(--green)}
+  .tag.likely{background:rgba(176,74,106,.12);color:var(--rose)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .tie-diagram{flex-direction:column}
+    .tie-mid .arrow2{transform:rotate(90deg)}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations · Tokenizer 進階</div>
+    <h1>造牌庫的兩種哲學,以及輸入輸出兩張表為什麼常常是同一張</h1>
+    <p class="tagline">
+      <a href="../docs/2026-07-04-tokenizer-bpe.md">tokenizer-bpe.md</a> 講過 BPE 是「合併」哲學:
+      從最細字元開始,不斷把最常黏在一起的兩塊焊起來,牌庫是<b>長出來</b>的。這頁往下走兩件事:
+      另一個門派 <b>Unigram</b> 整個方向相反,是「篩選」哲學;以及模型輸入端「查牌櫃收納位置」的表
+      跟輸出端「對牌庫打分」的表,很多模型其實是<b>同一份參數</b>。
+    </p>
+  </header>
+
+  <!-- ============ SECTION 1: 造牌庫的兩種哲學 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 1 · 造牌庫(訓練階段)</div>
+    <div class="sec-title">合併,還是篩選?兩種造牌庫的哲學互為鏡像</div>
+    <p class="sec-sub">
+      BPE 由小到大只加,Unigram(常見於 <b>SentencePiece</b> 工具包)反過來由大到小只減——
+      先列一大堆候選子詞,用機率模型幫每個候選打分,反覆砍掉貢獻最小的,直到剩下目標張數。
+      切換下面的分頁,按「下一步」逐步看兩種過程怎麼跑。
+    </p>
+
+    <div class="chips" id="schemeChips">
+      <div class="chip active" data-scheme="bpe"><h4>BPE(合併)</h4><div class="sub">由小到大,只加</div></div>
+      <div class="chip" data-scheme="unigram"><h4>Unigram(篩選)</h4><div class="sub">由大到小,只減</div></div>
+    </div>
+
+    <div class="stepper">
+      <span class="dir-badge" id="dirBadge">由小到大,只加</span>
+      <div class="stage" id="stage"></div>
+      <div class="controls">
+        <button class="btn primary" id="nextStepBtn">下一步 →</button>
+        <button class="btn" id="resetStepBtn">重來</button>
+      </div>
+      <div class="step-caption" id="stepCaption"></div>
+      <div class="step-idx" id="stepIdxLabel"></div>
+    </div>
+
+    <div class="cmp-table-wrap">
+      <table class="cmp-table">
+        <thead><tr><th></th><th>BPE(合併)</th><th>Unigram(篩選)</th></tr></thead>
+        <tbody>
+          <tr><td>方向</td><td>由小到大,只加</td><td>由大到小,只減</td></tr>
+          <tr><td>判斷依據</td><td>相鄰配對出現頻率</td><td>對整個語料庫概似度的貢獻</td></tr>
+          <tr><td>推論時的切法</td><td>固定優先順序,貪婪套用,結果唯一</td><td>機率模型,同一個詞可能有多種合法切法</td></tr>
+          <tr><td>額外用途</td><td>無</td><td>可做 subword regularization(訓練時隨機抽切法)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sec-sub">
+      兩者都是解決同一個問題(積木箱多大、怎麼切最合理)的不同手段,實務上常被放在同一個工具包
+      (SentencePiece)底下,依模型設計選其中一種。細節見
+      <a href="../docs/2026-07-06-tokenizer-schemes-and-weight-tying.md">造牌庫的兩種哲學筆記</a>。
+    </p>
+  </section>
+
+  <!-- ============ SECTION 2: WEIGHT TYING ============ -->
+  <section>
+    <div class="sec-kicker">區塊 2 · 輸入輸出兩張表</div>
+    <div class="sec-title">查牌櫃跟打分,常常是同一張表</div>
+    <p class="sec-sub">
+      模型輸入端要把每個字牌編號換成一條向量(查「牌櫃收納位置」,即 embedding);
+      模型輸出端要對牌庫裡每一張牌打一個分數(next-token prediction)。這兩個動作各自對應一張表,
+      形狀恰好互為<b>轉置</b>——很多模型乾脆讓它們共用同一份參數,這叫 <b>weight tying(權重綁定)</b>。
+    </p>
+
+    <div class="tie-diagram">
+      <div class="tie-box">
+        <div class="tb-h">輸入端</div>
+        <div class="tb-t">牌櫃收納位置表<br>(Embedding)</div>
+        <div class="tb-s">形狀:牌庫張數 × 向量維度</div>
+      </div>
+      <div class="tie-mid">
+        <div class="arrow2">⇄</div>
+        <div class="tie-note">形狀互為轉置<br>很多模型共用同一份參數</div>
+      </div>
+      <div class="tie-box">
+        <div class="tb-h">輸出端</div>
+        <div class="tb-t">對牌庫打分表<br>(Output projection)</div>
+        <div class="tb-s">形狀:向量維度 × 牌庫張數</div>
+      </div>
+    </div>
+
+    <div class="why-row">
+      <div class="why"><b>省參數</b> — 牌庫張數 × 向量維度往往是模型裡最大的一塊參數量之一,兩張表變一張,省下的參數量相當可觀。</div>
+      <div class="why"><b>概念上說得通</b> — 「查牌櫃收納位置」是給編號找向量,「打分」是給向量找最像哪個編號,方向相反但用的是同一套「編號 ↔ 位置」對應關係。</div>
+    </div>
+
+    <div class="panel">
+      <div class="ph">出處</div>
+      <h2>原始提案來自兩篇獨立論文</h2>
+      <div class="meta">
+        <b>Press &amp; Wolf, 2017</b><span><i>Using the Output Embedding to Improve Language Models</i>——論證輸出端矩陣本身就是一種合法的詞向量,建議跟輸入端 embedding 綁在一起。</span>
+        <b>Inan et al., 2017</b><span><i>Tying Word Vectors and Word Classifiers</i>——從損失函數理論框架獨立推導出同一個做法。</span>
+        <b>已知案例</b><span>GPT-2 是採用 weight tying 的例子之一。</span>
+      </div>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>誠實提醒:不是所有模型都綁</b> — 綁不綁是設計選擇,不是規則,要看那個模型自己的設計文件或原始碼。一個值得記住的走向:牌庫張數固定的情況下,模型整體規模越大,這張共用表佔全部參數的比例就越小,「省參數」的誘因也跟著變小;部分近期公開的大模型技術報告顯示不綁在更大規模下反而更常見——但這不是絕對規律,判斷任何一個具體模型有沒有綁,還是要查那個模型自己的說明。</div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      完整的信心等級標記(VERIFIED / LIKELY)與誠實聲明,見對應的
+      <a href="../docs/2026-07-06-tokenizer-schemes-and-weight-tying.md">技術筆記</a>。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">造牌庫哲學(原始論文)</div>
+        <a href="https://aclanthology.org/D18-2012/">Kudo &amp; Richardson, 2018 — SentencePiece: A Simple and Language Independent Subword Tokenizer and Detokenizer for Neural Text Processing(EMNLP 2018)<span class="tag verified">VERIFIED</span></a>
+        <a href="https://aclanthology.org/P18-1007/">Kudo, 2018 — Subword Regularization: Improving Neural Network Translation Models with Multiple Subword Candidates(ACL 2018)<span class="tag verified">VERIFIED</span></a>
+        <a href="https://aclanthology.org/P16-1162/">Sennrich et al., 2016 — Neural Machine Translation of Rare Words with Subword Units(BPE 原始論文)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">Weight tying(原始論文)</div>
+        <a href="https://aclanthology.org/E17-2025/">Press &amp; Wolf, 2017 — Using the Output Embedding to Improve Language Models(EACL 2017)<span class="tag verified">VERIFIED</span></a>
+        <a href="https://arxiv.org/abs/1611.01462">Inan, Khosravi &amp; Socher, 2017 — Tying Word Vectors and Word Classifiers(ICLR 2017)<span class="tag verified">VERIFIED</span></a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 造牌庫兩種哲學:逐步示範 ============ */
+  const BPE_STEPS = [
+    {
+      dir: '由小到大,只加',
+      html: `
+        <div class="tok-row">
+          <div class="word-group"><span class="tok-chip">h</span><span class="tok-chip">u</span><span class="tok-chip">g</span><span class="n">×10</span></div>
+          <div class="word-group"><span class="tok-chip">h</span><span class="tok-chip">u</span><span class="tok-chip">g</span><span class="tok-chip">s</span><span class="n">×5</span></div>
+          <div class="word-group"><span class="tok-chip">p</span><span class="tok-chip">u</span><span class="tok-chip">g</span><span class="n">×5</span></div>
+        </div>`,
+      caption: '拆到最細:三個詞全部打散成單一字元——牌庫目前只有 h / u / g / s / p 這幾張最基本的牌。'
+    },
+    {
+      dir: '由小到大,只加',
+      html: `
+        <div class="tok-row">
+          <div class="word-group"><span class="tok-chip">h</span><span class="tok-chip new">ug</span><span class="n">×10</span></div>
+          <div class="word-group"><span class="tok-chip">h</span><span class="tok-chip new">ug</span><span class="tok-chip">s</span><span class="n">×5</span></div>
+          <div class="word-group"><span class="tok-chip">p</span><span class="tok-chip new">ug</span><span class="n">×5</span></div>
+        </div>`,
+      caption: '數過所有相鄰配對,(u, g) 出現最多次(20 次)——焊成新積木 ug,牌庫多一張。'
+    },
+    {
+      dir: '由小到大,只加',
+      html: `
+        <div class="tok-row">
+          <div class="word-group"><span class="tok-chip new">hug</span><span class="n">×10</span></div>
+          <div class="word-group"><span class="tok-chip new">hug</span><span class="tok-chip">s</span><span class="n">×5</span></div>
+          <div class="word-group"><span class="tok-chip">p</span><span class="tok-chip">ug</span><span class="n">×5</span></div>
+        </div>`,
+      caption: '再數一次,(h, ug) 最多(15 次)——焊成 hug,牌庫又多一張。'
+    },
+    {
+      dir: '由小到大,只加',
+      html: `
+        <div class="tok-row">
+          <span class="tok-chip">h</span><span class="tok-chip">u</span><span class="tok-chip">g</span>
+          <span class="tok-chip">s</span><span class="tok-chip">p</span>
+          <span class="tok-chip new">ug</span><span class="tok-chip new">hug</span>
+        </div>`,
+      caption: '重複「數配對 → 合併最高分那對」,直到湊夠積木箱大小為止——牌庫現在有 h / u / g / s / p / ug / hug 這幾張(示範用的小箱子,真實牌庫要大得多)。'
+    }
+  ];
+
+  const UNI_STEPS = [
+    {
+      dir: '由大到小,只減',
+      html: `
+        <div class="tok-row">
+          <span class="tok-chip">un</span><span class="tok-chip">want</span><span class="tok-chip">ed</span>
+          <span class="tok-chip">wanted</span><span class="tok-chip">unwanted</span>
+          <span class="tok-chip">wan</span><span class="tok-chip">ant</span><span class="tok-chip">ted</span>
+          <span class="tok-chip">nt</span><span class="tok-chip">u</span>
+        </div>`,
+      caption: '先列一大堆候選子詞(教學示意,遠比真實情況小很多)——起始候選數量遠大於最終目標。'
+    },
+    {
+      dir: '由大到小,只減',
+      html: `
+        <div class="tok-row">
+          <span class="tok-chip">un<span class="sc">82</span></span><span class="tok-chip">want<span class="sc">90</span></span>
+          <span class="tok-chip">ed<span class="sc">75</span></span><span class="tok-chip">wanted<span class="sc">68</span></span>
+          <span class="tok-chip">unwanted<span class="sc">55</span></span><span class="tok-chip">wan<span class="sc">20</span></span>
+          <span class="tok-chip">ant<span class="sc">15</span></span><span class="tok-chip">ted<span class="sc">18</span></span>
+          <span class="tok-chip">nt<span class="sc">12</span></span><span class="tok-chip">u<span class="sc">8</span></span>
+        </div>`,
+      caption: '用 EM 把牌庫當 unigram 語言模型,幫每個候選估出機率(這裡的數字是教學示意的「貢獻分數」,不是真實模型輸出)。'
+    },
+    {
+      dir: '由大到小,只減',
+      html: `
+        <div class="tok-row">
+          <span class="tok-chip">un</span><span class="tok-chip">want</span>
+          <span class="tok-chip">ed</span><span class="tok-chip">wanted</span>
+          <span class="tok-chip">unwanted</span><span class="tok-chip">wan</span>
+          <span class="tok-chip removed">ant</span><span class="tok-chip">ted</span>
+          <span class="tok-chip removed">nt</span><span class="tok-chip removed">u</span>
+        </div>`,
+      caption: '算出拿掉某個候選之後,語料庫概似度掉最少的那些——ant / nt / u 貢獻最小,砍掉。'
+    },
+    {
+      dir: '由大到小,只減',
+      html: `
+        <div class="tok-row">
+          <span class="tok-chip">un</span><span class="tok-chip">want</span>
+          <span class="tok-chip">ed</span><span class="tok-chip">wanted</span>
+          <span class="tok-chip">unwanted</span><span class="tok-chip removed">wan</span>
+          <span class="tok-chip removed">ted</span>
+        </div>`,
+      caption: '重新估計機率 → 再砍一批:這一輪換 wan / ted 貢獻最小,砍掉,剩下 5 個候選。'
+    },
+    {
+      dir: '由大到小,只減',
+      html: `
+        <div class="tok-row">
+          <span class="tok-chip new">un</span><span class="tok-chip new">want</span>
+          <span class="tok-chip new">ed</span><span class="tok-chip new">wanted</span>
+          <span class="tok-chip new">unwanted</span>
+        </div>`,
+      caption: '牌庫縮到目標張數,定案。注意 unwanted 現在有兩種合法切法:un + want + ed,或 un + wanted——各自帶機率,推論時通常選機率最高(或用動態規劃求最佳)的那一種。'
+    }
+  ];
+
+  const schemeState = { mode:'bpe', idx:0 };
+  const stage = document.getElementById('stage');
+  const stepCaption = document.getElementById('stepCaption');
+  const stepIdxLabel = document.getElementById('stepIdxLabel');
+  const dirBadge = document.getElementById('dirBadge');
+  const nextStepBtn = document.getElementById('nextStepBtn');
+  const resetStepBtn = document.getElementById('resetStepBtn');
+
+  function stepsFor(mode){ return mode === 'bpe' ? BPE_STEPS : UNI_STEPS; }
+
+  function renderStep(){
+    const steps = stepsFor(schemeState.mode);
+    const s = steps[schemeState.idx];
+    stage.innerHTML = s.html;
+    stepCaption.textContent = s.caption;
+    dirBadge.textContent = s.dir;
+    stepIdxLabel.textContent = `第 ${schemeState.idx + 1} / ${steps.length} 步`;
+    nextStepBtn.disabled = schemeState.idx >= steps.length - 1;
+    fadeIn(stage);
+  }
+
+  document.querySelectorAll('#schemeChips .chip').forEach(c => {
+    c.addEventListener('click', () => {
+      schemeState.mode = c.dataset.scheme;
+      schemeState.idx = 0;
+      document.querySelectorAll('#schemeChips .chip').forEach(x => x.classList.toggle('active', x === c));
+      renderStep();
+    });
+  });
+  nextStepBtn.addEventListener('click', () => {
+    const steps = stepsFor(schemeState.mode);
+    if(schemeState.idx < steps.length - 1){ schemeState.idx++; renderStep(); }
+  });
+  resetStepBtn.addEventListener('click', () => { schemeState.idx = 0; renderStep(); });
+
+  renderStep();
+</script>
+</body>
+</html>

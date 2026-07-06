@@ -1,0 +1,540 @@
+---
+title: LLM Foundations 解碼策略 — 互動圖解
+summary: 貪婪解碼 vs beam search 兩張路線卡;同一排機率長條配溫度滑桿 + 貪婪/無限制抽樣/top-k/top-p 四種切法,不符合門檻的字牌變灰標「不能被抽」,按「抽一次」比較各策略抽出來的變化程度。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - decoding
+  - sampling
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — LLM Foundations 解碼策略:分數打完之後,怎麼從一排分數挑出一張牌接上去。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-06-decoding-strategies.md
+    ../docs/2026-07-04-next-token-prediction.md(背景:牌庫打分怎麼來的)
+  Last synced: 2026-07-06
+  What it is:
+    圖解一(兩條求穩定的路線)— 貪婪解碼 vs beam search 兩張卡片,點了看各自做法、
+      好處、代價,對應 101 頁「④ 對牌庫打分」站的延伸。
+    圖解二(同一排分數,四種抽法)— 沿用 101 圖 C 的 .bars 機率長條當基礎:溫度滑桿
+      拖動即時重繪長條高度差距;四個 chips 切換「貪婪解碼 / 無限制抽樣 / top-k / top-p」;
+      不符合門檻的長條變灰、標示「不能被抽」;「抽一次」按鈕連續按,把抽出序列疊成一條
+      紀錄,直接看出同一分佈下不同策略的變化程度差多少。候選分佈與百分比皆為教學示意,
+      非真實模型輸出。
+    圖解三(誠實提醒)— 光譜兩端的取捨:貪婪/beam 求穩定安全但容易重複;溫度高/
+      top-k 寬鬆/top-p 門檻高求多樣但可能不連貫。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>LLM Foundations 解碼策略 — 從一排分數到一個字</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:13px;font-family:var(--mono);flex:0 0 auto;padding:0 4px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .deeper a{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:150px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:12px;text-align:center}
+
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:52px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:650;padding:7px 14px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s ease}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  .slider-row{display:flex;align-items:center;gap:14px;margin-top:16px;flex-wrap:wrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--accent)}
+  .temp-val{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:650;min-width:78px;text-align:right}
+
+  /* bars */
+  .bars{display:flex;flex-direction:column;gap:9px;max-width:520px;margin:0 auto}
+  .bar-row{display:grid;grid-template-columns:60px 1fr 66px;align-items:center;gap:12px;
+    border-radius:9px;padding:5px 8px;transition:background .12s ease,opacity .15s ease}
+  .bar-row.picked{background:rgba(154,107,46,.12)}
+  .bar-row .tok{font-family:var(--mono);font-size:13.5px;text-align:right}
+  .bar-track{background:var(--line-soft);border-radius:999px;height:13px;overflow:hidden;border:1px solid var(--line)}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--accent));border-radius:999px 0 0 999px;transition:width .22s ease}
+  .bar-row .pct{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+  .bar-row.excluded{opacity:.55}
+  .bar-row.excluded .bar-fill{background:var(--faint)}
+  .bar-row.excluded .pct{font-style:italic;font-size:11px;color:var(--faint)}
+
+  .stepper{margin-top:22px;padding:20px;border-radius:14px;background:var(--panel);border:1px solid var(--line);
+    box-shadow:var(--shadow);text-align:center}
+  .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .draw-history{margin-top:16px}
+  .draw-history .pill{cursor:default}
+  .draw-history .row-pills{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  .runnote{font-size:12.5px;color:var(--muted);margin-top:10px;min-height:20px}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations · 解碼策略</div>
+    <h1>從一排分數到一個字 — 抽牌策略怎麼選</h1>
+    <p class="tagline">
+      101 頁圖 C 提過「分數最高的不一定被抽」——這頁把「不一定」拆開來看。先比較兩條求
+      穩定的路線(貪婪解碼、beam search),再用同一排機率長條,交叉試試溫度、top-k、
+      top-p 這幾個抽樣旋鈕,看看同一個分佈,不同策略抽出來的變化程度差多少。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 貪婪解碼 vs Beam search ============ -->
+  <section>
+    <div class="sec-kicker">圖解一 · 兩條求穩定的路線</div>
+    <div class="sec-title">貪婪解碼 vs beam search — 都想穩,但穩的方式不一樣</div>
+    <p class="sec-sub">
+      這兩種做法的共同點是<b>不隨機</b>:同樣輸入,每次都會抽出一樣的結果。差別在貪婪解碼
+      只看眼前這一張,beam search 同時養好幾條候選路線一起看。點卡片看各自的做法與代價。
+    </p>
+
+    <div class="row" id="gbRow">
+      <div class="node active" data-key="greedy">
+        <div class="idx">方案 1 · Greedy Decoding</div>
+        <h3>貪婪解碼</h3>
+        <div class="q">每一輪都抽當下分數最高的那張牌</div>
+      </div>
+      <div class="arrow">vs</div>
+      <div class="node" data-key="beam">
+        <div class="idx">方案 2 · Beam Search</div>
+        <h3>Beam search</h3>
+        <div class="q">同時養好幾條候選路線,最後選整體分數最高的</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelGB"></div>
+  </section>
+
+  <!-- ============ SECTION B: 同一排分數,四種抽法 ============ -->
+  <section>
+    <div class="sec-kicker">圖解二 · 同一排分數,四種抽法</div>
+    <div class="sec-title">分數打完之後,從裡面抽一張——用哪種抽法差很多</div>
+    <p class="sec-sub">
+      下面是模型對「今天天氣很<b>___</b>」打完分之後的候選長條(<b>教學示意分佈,不是
+      真實模型輸出</b>)。拖動溫度滑桿,看分數差距怎麼被放大或壓平;切換下面四種抽法,
+      看哪些字牌會被判定「不能被抽」;按幾次「抽一次」,比較同一個分佈下,不同策略抽出來
+      的變化程度差多少。
+    </p>
+
+    <div class="chips" id="modeChips">
+      <div class="chip" data-mode="greedy"><h4>貪婪解碼</h4><div class="sub">每次都抽最高分</div></div>
+      <div class="chip" data-mode="raw"><h4>無限制抽樣</h4><div class="sub">連長尾都能抽到</div></div>
+      <div class="chip active" data-mode="topk"><h4>Top-k</h4><div class="sub">只留分數前 k 名</div></div>
+      <div class="chip" data-mode="topp"><h4>Top-p(nucleus)</h4><div class="sub">累積機率超過 p 就停手</div></div>
+    </div>
+
+    <div class="slider-row">
+      <span class="ctl-label">溫度 T</span>
+      <input type="range" id="tempSlider" min="0.3" max="2" step="0.1" value="1">
+      <span class="temp-val" id="tempVal">T = 1.0</span>
+    </div>
+
+    <div class="ctl-row" id="kCtl">
+      <span class="ctl-label">選 k</span>
+      <span class="pill" data-k="1">k=1</span>
+      <span class="pill" data-k="2">k=2</span>
+      <span class="pill active" data-k="3">k=3</span>
+      <span class="pill" data-k="5">k=5</span>
+      <span class="pill" data-k="8">k=8</span>
+    </div>
+    <div class="ctl-row" id="pCtl" style="display:none">
+      <span class="ctl-label">選 p</span>
+      <span class="pill" data-p="0.5">p=0.5</span>
+      <span class="pill" data-p="0.7">p=0.7</span>
+      <span class="pill active" data-p="0.9">p=0.9</span>
+      <span class="pill" data-p="0.95">p=0.95</span>
+      <span class="pill" data-p="1.0">p=1.0(不限制)</span>
+    </div>
+
+    <div class="scene-box">
+      <div class="bars" id="barsList"></div>
+      <div class="scene-note">長條寬度 = 這個策略底下實際的抽樣機率;灰色 = 被這個策略排除,標「不能被抽」——候選分佈與百分比皆為教學示意,非真實模型輸出。</div>
+    </div>
+
+    <div class="stepper">
+      <div class="controls">
+        <button class="btn primary" id="drawBtn">抽一次 →</button>
+        <button class="btn" id="clearHistBtn">清空紀錄</button>
+      </div>
+      <div class="draw-history" id="drawHistory"></div>
+    </div>
+
+    <div class="panel" id="panelMode"></div>
+  </section>
+
+  <!-- ============ SECTION C: 誠實提醒 ============ -->
+  <section>
+    <div class="sec-kicker">圖解三 · 誠實提醒</div>
+    <div class="sec-title">沒有絕對的「最好」策略,是設計取捨</div>
+    <p class="sec-sub">
+      這幾種策略排在一起看,浮現的是一條光譜,兩端各有清楚的代價——不是選一個「正確答案」,
+      是依任務性質調的組合拳。
+    </p>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>穩定安全的代價</b> — 貪婪解碼、beam search 求穩定可重現,但容易卡進重複死迴圈,產出偏乏味。適合翻譯、結構化輸出這類答案空間確定、要精確的任務。</div>
+      <div class="exclusion"><b>多樣有趣的代價</b> — 溫度高、top-k 寬鬆、top-p 門檻高求多樣性、更像人類寫作的變化,但機率分佈的尾巴被放進來得越多,連貫性、事實準確度的風險越高。適合創意寫作、腦力激盪這類任務。</div>
+    </div>
+
+    <p class="sec-sub" style="margin-top:14px">
+      實務上溫度、top-k、top-p(甚至跟 beam search 疊用)是要依任務性質一起調的組合拳。
+      完整推導、查證出處與誠實聲明見
+      <a href="../docs/2026-07-06-decoding-strategies.md" style="color:var(--accent)">解碼策略筆記</a>——
+      這篇也接著
+      <a href="../docs/2026-07-04-next-token-prediction.md" style="color:var(--accent)">next-token-prediction.md</a>
+      「對牌庫打分」講完之後的下一步。
+    </p>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">機制講解</div>
+        <a href="https://huggingface.co/blog/how-to-generate">Hugging Face — How to generate text(貪婪解碼、beam search、溫度、top-k、top-p 各自的定義與效果說明)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">原始論文</div>
+        <a href="https://arxiv.org/abs/1904.09751">Holtzman, Buys, Du, Forbes &amp; Choi, 2019 — The Curious Case of Neural Text Degeneration(ICLR 2020;nucleus sampling / top-p 原始論文)</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 圖解一:貪婪解碼 vs beam search ============ */
+  const GB = {
+    greedy: {
+      tag: '方案 1 · Greedy Decoding', title: '貪婪解碼 — 每次都抽最高分',
+      what: '公式:<code>下一張牌 = argmax P(牌 | 目前這排牌)</code>。每一輪只看當下分數最高的那一張,完全不留機會給第二名。',
+      ex: '好處是<b>穩定、可重現</b>——同樣的輸入,每次都抽出一模一樣的句子,除錯、寫規格測試都方便。',
+      deeper: '代價是<b>容易卡進重複的死迴圈</b>:一旦某個片語被抽出來一次,它又會把後面幾輪的分數往同一個方向推,常見到「我不知道我不知道我不知道……」這種卡帶現象——Hugging Face 官方部落格點名這是貪婪解碼與 beam search 共同的毛病。'
+    },
+    beam: {
+      tag: '方案 2 · Beam Search', title: 'Beam search — 同時養幾條候選路線',
+      what: '同時保留 <code>num_beams</code> 條候選路線,每一輪都讓每條路線各自往下展開幾種可能,再從所有展開結果裡留下分數最高的 <code>num_beams</code> 條繼續養,直到全部路線都走到結束,最後選<b>整條路線總分數</b>最高的那一條。',
+      ex: '這解決了貪婪解碼「一步走錯,萬劫不復」的問題——Hugging Face 部落格指出 beam search「一定能找到比貪婪解碼分數更高的輸出序列(但不保證找到全域最高分的那一條)」。因為它求的是整體路線最合適,常用在翻譯、摘要這類答案空間相對確定、需要精確度的任務。',
+      deeper: '代價是它跟貪婪解碼一樣<b>嚴重受困於重複生成</b>,而且因為偏好整體分數高的路線,容易養出「安全但無聊」的句子——這正是下一節抽樣派想解決的問題。完整推導見 <a href="../docs/2026-07-06-decoding-strategies.md">解碼策略筆記</a>,打分的來源見 <a href="../docs/2026-07-04-next-token-prediction.md">next-token-prediction.md</a>。'
+    }
+  };
+  const panelGB = document.getElementById('panelGB');
+  function renderGB(key){
+    const d = GB[key];
+    document.querySelectorAll('#gbRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelGB.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>怎麼做</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+      <div class="deeper"><b>代價</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelGB);
+  }
+  document.querySelectorAll('#gbRow .node').forEach(el => el.addEventListener('click', () => renderGB(el.dataset.key)));
+  renderGB('greedy');
+
+  /* ============ 圖解二:同一排分數,四種抽法 ============ */
+  // 候選分佈為教學示意的原始分數(logits),不是真實模型輸出
+  const CANDS = [
+    { tok: '好',   z: 3.0 },
+    { tok: '不錯', z: 2.6 },
+    { tok: '舒服', z: 2.1 },
+    { tok: '涼爽', z: 1.6 },
+    { tok: '悶熱', z: 1.3 },
+    { tok: '普通', z: 0.8 },
+    { tok: '糟',   z: 0.1 },
+    { tok: '怪',   z: -0.4 },
+    { tok: '奇怪', z: -0.7 },
+    { tok: '恐怖', z: -1.3 }
+  ];
+
+  const state = { mode: 'topk', T: 1.0, k: 3, p: 0.9, history: [] };
+
+  function softmax(zs, T){
+    const scaled = zs.map(z => z / T);
+    const max = Math.max(...scaled);
+    const exps = scaled.map(s => Math.exp(s - max));
+    const sum = exps.reduce((a, b) => a + b, 0);
+    return exps.map(e => e / sum);
+  }
+
+  function getDistribution(){
+    const probs = softmax(CANDS.map(c => c.z), state.T);
+    const order = probs.map((p, i) => i).sort((a, b) => probs[b] - probs[a]);
+    let included = new Array(probs.length).fill(true);
+    if(state.mode === 'greedy'){
+      included = included.map((_, i) => i === order[0]);
+    } else if(state.mode === 'topk'){
+      const keep = new Set(order.slice(0, state.k));
+      included = included.map((_, i) => keep.has(i));
+    } else if(state.mode === 'topp'){
+      const keep = new Set();
+      let cum = 0;
+      for(const idx of order){
+        keep.add(idx);
+        cum += probs[idx];
+        if(cum >= state.p) break;
+      }
+      included = included.map((_, i) => keep.has(i));
+    }
+    // mode 'raw' -> 全部 true,不設門檻
+    const maskedProbs = probs.map((p, i) => included[i] ? p : 0);
+    const sum = maskedProbs.reduce((a, b) => a + b, 0);
+    const renorm = maskedProbs.map(p => sum > 0 ? p / sum : 0);
+    return { probs, included, renorm };
+  }
+
+  const barsList = document.getElementById('barsList');
+  function renderBars(){
+    const { probs, included, renorm } = getDistribution();
+    barsList.innerHTML = '';
+    CANDS.forEach((c, i) => {
+      const row = document.createElement('div');
+      row.className = 'bar-row' + (included[i] ? '' : ' excluded');
+      row.dataset.idx = i;
+      const widthPct = included[i] ? Math.max(renorm[i] * 100, 1) : Math.max(probs[i] * 100, 1);
+      const label = included[i] ? Math.round(renorm[i] * 100) + '%' : '不能被抽';
+      row.innerHTML = `<div class="tok">${c.tok}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${widthPct}%"></div></div>
+        <div class="pct">${label}</div>`;
+      barsList.appendChild(row);
+    });
+  }
+
+  const MODES = {
+    greedy: {
+      tag: '模式 1 · 貪婪解碼', title: '每次都抽最高分',
+      what: '不管溫度怎麼調,貪婪解碼永遠只看當下分數最高的那一張——因為溫度不會改變分數的排序,只會改變領先幅度被放大還是壓平。上面的長條裡,只有目前第一名不會被畫成「不能被抽」。',
+      deeper: '<b>穩定、可重現</b>,但按幾次「抽一次」你會發現永遠抽到同一張牌——這就是「死板」的意思,也是重複死迴圈的來源。'
+    },
+    raw: {
+      tag: '模式 2 · 無限制抽樣', title: '按機率抽,連長尾都有機會',
+      what: '把溫度縮放過的機率,直接拿去抽籤——連分數很低的長尾字牌都留在候選裡,沒有任何門檻,所以上面看不到任何一張被標「不能被抽」。',
+      deeper: '<b>變化最大</b>,但 Holtzman et al. 2019 指出,對整個分佈做無限制抽樣,產出的文字容易走向不連貫、語無倫次——長尾一旦被抽到,後面很難接得順。'
+    },
+    topk: {
+      tag: '模式 3 · Top-k', title: '只從分數最高的 k 張裡抽',
+      what: '先把候選依分數排序,只留下前 k 名(其餘的長條變灰、標示「不能被抽」),機率重新正規化之後才抽。',
+      deeper: '<b>k 是寫死的數字</b>——調小 k 看看:分佈很集中時,k 太大會硬留下不該考慮的冷門字;調大 k 看看:分佈很分散時,k 太小又會砍掉一些原本還算合理的選項。'
+    },
+    topp: {
+      tag: '模式 4 · Top-p(nucleus sampling)', title: '候選集大小,跟著分佈自動調整',
+      what: '把候選依分數由高到低排序、累加機率,一旦累加超過門檻 p 就停手——只從這個「核心」(nucleus)裡抽,其餘全部歸零。',
+      deeper: '<b>候選集大小是動態的</b>:試著調低溫度讓分佈更集中,核心會自動縮到只剩 1、2 張;調高溫度讓分佈更分散,核心又會自動擴大——這是它跟 top-k 最關鍵的差別。'
+    }
+  };
+  const panelMode = document.getElementById('panelMode');
+  function renderPanelMode(){
+    const d = MODES[state.mode];
+    panelMode.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      <div class="deeper"><b>設計取捨</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelMode);
+  }
+
+  const drawHistory = document.getElementById('drawHistory');
+  function renderHistory(){
+    if(state.history.length === 0){
+      drawHistory.innerHTML = '<div class="runnote">還沒抽過——按上面「抽一次」試試看,連續按幾下比較看看。</div>';
+      return;
+    }
+    const distinct = new Set(state.history).size;
+    const pills = state.history.map((t, i) => `<span class="pill">${i + 1}. ${t}</span>`).join('');
+    const repeatNote = state.mode === 'greedy'
+      ? '——貪婪解碼永遠只抽同一張,這就是「穩定但死板」的意思。'
+      : '';
+    drawHistory.innerHTML = `
+      <div class="row-pills">${pills}</div>
+      <div class="runnote">已經抽了 ${state.history.length} 次,抽到 ${distinct} 種不同的字牌${repeatNote}</div>
+    `;
+    fadeIn(drawHistory);
+  }
+
+  function highlightPicked(idx){
+    barsList.querySelectorAll('.bar-row').forEach(r => r.classList.remove('picked'));
+    const row = barsList.querySelector(`.bar-row[data-idx="${idx}"]`);
+    if(row){ row.classList.add('picked'); fadeIn(row); }
+  }
+
+  function drawOnce(){
+    const { included, renorm } = getDistribution();
+    let idx = included.indexOf(true);
+    if(state.mode !== 'greedy'){
+      const r = Math.random();
+      let cum = 0;
+      for(let i = 0; i < renorm.length; i++){
+        cum += renorm[i];
+        idx = i;
+        if(r <= cum) break;
+      }
+    }
+    state.history.push(CANDS[idx].tok);
+    highlightPicked(idx);
+    renderHistory();
+  }
+
+  document.getElementById('tempSlider').addEventListener('input', (e) => {
+    state.T = +e.target.value;
+    document.getElementById('tempVal').textContent = `T = ${state.T.toFixed(1)}`;
+    renderBars();
+  });
+
+  document.querySelectorAll('#modeChips .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      state.mode = chip.dataset.mode;
+      state.history = [];
+      document.querySelectorAll('#modeChips .chip').forEach(c => c.classList.toggle('active', c === chip));
+      document.getElementById('kCtl').style.display = state.mode === 'topk' ? 'flex' : 'none';
+      document.getElementById('pCtl').style.display = state.mode === 'topp' ? 'flex' : 'none';
+      renderBars();
+      renderPanelMode();
+      renderHistory();
+    });
+  });
+
+  document.querySelectorAll('#kCtl .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      state.k = +p.dataset.k;
+      state.history = [];
+      document.querySelectorAll('#kCtl .pill').forEach(x => x.classList.toggle('active', x === p));
+      renderBars();
+      renderHistory();
+    });
+  });
+  document.querySelectorAll('#pCtl .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      state.p = +p.dataset.p;
+      state.history = [];
+      document.querySelectorAll('#pCtl .pill').forEach(x => x.classList.toggle('active', x === p));
+      renderBars();
+      renderHistory();
+    });
+  });
+
+  document.getElementById('drawBtn').addEventListener('click', drawOnce);
+  document.getElementById('clearHistBtn').addEventListener('click', () => {
+    state.history = [];
+    barsList.querySelectorAll('.bar-row').forEach(r => r.classList.remove('picked'));
+    renderHistory();
+  });
+
+  /* 初始狀態 */
+  renderBars();
+  renderPanelMode();
+  renderHistory();
+</script>
+</body>
+</html>

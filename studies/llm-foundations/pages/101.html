@@ -1,0 +1,649 @@
+---
+title: LLM Foundations 101 — 互動圖解
+summary: 三張互動圖:文字接龍核心迴圈五站(上句→換成字牌→讀牌→對牌庫打分→抽牌接上,點場景看機制)、讀牌怎麼讀(關聯權重、multi-head 眼光、輪次 layers 互動模擬)、牌庫打分 + 接龍逐步示範;含「切牌=編號、查牌櫃位置=embedding,是兩步」的釐清。
+date: 2026-07-04
+tags:
+  - llm-foundations
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — LLM Foundations 101:三張互動圖解。可長期回看的教學頁(pages/ genre,
+  發布於 /llm-foundations/101/),不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致——本頁以「文字接龍」為基底
+  (機制的直白描述,不算比喻),「字牌/牌庫/讀牌」是輕量呈現層;docs 裡的比喻措辭不同,
+  但機制概念一致):
+    ../docs/2026-07-04-transformer-self-attention.md
+    ../docs/2026-07-04-tokenizer-bpe.md
+    ../docs/2026-07-04-next-token-prediction.md
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(核心迴圈五站)— 你出的上句(輸入文字)→ 換成字牌(Tokenizer)→ 讀牌
+      (Self-attention × 很多輪)→ 對牌庫打分(Next-token prediction)→ 抽牌接上(迴圈)。
+      SVG 接龍場景 + 五站卡片列,兩邊 data-key 同步,點任一邊看該站機制與更深一層。
+      第 2 站特別釐清:切牌的產物是「編號」,查出每張牌在「牌櫃」裡的收納位置(embedding)是模型內的
+      另一步——兩步常被混講。
+    圖 B(讀牌怎麼讀)— 「整排一起看 vs 傳話遊戲」切換;整排一起看模式下可以:點一張牌看它
+      對整排牌(含自己)的關聯比例、換一副眼光(multi-head,兩種眼光讓權重分布不同)、
+      按「再讀一輪」看輪次(layers)疊上去之後理解怎麼變。權重數字為示意,非真實模型輸出。
+    圖 C(對牌庫打分 + 接龍)— 牌庫每張牌的分數長條(可點),接龍逐步示範(示意腳本,
+      非真實推論);「牌庫是型錄、接上的是副本」——牌庫固定不變、同一張牌可以接很多次,
+      輸出的句子就是桌上那排牌依序讀出來,這幾個容易搞混的點在這節講清楚。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>LLM Foundations 101 — 核心迴圈:一場超大規模的文字接龍</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:150px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .zone{cursor:pointer}
+  .zone .st{transition:stroke .15s ease}
+  .zone .stf{transition:fill .15s ease}
+  .zone:hover .st,.zone.active .st{stroke:currentColor}
+  .zone:hover .stf,.zone.active .stf{fill:currentColor}
+  .zone.active .fillable{fill:color-mix(in srgb,currentColor 8%,var(--panel))}
+  .zone.active text{fill:currentColor}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:8px;text-align:center}
+
+  /* 圖 B controls */
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:74px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:650;padding:7px 14px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s ease}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .round-caption{margin-top:12px;padding:10px 14px;background:var(--bg);border-left:3px solid var(--rose);
+    border-radius:0 10px 10px 0;font-size:13px}
+
+  /* 圖 C bars */
+  .bars{display:flex;flex-direction:column;gap:9px;margin-top:20px;max-width:460px}
+  .bar-row{display:grid;grid-template-columns:64px 1fr 46px;align-items:center;gap:12px;
+    cursor:pointer;border-radius:9px;padding:5px 8px;transition:background .12s ease}
+  .bar-row:hover{background:var(--line-soft)}
+  .bar-row.picked{background:rgba(154,107,46,.10)}
+  .bar-row .tok{font-family:var(--mono);font-size:13.5px;text-align:right}
+  .bar-track{background:var(--line-soft);border-radius:999px;height:13px;overflow:hidden;border:1px solid var(--line)}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--accent));border-radius:999px 0 0 999px}
+  .bar-row .pct{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  .stepper{margin-top:22px;padding:20px;border-radius:14px;background:var(--panel);border:1px solid var(--line);
+    box-shadow:var(--shadow);text-align:center}
+  .sentence{font-family:var(--mono);font-size:21px;letter-spacing:.01em;min-height:30px}
+  .sentence .grown{color:var(--accent);font-weight:700}
+  .controls{margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .runnote{font-size:12.5px;color:var(--muted);margin-top:10px;min-height:20px}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations 101</div>
+    <h1>LLM 核心迴圈 — 一場超大規模的文字接龍</h1>
+    <p class="tagline">
+      LLM 生成文字,骨子裡就是在玩文字接龍:把你打的字換成它牌庫裡的「字牌」,反覆讀牌,
+      對整個牌庫打分,抽一張接上,再來一輪——「接龍」不是比喻,是這個機制的直白描述。
+      圖 A 是核心迴圈五站(點場景或卡片);圖 B 放大「讀牌」這一站,看每張牌怎麼同時參照
+      整排牌(含 multi-head 眼光、反覆讀很多輪的互動模擬);圖 C 放大「打分與接龍」,講清楚
+      牌庫跟接出來的句子是兩個不同的東西。點任何卡片看細節。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 核心迴圈五站 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 核心迴圈</div>
+    <div class="sec-title">五站,接一個字;不斷重複,接出一句話</div>
+    <p class="sec-sub">
+      這五站跑完一輪,句子多一個字;不斷重複,直到模型抽出「結束牌」自己停下來。
+      點場景裡的任何一站(或下面的卡片)看它的機制。
+    </p>
+
+    <div class="scene-box">
+      <svg id="caseSvg" viewBox="0 0 760 300" style="width:100%;height:auto;display:block">
+        <defs>
+          <marker id="arrGrey" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#b9ad9c"/></marker>
+        </defs>
+        <!-- Zone 1: 你出的上句 -->
+        <g class="zone" data-key="text" style="color:#2f6f9e">
+          <rect class="st fillable" x="22" y="78" width="96" height="118" rx="8" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <path d="M 98 78 L 118 98 L 98 98 Z" fill="var(--line-soft)" class="stf"/>
+          <text x="70" y="128" text-anchor="middle" font-size="14" font-family="var(--mono)" fill="var(--ink)">今天天氣</text>
+          <line x1="38" y1="150" x2="102" y2="150" class="st" stroke="#d8d0c0" stroke-width="2"/>
+          <line x1="38" y1="166" x2="88" y2="166" class="st" stroke="#d8d0c0" stroke-width="2"/>
+          <text x="70" y="222" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="#8a7d6e">① 你出的上句</text>
+        </g>
+        <text x="136" y="145" font-size="15" fill="#a99c8a">→</text>
+        <!-- Zone 2: 換成字牌 -->
+        <g class="zone" data-key="tokenize" style="color:#9a6b2e">
+          <rect class="st fillable" x="158" y="92" width="54" height="64" rx="7" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="185" y="124" text-anchor="middle" font-size="12.5" font-family="var(--mono)" fill="var(--ink)">今天</text>
+          <text x="185" y="144" text-anchor="middle" font-size="9" font-family="var(--mono)" fill="#a99c8a">#1024</text>
+          <rect class="st fillable" x="220" y="92" width="54" height="64" rx="7" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="247" y="124" text-anchor="middle" font-size="12.5" font-family="var(--mono)" fill="var(--ink)">天氣</text>
+          <text x="247" y="144" text-anchor="middle" font-size="9" font-family="var(--mono)" fill="#a99c8a">#2871</text>
+          <line x1="216" y1="72" x2="216" y2="88" class="st" stroke="#b9ad9c" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <text x="216" y="66" text-anchor="middle" font-size="11" fill="#8a7d6e">✂</text>
+          <text x="216" y="222" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="#8a7d6e">② 換成字牌(編號)</text>
+        </g>
+        <text x="288" y="145" font-size="15" fill="#a99c8a">→</text>
+        <!-- Zone 3: 讀牌 -->
+        <g class="zone" data-key="attend" style="color:#b04a6a">
+          <rect class="st fillable" x="308" y="62" width="162" height="152" rx="12" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <rect x="324" y="118" width="50" height="58" rx="6" fill="var(--bg)" class="st" stroke="#b9ad9c" stroke-width="1.6"/>
+          <text x="349" y="152" text-anchor="middle" font-size="11.5" font-family="var(--mono)" fill="var(--ink)">今天</text>
+          <rect x="402" y="118" width="50" height="58" rx="6" fill="var(--bg)" class="st" stroke="#b9ad9c" stroke-width="1.6"/>
+          <text x="427" y="152" text-anchor="middle" font-size="11.5" font-family="var(--mono)" fill="var(--ink)">天氣</text>
+          <path d="M 360 112 C 375 94 401 94 416 112" fill="none" class="st" stroke="#b04a6a" stroke-width="2" opacity=".65" marker-end="url(#arrGrey)"/>
+          <path d="M 416 182 C 401 200 375 200 360 182" fill="none" class="st" stroke="#b04a6a" stroke-width="2" opacity=".65" marker-end="url(#arrGrey)"/>
+          <rect x="404" y="70" width="52" height="18" rx="9" fill="rgba(176,74,106,.12)"/>
+          <text x="430" y="83" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="#b04a6a">× 96 輪</text>
+          <text x="389" y="240" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="#8a7d6e">③ 讀牌(見圖 B)</text>
+        </g>
+        <text x="486" y="145" font-size="15" fill="#a99c8a">→</text>
+        <!-- Zone 4: 對牌庫打分 -->
+        <g class="zone" data-key="predict" style="color:#0c7a59">
+          <rect class="st fillable" x="506" y="62" width="126" height="152" rx="10" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="569" y="86" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">牌庫(幾萬張)</text>
+          <rect x="520" y="98" width="14" height="14" rx="3" class="stf" fill="#b9ad9c"/>
+          <rect x="542" y="101" width="66" height="8" rx="4" fill="rgba(12,122,89,.45)"/>
+          <rect x="520" y="124" width="14" height="14" rx="3" class="stf" fill="#b9ad9c"/>
+          <rect x="542" y="127" width="46" height="8" rx="4" fill="rgba(12,122,89,.30)"/>
+          <rect x="520" y="150" width="14" height="14" rx="3" class="stf" fill="#b9ad9c"/>
+          <rect x="542" y="153" width="30" height="8" rx="4" fill="rgba(12,122,89,.20)"/>
+          <rect x="520" y="176" width="14" height="14" rx="3" class="stf" fill="#b9ad9c"/>
+          <rect x="542" y="179" width="18" height="8" rx="4" fill="rgba(12,122,89,.12)"/>
+          <text x="569" y="240" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="#8a7d6e">④ 每張牌打一個分數</text>
+        </g>
+        <!-- Zone 5: 抽牌接上(迴圈) -->
+        <g class="zone" data-key="append" style="color:#8a7d6e">
+          <path d="M 640 120 L 654 120" class="st" stroke="#b9ad9c" stroke-width="2" marker-end="url(#arrGrey)"/>
+          <rect class="st fillable" x="660" y="92" width="54" height="64" rx="7" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="687" y="130" text-anchor="middle" font-size="12.5" font-family="var(--mono)" fill="var(--ink)">很</text>
+          <path d="M 687 166 C 687 268 400 282 390 220" fill="none" class="st" stroke="#b9ad9c" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrGrey)"/>
+          <text x="660" y="196" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="#8a7d6e">⑤ 抽牌,接上</text>
+          <text x="660" y="212" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="#a99c8a">(下一輪多一張牌)</text>
+        </g>
+      </svg>
+      <div class="scene-note">點場景裡的任何一站,或下面的卡片——兩邊會同步亮起來</div>
+    </div>
+
+    <div class="row" id="loopRow">
+      <div class="node" data-key="text">
+        <div class="idx">01 · 你出的上句</div>
+        <h3>輸入文字</h3>
+        <div class="q">接龍的開局,就是你打的字</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="tokenize">
+        <div class="idx">02 · 換成字牌</div>
+        <h3>Tokenizer</h3>
+        <div class="q">查固定牌庫,把文字換成一排編號</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="attend">
+        <div class="idx">03 · 讀牌</div>
+        <h3>Self-attention</h3>
+        <div class="q">每張牌同時參照整排牌,反覆很多輪</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="predict">
+        <div class="idx">04 · 對牌庫打分</div>
+        <h3>Next-token prediction</h3>
+        <div class="q">牌庫裡每張牌:接在後面有多合適?</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" data-key="append">
+        <div class="idx">05 · 抽牌,接上</div>
+        <h3>迴圈</h3>
+        <div class="q">新牌接到隊伍尾巴,回第 3 站重讀</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelA">
+      <p class="placeholder">↑ 點一站,看機制說明。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: 讀牌放大看 ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 第 3 站放大看</div>
+    <div class="sec-title">讀牌怎麼讀 — 每張牌同時參照整排牌</div>
+    <p class="sec-sub">
+      Transformer 之前的做法(RNN/LSTM)像玩<b>傳話遊戲</b>:牌的資訊一張接一張往後傳,
+      傳到後面會失真,而且只能排隊。Self-attention 換成<b>整排一起看</b>:每張牌同時看得到
+      整排牌(含自己),各自算出「哪幾張跟我最相關」,把相關的資訊按比例混進自己的理解——
+      全部同時進行,沒有輪流。切到整排一起看模式後:<b>點一張牌</b>看它的關聯比例、
+      <b>換一副眼光</b>看同一排牌怎麼被讀出不同重點(multi-head)、按<b>「再讀一輪」</b>
+      看理解一輪一輪疊上去(layers)。
+    </p>
+
+    <div class="chips" id="cmpChips">
+      <div class="chip active" data-cmp="table"><h4>整排一起看</h4><div class="sub">Transformer · self-attention</div></div>
+      <div class="chip" data-cmp="chain"><h4>傳話遊戲</h4><div class="sub">RNN · 一張接一張傳</div></div>
+    </div>
+
+    <div class="ctl-row" id="witnessCtl">
+      <span class="ctl-label">點一張牌</span>
+      <span class="pill" data-w="0">今天</span>
+      <span class="pill" data-w="1">天氣</span>
+      <span class="pill active" data-w="2">很</span>
+      <span class="pill" data-w="3">好</span>
+    </div>
+    <div class="ctl-row" id="headCtl">
+      <span class="ctl-label">換一副眼光</span>
+      <span class="pill active" data-h="A">眼光 A(偏看鄰近)</span>
+      <span class="pill" data-h="B">眼光 B(偏看遠處)</span>
+    </div>
+    <div class="ctl-row" id="roundCtl">
+      <span class="ctl-label">讀牌輪次</span>
+      <button class="btn primary" id="nextRoundBtn">再讀一輪 →</button>
+      <button class="btn" id="resetRoundBtn">回到第 1 輪</button>
+    </div>
+
+    <div class="scene-box" style="margin-top:16px">
+      <div id="cmpDiagram" style="display:flex;justify-content:center"></div>
+      <div class="scene-note" id="cmpNote">權重數字是教學示意,不是真實模型算出來的值</div>
+    </div>
+    <div class="round-caption" id="roundCaption"></div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>整排一起看的代價</b> — 每張牌都要對整排牌打分,成本隨牌數<b>平方</b>成長——句子一長,讀牌費爆炸。這是 Mamba/RWKV 這些替代架構想解決的問題。</div>
+      <div class="exclusion"><b>傳話遊戲不是完全沒用</b> — 整排一起看能平行處理之前,傳話是唯一選項;同讀贏的地方是「推得動多大的規模」,不是「傳話這個概念本身錯了」。</div>
+      <div class="exclusion"><b>「眼光」學到什麼不保證看得懂</b> — 「偏看鄰近/偏看遠處」是教學上的簡化;真實模型的每副眼光(head)學到什麼角度,是訓練自己長出來的,不保證對應到人類看得懂的分類。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: 對牌庫打分 + 接龍 ============ -->
+  <section>
+    <div class="sec-kicker">圖 C · 第 4-5 站放大看</div>
+    <div class="sec-title">對牌庫打分,抽一張,接上 — 然後再來一輪</div>
+    <p class="sec-sub">
+      讀牌全部結束後,模型對<b>牌庫裡每一張牌</b>打一個「接在後面有多合適」的分數(機率)——
+      牌庫是訓練前就定死的幾萬張,每一輪打分的都是同一個牌庫。點下面的長條看候選;
+      下方是接龍的逐步示範(<b>示意腳本,不是真實模型推論</b>)。
+    </p>
+
+    <div class="bars" id="barsList"></div>
+
+    <div class="stepper">
+      <div class="sentence" id="liveSentence">今天天氣</div>
+      <div class="controls">
+        <button class="btn primary" id="stepBtn">接下一張 →</button>
+        <button class="btn" id="resetBtn">重來</button>
+      </div>
+      <div class="runnote" id="runNote">按「接下一張」,看牌一張一張接上去。</div>
+    </div>
+
+    <div class="panel">
+      <div class="ph">牌庫 vs 接出來的句子 · 容易搞混的一點</div>
+      <h2>牌庫是型錄,接上的是副本</h2>
+      <div class="meta">
+        <b>牌庫是什麼</b><span>「所有可能的下一個字」的固定型錄(訓練前就定死,跟第 2 站切牌查的是<b>同一本</b>)——它不會變大、不會變小,牌也不會被「抽走」。</span>
+        <b>接上的是什麼</b><span>型錄裡那張牌的<b>一個新副本</b>——所以「的」可以在同一句話被接五次,每次都是新的一張。牌庫永遠是完整的,句子愛接多長就接多長。</span>
+        <b>輸出的句子是什麼</b><span>桌上那排牌<b>依序讀出來</b>就是了:前段是你出的上句(prompt),後段是模型一張一張接上去的牌。沒有任何身分轉換——新牌一接上,下一輪讀牌時它就是整排牌普通的一員。</span>
+      </div>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>分數最高的不一定被抽</b> — 可以每次都抽最高分(輸出穩定但死板),也可以按分數高低機率抽選(這是同一個問題每次回答不完全一樣的來源之一,俗稱的「溫度」就在調這件事)。</div>
+      <div class="exclusion"><b>舊牌不用每輪重讀</b> — 每接一張新牌就把 96 輪讀牌全部重跑,聽起來很浪費;實際上舊牌每一輪的讀牌結果都有留檔,新牌自己走完 96 輪、沿途查檔就好(這個機制叫 KV cache)。</div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      本頁討論的每一個機制,對應的公認講解資源與原始論文——想深入哪一站,就從那一站的連結進去。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">機制講解(對應各站)</div>
+        <a href="https://www.3blue1brown.com/lessons/gpt/">3Blue1Brown — Transformers, the tech behind LLMs(圖 A 整個迴圈:接龍生成、embedding「相近的字向量相近」的視覺化)</a>
+        <a href="https://www.youtube.com/watch?v=zduSFxRajkE">Karpathy — Let's build the GPT Tokenizer(第 2 站:BPE 從零實作、tokenizer 是模型外的獨立階段、encode/decode)</a>
+        <a href="https://huggingface.co/learn/llm-course/chapter6/5">Hugging Face LLM course — Byte-Pair Encoding(第 2 站:byte-level BPE、GPT-2 牌庫 50,257 的組成)</a>
+        <a href="https://www.3blue1brown.com/lessons/attention/">3Blue1Brown — Attention in transformers(第 3 站:attention 逐步視覺化)</a>
+        <a href="https://jalammar.github.io/illustrated-transformer/">Jay Alammar — The Illustrated Transformer(第 3 站:Q/K/V 怎麼算、multi-head「8 副眼光各自算、拼接、再合併」的原始圖解)</a>
+        <a href="https://jalammar.github.io/illustrated-gpt2/">Jay Alammar — The Illustrated GPT-2(第 4-5 站:decoder-only 的接龍迴圈、一次生成一個 token)</a>
+        <a href="https://huggingface.co/blog/how-to-generate">Hugging Face — How to generate text(圖 C:溫度、top-k、抽樣策略——「分數最高不一定被抽」那張卡的出處)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">原始論文</div>
+        <a href="https://arxiv.org/abs/1706.03762">Vaswani et al., 2017 — Attention Is All You Need(Transformer 原始論文)</a>
+        <a href="https://aclanthology.org/P16-1162/">Sennrich et al., 2016 — Neural Machine Translation of Rare Words with Subword Units(BPE 引進 NLP 的原始論文)</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 圖 A:五站(SVG zones + node row 同步) ============ */
+  const LOOP = {
+    text: {
+      title: '輸入文字', tag: '01 · 你出的上句',
+      what: '文字接龍的開局——沒有任何魔法,就是你打的字。「今天天氣」這四個字,是這一局接龍的上句。',
+      ex: '你在聊天視窗打的字送進模型前,還會被包上系統訊息、對話歷史等等——那是 prompt 組裝的事,屬於 agent 的範圍,這一頁不展開。',
+      deeper: '對模型來說,你的上句跟它自己接出來的字沒有本質區別——都是「目前為止桌上那排牌」的一部分。這也是為什麼 prompt 裡放幾個範例就能引導它(in-context learning 的入口)。'
+    },
+    tokenize: {
+      title: 'Tokenizer', tag: '02 · 換成字牌(編號)',
+      what: '模型不認得文字,只認得自家牌庫裡的牌。輸入的句子被查表換成一排字牌——常見的詞一張牌(「今天」可能就是一張),罕見的詞拆成好幾張小牌(甚至拆到 byte 層級)。<b>牌不等於詞</b>:牌是牌庫按頻率切出來的,詞是人類語言學上的分法,兩套常常對不上——這也是為什麼 LLM 有時候數不出 strawberry 裡有幾個 r,它看到的是幾張不透明的牌,不是一個一個字母。',
+      ex: '容易搞混的一點:這一站的產物是牌的「編號」(離散的整數,場景圖裡的 #1024),還不是意思。進了模型之後第一步,是查出每張牌在一座超大「牌櫃」裡的收納位置(embedding)——這個牌櫃收得很有講究:意思相近的牌收在附近(「貓」跟「狗」是鄰居,「貓」跟「冰箱」隔很遠),常搭配出組合技的牌也排得近,後面所有讀牌運算用的都是這個位置。注意櫃裡沒有「怪獸區/魔法區」那種隔板——只有連續的遠近,而且收納方式是訓練自己排出來的,不是人定的。切牌在模型外,查牌櫃在模型內,兩步是分開的。',
+      deeper: '牌庫怎麼造出來的演算法叫 BPE:從單一字元開始,不斷合併語料裡最常黏在一起的兩張,直到湊滿幾萬張。牌庫定案後就不再變——第 4 站打分的對象就是同一本牌庫。細節在 tokenizer-bpe.md。'
+    },
+    attend: {
+      title: 'Self-attention', tag: '03 · 讀牌',
+      what: '每張牌同時參照整排牌裡的每一張(含自己),各自算出「哪幾張跟我最相關」,把相關牌的資訊按比例混進自己的理解——全部同時進行,沒有輪流,也沒有誰指揮誰。這個「整排一起看」重複很多輪(GPT-3 有 96 輪),每一輪的理解疊在上一輪之上。',
+      ex: '讀到「很」這張牌時,它可能重看「天氣」、幾乎不看「今天」——每張牌的參照比例都不一樣,詳見圖 B 的互動模擬。',
+      deeper: '正是「每張牌直接看得到整排牌」這個結構,讓 prompt 裡的範例能被直接利用——模型不改任何參數,就能靠幾個範例「當場學會」新任務(in-context learning)。'
+    },
+    predict: {
+      title: 'Next-token prediction', tag: '04 · 對牌庫打分',
+      what: '讀牌全部結束後,模型對牌庫裡「每一張牌」打一個「接在後面有多合適」的分數(機率)——注意是對整個牌庫的幾萬張全部打分,不是只挑幾張看。',
+      ex: '「今天天氣」之後:「很」38%、「真」27%、「不」16%……見圖 C 的長條。分數最高的不一定被抽——可以按機率抽選,這是輸出會有變化的來源之一。<br><br><b>這也是為什麼接龍能回答問題</b>:網路文字裡本來就有大量「Q: ……?A: ……」這種問答形狀的段落。牌庫打分打準了,接龍接到這個位置,分數最高的接續自然就是像樣的答案——不是換了一套機制在「回答」,是同一套打分機制,遇到這個文字形狀該接的東西剛好是答案。',
+      deeper: '要把「接得合適」這件事做準,逼著模型必須內化文法、事實、甚至邏輯——這叫壓縮論證,是「為什麼接龍接得好就顯得聰明」的答案起點,詳見 next-token-prediction.md。'
+    },
+    append: {
+      title: '迴圈', tag: '05 · 抽牌,接上',
+      what: '選中的牌接到隊伍尾巴——然後整排牌(多了一張)回到第 3 站重新讀牌,接出下一張。每重複一輪,句子多一個字,直到模型抽出「結束牌」自己停下來。',
+      ex: '注意兩個迴圈的尺度:96 輪讀牌(層)是「接出一張牌」的內部流程,牌數不變;「接上→重讀」才是讓句子變長的外圈,一圈多一張牌。',
+      deeper: '「一張定案完才輪到下一張」這個順序,術語叫 autoregressive——它跟 tool use 這類 agent 技巧天生合拍(接到一半可以停下來等工具結果),而 diffusion 這種「一次生成一大片」的做法就需要額外設計。'
+    }
+  };
+
+  const panelA = document.getElementById('panelA');
+  function activeForKey(key){
+    document.querySelectorAll('[data-key]').forEach(el => {
+      el.classList.toggle('active', el.dataset.key === key);
+    });
+  }
+  function renderA(key){
+    const d = LOOP[key];
+    activeForKey(key);
+    panelA.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+      <div class="deeper"><b>更深一層</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelA);
+  }
+  document.querySelectorAll('#loopRow .node, #caseSvg .zone').forEach(el => {
+    el.addEventListener('click', () => renderA(el.dataset.key));
+  });
+
+  /* ============ 圖 B:整排一起看互動模擬 ============ */
+  const TOKENS = ['今天','天氣','很','好'];
+  const state = { mode:'table', focus:2, head:'A', round:1 };
+  const MAX_ROUND = 3;
+
+  // 示意權重:眼光 A 偏看鄰近,眼光 B 偏看遠處。輪次越多分布越銳利(round 次方後歸一)。
+  function baseWeights(focus, head){
+    return TOKENS.map((_, j) => {
+      const dist = Math.abs(focus - j);
+      if(head === 'A') return 1 / (1 + dist * 1.4);          // 鄰近重
+      return dist === 0 ? 0.35 : 0.55 + dist * 0.45;          // 遠處重,自己輕
+    });
+  }
+  function weightsFor(focus, head, round){
+    const raw = baseWeights(focus, head).map(w => Math.pow(w, round));
+    const sum = raw.reduce((a,b)=>a+b,0);
+    return raw.map(w => w/sum);
+  }
+
+  const ROUND_CAPTIONS = {
+    1: '第 1 輪:每張牌手上還是原始資訊,參照到的多半是鄰近、表面的關聯。',
+    2: '第 2 輪:這一輪讀的已經是上一輪各自混合過的理解——開始摻進間接的關聯,分布也更集中。',
+    3: '第 3 輪:理解疊過兩次,關聯已經很迂迴——真實模型會這樣疊幾十輪(GPT-3 是 96 輪)。'
+  };
+
+  const cmpDiagram = document.getElementById('cmpDiagram');
+  const roundCaption = document.getElementById('roundCaption');
+  const cmpNote = document.getElementById('cmpNote');
+
+  function tableSVG(){
+    const cx=210, cy=118, r=76;
+    const pts = TOKENS.map((_,i)=>{
+      const a = (Math.PI*2/TOKENS.length)*i - Math.PI/2;
+      return [cx+r*Math.cos(a), cy+r*Math.sin(a)];
+    });
+    const w = weightsFor(state.focus, state.head, state.round);
+    const [fx, fy] = pts[state.focus];
+    let edges='';
+    // 淡的全連結底線
+    for(let i=0;i<pts.length;i++) for(let j=i+1;j<pts.length;j++){
+      edges += `<line x1="${pts[i][0]}" y1="${pts[i][1]}" x2="${pts[j][0]}" y2="${pts[j][1]}" stroke="var(--line)" stroke-width="1"/>`;
+    }
+    // focus 對每張牌的參照線(粗細=權重)
+    let labels='';
+    w.forEach((wt, j) => {
+      const pct = Math.round(wt*100);
+      if(j === state.focus){
+        labels += `<text x="${fx}" y="${fy+34}" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="var(--rose)">含自己 ${pct}%</text>
+          <circle cx="${fx}" cy="${fy}" r="26" fill="none" stroke="var(--rose)" stroke-width="${1+wt*6}" opacity=".5"/>`;
+        return;
+      }
+      const [tx, ty] = pts[j];
+      const mx = fx + (tx-fx)*0.6, my = fy + (ty-fy)*0.6;
+      edges += `<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="var(--rose)" stroke-width="${0.5+wt*11}" opacity=".75"/>`;
+      labels += `<text x="${mx}" y="${my-6}" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="var(--rose)">${pct}%</text>`;
+    });
+    const nodes = pts.map((p,i)=>{
+      const isF = i === state.focus;
+      return `<g class="wnode" data-w="${i}" style="cursor:pointer">
+        <circle cx="${p[0]}" cy="${p[1]}" r="21" fill="${isF ? 'rgba(176,74,106,.10)' : 'var(--panel)'}" stroke="${isF ? 'var(--rose)' : 'var(--accent)'}" stroke-width="${isF ? 2.4 : 1.6}"/>
+        <text x="${p[0]}" y="${p[1]+4}" text-anchor="middle" font-size="11.5" font-family="var(--mono)" fill="var(--ink)">${TOKENS[i]}</text></g>`;
+    }).join('');
+    return `<svg width="420" height="252" viewBox="0 0 420 252">${edges}${nodes}${labels}
+      <text x="210" y="244" text-anchor="middle" font-size="11.5" fill="var(--muted)">「${TOKENS[state.focus]}」這張牌(第 ${state.round} 輪 · 眼光 ${state.head})的參照比例</text></svg>`;
+  }
+
+  function chainSVG(){
+    const y=110, gap=88, x0=64;
+    let lines='', nodes='';
+    for(let i=0;i<TOKENS.length;i++){
+      const x = x0 + i*gap;
+      if(i>0){ lines += `<line x1="${x0+(i-1)*gap+21}" y1="${y}" x2="${x-21}" y2="${y}" stroke="var(--faint)" stroke-width="1.8" marker-end="url(#arrChain)"/>`; }
+      nodes += `<g><circle cx="${x}" cy="${y}" r="21" fill="var(--panel)" stroke="var(--faint)" stroke-width="1.8"/>
+        <text x="${x}" y="${y+4}" text-anchor="middle" font-size="11.5" font-family="var(--mono)" fill="var(--ink)">${TOKENS[i]}</text></g>`;
+    }
+    return `<svg width="420" height="220" viewBox="0 0 420 220">
+      <defs><marker id="arrChain" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--faint)"/></marker></defs>
+      ${lines}${nodes}
+      <text x="210" y="196" text-anchor="middle" font-size="11.5" fill="var(--muted)">資訊只能一張一張往後傳——傳到後面會失真,而且沒辦法同時處理</text></svg>`;
+  }
+
+  function renderCmp(){
+    const isTable = state.mode === 'table';
+    cmpDiagram.innerHTML = isTable ? tableSVG() : chainSVG();
+    document.querySelectorAll('#cmpChips .chip').forEach(c => c.classList.toggle('active', c.dataset.cmp === state.mode));
+    ['witnessCtl','headCtl','roundCtl'].forEach(id => {
+      document.getElementById(id).style.display = isTable ? 'flex' : 'none';
+    });
+    roundCaption.style.display = isTable ? 'block' : 'none';
+    if(isTable){
+      roundCaption.textContent = ROUND_CAPTIONS[state.round];
+      document.querySelectorAll('#witnessCtl .pill').forEach(p => p.classList.toggle('active', +p.dataset.w === state.focus));
+      document.querySelectorAll('#headCtl .pill').forEach(p => p.classList.toggle('active', p.dataset.h === state.head));
+      document.getElementById('nextRoundBtn').disabled = state.round >= MAX_ROUND;
+      // 綁定 SVG 裡的牌節點
+      cmpDiagram.querySelectorAll('.wnode').forEach(g => {
+        g.addEventListener('click', () => { state.focus = +g.dataset.w; renderCmp(); });
+      });
+      cmpNote.textContent = '權重數字是教學示意,不是真實模型算出來的值——點牌的圓圈也可以切換';
+    } else {
+      cmpNote.textContent = 'RNN/LSTM 的傳遞方式:資訊得擠進一條逐張傳遞的通道';
+    }
+    fadeIn(cmpDiagram);
+  }
+  document.querySelectorAll('#cmpChips .chip').forEach(c => c.addEventListener('click', () => { state.mode = c.dataset.cmp; renderCmp(); }));
+  document.querySelectorAll('#witnessCtl .pill').forEach(p => p.addEventListener('click', () => { state.focus = +p.dataset.w; renderCmp(); }));
+  document.querySelectorAll('#headCtl .pill').forEach(p => p.addEventListener('click', () => { state.head = p.dataset.h; renderCmp(); }));
+  document.getElementById('nextRoundBtn').addEventListener('click', () => { if(state.round < MAX_ROUND){ state.round++; renderCmp(); } });
+  document.getElementById('resetRoundBtn').addEventListener('click', () => { state.round = 1; renderCmp(); });
+
+  /* ============ 圖 C:牌庫長條 + 接龍示範 ============ */
+  const candidates = [
+    {tok:'很', pct:38}, {tok:'真', pct:27}, {tok:'不', pct:16}, {tok:'如何', pct:11}, {tok:'…', pct:8}
+  ];
+  const barsList = document.getElementById('barsList');
+  const runNote = document.getElementById('runNote');
+  candidates.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML = `<div class="tok">${c.tok}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${c.pct}%"></div></div>
+      <div class="pct">${c.pct}%</div>`;
+    row.addEventListener('click', () => {
+      document.querySelectorAll('.bar-row').forEach(r => r.classList.remove('picked'));
+      row.classList.add('picked');
+      runNote.textContent = `牌庫上「${c.tok}」的分數是 ${c.pct}%——這只是示範打分,下面的接龍示範走的是固定劇本。`;
+    });
+    barsList.appendChild(row);
+  });
+
+  const scriptSteps = [
+    {append:'很', note:'96 輪讀牌跑完,對牌庫打分——「很」分數最高,抽出接上。'},
+    {append:'好', note:'桌上多了一張牌,整套流程重跑一輪——這次抽出「好」。'},
+    {append:'。', note:'再跑一輪,這次抽出的是「。」——句子自然收尾。'},
+    {append:null, note:'模型抽出結束牌,自己停下來——「今天天氣很好。」就是桌上那排牌依序讀出來。'}
+  ];
+  let stepIdx = 0;
+  const sentenceEl = document.getElementById('liveSentence');
+  const stepBtn = document.getElementById('stepBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  function renderSentence(){
+    const grown = scriptSteps.slice(0, stepIdx).map(s => s.append || '').join('');
+    sentenceEl.innerHTML = `今天天氣<span class="grown">${grown}</span>`;
+  }
+  stepBtn.addEventListener('click', () => {
+    if(stepIdx >= scriptSteps.length) return;
+    const step = scriptSteps[stepIdx];
+    stepIdx++;
+    renderSentence();
+    runNote.textContent = step.note;
+    if(stepIdx >= scriptSteps.length) stepBtn.disabled = true;
+  });
+  resetBtn.addEventListener('click', () => {
+    stepIdx = 0; stepBtn.disabled = false;
+    renderSentence();
+    runNote.textContent = '按「接下一張」,看牌一張一張接上去。';
+  });
+  renderSentence();
+
+  /* 初始狀態 */
+  renderA('attend');
+  renderCmp();
+</script>
+</body>
+</html>

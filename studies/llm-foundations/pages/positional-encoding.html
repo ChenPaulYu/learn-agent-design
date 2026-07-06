@@ -1,0 +1,461 @@
+---
+title: 位置編碼 — 整排一起看天生不分順序,怎麼補
+summary: 互動示範「整排一起看」的排列不變性問題(打亂字牌,權重不變)——切換不加位置編碼 / 正弦波位置編碼 / RoPE 旋轉三種模式,看關聯權重怎麼開始正確反映相對距離;另有「整句右移」測試,對照正弦波與 RoPE 對「只看相對距離」這件事,一個是間接可推、一個是算式天生保證。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - interactive
+  - positional-encoding
+  - rope
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — 位置編碼:整排一起看天生分不出順序,怎麼補上「第幾個」。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-06-positional-encoding.md
+    ../docs/2026-07-04-transformer-self-attention.md
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖 A(互動核心)— 一句「貓 追 老鼠」放在一條位置數線上。三種模式切換:不加位置編碼 /
+      正弦波位置編碼 / RoPE 旋轉。「打亂順序」按鈕重排三張牌的相對次序(示範排列不變性問題,
+      以及修法之後權重怎麼開始正確反映新的相對距離);「整句右移一格」按鈕把整段話沿數線平移
+      (相對距離不變,只有絕對位置變了)——對照正弦波(間接可推,示範上會有輕微飄動)跟 RoPE
+      (算式天生保證,右移後權重完全不變)的差別。權重數字與飄動幅度皆為教學示意,不是真實模型
+      算出來的值,也不是嚴謹的正弦波/RoPE 公式實作,只用來示範三種做法「看不看位置」「看不看
+      相對距離」的定性差異。
+    圖 B(靜態比較)— 三種做法對照表 + 容易被忽略的地方,原樣對應 docs 那篇筆記的整理。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>位置編碼 — 整排一起看天生不分順序,怎麼補</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+  .tagline a{color:var(--accent);text-decoration:none;border-bottom:1px dashed var(--accent)}
+  .tagline a:hover{color:var(--rose);border-color:var(--rose)}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:170px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:74px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:650;padding:7px 14px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s ease}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .round-caption{margin-top:12px;padding:10px 14px;background:var(--bg);border-left:3px solid var(--rose);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .round-caption b{color:var(--rose)}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:8px;text-align:center}
+
+  .dist-table{margin-top:16px;width:100%;border-collapse:collapse;font-size:13px}
+  .dist-table th{font-family:var(--mono);font-size:10.5px;color:var(--faint);text-transform:uppercase;
+    letter-spacing:.03em;text-align:left;padding:6px 10px;border-bottom:1px solid var(--line)}
+  .dist-table td{padding:8px 10px;border-bottom:1px solid var(--line-soft)}
+  .dist-table td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .dist-table tr.is-focus td{background:rgba(154,107,46,.07)}
+
+  .cmp-table{margin-top:20px;width:100%;border-collapse:collapse;font-size:13.5px;overflow-x:auto;display:block}
+  .cmp-table th{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;
+    letter-spacing:.03em;text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .cmp-table td{padding:10px 14px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+  .cmp-table tr:last-child td{border-bottom:none}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .dist-table{font-size:12px}
+    .cmp-table{font-size:12px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations</div>
+    <h1>位置編碼 — 整排一起看天生不分順序,怎麼補上「第幾個」</h1>
+    <p class="tagline">
+      <a href="../docs/2026-07-04-transformer-self-attention.md">「整排一起看」</a>算關聯只吃
+      每張字牌牌櫃收納位置查出來的向量,完全不吃它排在隊伍第幾個——把一句話的字牌打亂重排,算出
+      來的關聯權重理論上不會變。下面的互動先讓你親眼看到這個問題,再切換兩種修法:<b>正弦波位置
+      編碼</b>(疊加到牌向量上)跟 <b>RoPE</b>(旋轉 Query/Key 向量),看關聯權重怎麼開始正確
+      反映牌與牌之間的相對距離。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 互動核心 ============ -->
+  <section>
+    <div class="sec-kicker">圖 A · 互動核心</div>
+    <div class="sec-title">打亂順序、整句右移——三種做法看不看位置,一試就知道</div>
+    <p class="sec-sub">
+      句子固定是「貓 追 老鼠」三張牌,放在一條位置數線上。切模式看「不加位置編碼」跟兩種修法
+      的差別;<b>打亂順序</b>重排三張牌的相對次序;<b>整句右移一格</b>把整段話沿數線平移一格
+      (相對距離不變,只有絕對位置變了)——這是拿來對照正弦波跟 RoPE 的關鍵測試。
+    </p>
+
+    <div class="chips" id="modeChips">
+      <div class="chip active" data-mode="none"><h4>不加位置編碼</h4><div class="sub">問題本身 · 排列不變</div></div>
+      <div class="chip" data-mode="sin"><h4>正弦波位置編碼</h4><div class="sub">Vaswani et al., 2017 · 疊加</div></div>
+      <div class="chip" data-mode="rope"><h4>RoPE 旋轉</h4><div class="sub">Su et al., 2021 · 旋轉 Q/K</div></div>
+    </div>
+
+    <div class="ctl-row" id="focusCtl">
+      <span class="ctl-label">看誰的關聯</span>
+      <span class="pill" data-f="cat">貓</span>
+      <span class="pill active" data-f="chase">追</span>
+      <span class="pill" data-f="mouse">老鼠</span>
+    </div>
+    <div class="ctl-row">
+      <span class="ctl-label">操作</span>
+      <button class="btn primary" id="shuffleBtn">打亂順序</button>
+      <button class="btn" id="shiftBtn">整句右移一格 →</button>
+      <button class="btn" id="resetPeBtn">重置</button>
+    </div>
+
+    <div class="scene-box">
+      <div id="peDiagram" style="display:flex;justify-content:center"></div>
+      <div class="scene-note" id="peNote">權重數字是教學示意,不是真實模型算出來的值</div>
+    </div>
+
+    <table class="dist-table" id="distTable"></table>
+
+    <div class="round-caption" id="actionCaption">按「打亂順序」或「整句右移一格」,看權重怎麼變(或不變)。</div>
+
+    <div class="panel" id="modePanel"></div>
+  </section>
+
+  <!-- ============ SECTION B: 靜態比較 ============ -->
+  <section>
+    <div class="sec-kicker">圖 B · 三種做法放在一起比</div>
+    <div class="sec-title">位置資訊接在哪、學不學、有沒有天生綁定相對距離</div>
+    <p class="sec-sub">整理自 <a href="../docs/2026-07-06-positional-encoding.md" style="color:var(--accent)">位置編碼筆記</a> 的比較表。</p>
+
+    <div style="overflow-x:auto">
+      <table class="cmp-table">
+        <thead>
+          <tr><th>做法</th><th>位置資訊接在哪</th><th>是否學習</th><th>天生綁定相對距離?</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>不做任何處理</td><td>沒有</td><td>—</td><td>否(排列不變,問題本身)</td></tr>
+          <tr><td>正弦波位置編碼</td><td>疊加到牌的向量上</td><td>否(公式算死)</td><td>間接可推,非算式保證</td></tr>
+          <tr><td>RoPE</td><td>旋轉 Query/Key 向量</td><td>否(公式算死)</td><td>是(內積結果天生只看差)</td></tr>
+          <tr><td>ALiBi</td><td>扣在算完的關聯分數上</td><td>否(公式算死)</td><td>是(懲罰值直接是距離的函數)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>位置編碼解的是副作用,不是加分功能</b> — 沒有它,整排一起看這個機制在語言任務上根本不成立,不是「加了更好、不加也還行」的選配。</div>
+      <div class="exclusion"><b>三種做法都不是學出「位置」本身</b> — 正弦波跟 RoPE 的角度/波形都是公式先算死的,模型學的是怎麼運用這份已經算好的位置訊號。</div>
+      <div class="exclusion"><b>「相對距離」比「絕對位置」更好用</b> — 「這兩個字隔三個字」不管出現在文件開頭還是第 500 個字之後都一樣重要;死記「這是第 500 個字」對理解語意本身沒什麼用處。</div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">原始論文</div>
+        <a href="https://arxiv.org/abs/1706.03762">Vaswani et al., 2017 — Attention Is All You Need(正弦波位置編碼原始公式出處)</a>
+        <a href="https://arxiv.org/abs/2104.09864">Su et al., 2021 — RoFormer: Enhanced Transformer with Rotary Position Embedding(RoPE 原始論文)</a>
+        <a href="https://arxiv.org/abs/2108.12409">Press, Smith & Lewis, 2021 — Train Short, Test Long(ALiBi 原始論文)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">延伸閱讀(本站筆記)</div>
+        <a href="../docs/2026-07-06-positional-encoding.md">位置編碼:整排一起看天生不分順序,怎麼補上「第幾個」(本頁的真相來源)</a>
+        <a href="../docs/2026-07-04-transformer-self-attention.md">為什麼 Transformer 的「整排一起看」特別適合拿來做 LLM(「整排一起看」機制本身)</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 圖 A:位置編碼互動 ============ */
+  const WORDS = ['cat','chase','mouse'];
+  const LABEL = { cat:'貓', chase:'追', mouse:'老鼠' };
+  const COLOR = { cat:'var(--blue)', chase:'var(--rose)', mouse:'var(--green)' };
+  // 內容相容度(教學示意):只跟「牌本身是誰」有關,跟排在第幾個無關。
+  const AFF = {
+    cat:   { cat:0.15, chase:0.85, mouse:0.25 },
+    chase: { cat:0.85, chase:0.15, mouse:0.85 },
+    mouse: { cat:0.25, chase:0.85, mouse:0.15 },
+  };
+  const MAX_SHIFT = 5;
+
+  const pe = { mode:'none', order:['cat','chase','mouse'], startPos:0, focus:'chase' };
+
+  function posOf(id){ return pe.startPos + pe.order.indexOf(id); }
+
+  function rawWeight(focusId, otherId){
+    if(pe.mode === 'none') return AFF[focusId][otherId];
+    const pi = posOf(focusId), pj = posOf(otherId);
+    const d = pi - pj;
+    const distF = 1 / (1 + 0.9 * Math.abs(d));
+    let base = AFF[focusId][otherId] * distF;
+    if(pe.mode === 'sin'){
+      const wobble = 1 + 0.18 * Math.sin(pi * 1.3) * Math.cos(pj * 1.7);
+      base *= wobble;
+    }
+    return Math.max(base, 0.01);
+  }
+
+  function weightsFor(focusId){
+    const raws = WORDS.map(id => rawWeight(focusId, id));
+    const sum = raws.reduce((a,b)=>a+b, 0);
+    return WORDS.map((id,i) => ({ id, pct: raws[i]/sum }));
+  }
+
+  function totalVariation(a, b){
+    // a, b: [{id,pct}] 相同順序 → 差距的一半總和,轉成百分點
+    let s = 0;
+    for(let i=0;i<a.length;i++) s += Math.abs(a[i].pct - b[i].pct);
+    return (s/2)*100;
+  }
+
+  const peDiagram = document.getElementById('peDiagram');
+  const peNote = document.getElementById('peNote');
+  const distTable = document.getElementById('distTable');
+  const actionCaption = document.getElementById('actionCaption');
+  const modePanel = document.getElementById('modePanel');
+
+  function peSVG(){
+    const spacing = 78, x0 = 60, y = 150, axisMax = MAX_SHIFT + 2;
+    let axis = `<line x1="${x0-24}" y1="${y}" x2="${x0+spacing*axisMax}" y2="${y}" stroke="var(--line)" stroke-width="1.5"/>`;
+    for(let p=0; p<=axisMax; p++){
+      const x = x0 + spacing*p;
+      axis += `<line x1="${x}" y1="${y-5}" x2="${x}" y2="${y+5}" stroke="var(--line)" stroke-width="1.5"/>
+        <text x="${x}" y="${y+22}" text-anchor="middle" font-size="9.5" font-family="var(--mono)" fill="var(--faint)">${p}</text>`;
+    }
+    axis += `<text x="${x0-24}" y="${y+40}" font-size="10.5" font-family="var(--mono)" fill="var(--faint)">位置 →</text>`;
+
+    const nodeX = id => x0 + spacing*posOf(id);
+    const w = weightsFor(pe.focus);
+    const wMap = Object.fromEntries(w.map(o => [o.id, o.pct]));
+
+    let edges = '', selfLoop = '', nodes = '';
+    WORDS.forEach(id => {
+      const isFocus = id === pe.focus;
+      const x = nodeX(id);
+      if(isFocus){
+        const pct = wMap[id];
+        selfLoop = `<path d="M ${x-16},${y-24} A 20 20 0 1 1 ${x+16},${y-24}" fill="none" stroke="${COLOR[id]}" stroke-width="${1+pct*16}" opacity=".55"/>
+          <text x="${x}" y="${y-44}" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="${COLOR[id]}">含自己 ${Math.round(pct*100)}%</text>`;
+      } else {
+        const pct = wMap[id];
+        const fx = nodeX(pe.focus);
+        const midx = (fx+x)/2;
+        const dist = Math.abs(posOf(pe.focus)-posOf(id));
+        const arcH = 34 + dist*14;
+        edges += `<path d="M ${fx},${y-20} Q ${midx},${y-20-arcH} ${x},${y-20}" fill="none" stroke="${COLOR[pe.focus]}" stroke-width="${0.6+pct*15}" opacity=".7"/>
+          <text x="${midx}" y="${y-22-arcH}" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="${COLOR[pe.focus]}">${Math.round(pct*100)}%</text>`;
+      }
+      nodes += `<g>
+        <circle cx="${x}" cy="${y}" r="22" fill="${isFocus ? 'rgba(176,74,106,.10)' : 'var(--panel)'}" stroke="${COLOR[id]}" stroke-width="${isFocus?2.6:1.8}"/>
+        <text x="${x}" y="${y+5}" text-anchor="middle" font-size="13" font-family="var(--mono)" fill="var(--ink)">${LABEL[id]}</text>
+      </g>`;
+    });
+
+    const height = 210 + (MAX_SHIFT>0? 20:0);
+    return `<svg width="${x0+spacing*axisMax+30}" height="230" viewBox="0 0 ${x0+spacing*axisMax+30} 230" style="max-width:100%;height:auto">
+      ${axis}${edges}${nodes}${selfLoop}
+    </svg>`;
+  }
+
+  function renderDistTable(){
+    const w = weightsFor(pe.focus);
+    const wMap = Object.fromEntries(w.map(o => [o.id, o.pct]));
+    let rows = '';
+    WORDS.forEach(id => {
+      const isFocus = id === pe.focus;
+      const dist = isFocus ? '—(自己)' : Math.abs(posOf(pe.focus)-posOf(id));
+      rows += `<tr class="${isFocus?'is-focus':''}">
+        <td>${LABEL[id]}</td>
+        <td class="num">${posOf(id)}</td>
+        <td class="num">${dist}</td>
+        <td class="num">${Math.round(wMap[id]*100)}%</td>
+      </tr>`;
+    });
+    distTable.innerHTML = `
+      <thead><tr><th>字牌</th><th>目前位置</th><th>離「${LABEL[pe.focus]}」幾格</th><th>權重</th></tr></thead>
+      <tbody>${rows}</tbody>`;
+  }
+
+  const MODE_INFO = {
+    none: {
+      title: '不加位置編碼 — 問題本身',
+      what: 'Query/Key/Value 只吃每張牌牌櫃收納位置查出來的那條向量,完全不吃它排在隊伍第幾個。所以上面的權重表只跟「貓/追/老鼠」這幾個<b>字本身</b>有關——打亂順序、整句右移,數字完全不會變。',
+      ex: '試試看:按「打亂順序」把「貓 追 老鼠」重排成「老鼠 追 貓」——「追」對「貓」跟「追」對「老鼠」的權重完全沒變,只是畫面上牌換了位置。這就是排列不變性(permutation invariance):模型看到的是一袋牌的集合,不是一列有順序的牌。'
+    },
+    sin: {
+      title: '正弦波位置編碼 — 疊加,間接可推',
+      what: '每個位置疊加一組固定、不學習的正弦/餘弦波紋到牌向量上,牌向量從此同時帶著「內容」跟「第幾個」兩份資訊,混在同一條向量裡。',
+      ex: '試試看:「打亂順序」之後,權重會隨新的相對距離重新分佈(離得近的權重變大)——問題修好了。但按「整句右移一格」,權重會有<b>輕微飄動</b>,不是完全不變:因為位置資訊是疊加混進內容向量的,「兩張牌隔多遠」是可以間接推算出來,但不是算式天生保證的乾淨性質。'
+    },
+    rope: {
+      title: 'RoPE — 旋轉 Query/Key,天生只看差',
+      what: '不是疊加,而是把 Query、Key 向量按位置比例各自旋轉一個角度,再拿去做內積算關聯分數。旋轉是等距變換,兩個轉過的向量內積結果天生只跟「轉了幾度的差」有關,換算回位置就是只跟「相隔幾格」掛勾。',
+      ex: '試試看:「打亂順序」一樣會讓權重反映新的相對距離。關鍵測試是「整句右移一格」——權重<b>完全不變</b>(diff 0.0):把整句話往右平移,每張牌之間的相對距離沒變,算出來的關聯權重也不會變,這是正弦波疊加法沒有直接保證的一個乾淨性質。'
+    }
+  };
+
+  function renderModePanel(){
+    const d = MODE_INFO[pe.mode];
+    modePanel.innerHTML = `
+      <div class="ph">目前模式</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+    `;
+    fadeIn(modePanel);
+  }
+
+  function renderPE(){
+    peDiagram.innerHTML = peSVG();
+    renderDistTable();
+    document.querySelectorAll('#modeChips .chip').forEach(c => c.classList.toggle('active', c.dataset.mode === pe.mode));
+    document.querySelectorAll('#focusCtl .pill').forEach(p => p.classList.toggle('active', p.dataset.f === pe.focus));
+    document.getElementById('shiftBtn').disabled = false;
+    peNote.textContent = pe.mode === 'none'
+      ? '權重只看字牌內容,不看位置——教學示意,不是真實模型輸出'
+      : '權重數字與飄動幅度為教學示意,不是真實模型算出來的值';
+    renderModePanel();
+    fadeIn(peDiagram);
+  }
+
+  document.querySelectorAll('#modeChips .chip').forEach(c => c.addEventListener('click', () => {
+    pe.mode = c.dataset.mode;
+    actionCaption.innerHTML = `已切換到「${MODE_INFO[pe.mode].title.split(' —')[0]}」——按「打亂順序」或「整句右移一格」看差異。`;
+    renderPE();
+  }));
+  document.querySelectorAll('#focusCtl .pill').forEach(p => p.addEventListener('click', () => {
+    pe.focus = p.dataset.f;
+    renderPE();
+  }));
+
+  document.getElementById('shuffleBtn').addEventListener('click', () => {
+    const before = pe.order.join(',');
+    let next;
+    do {
+      next = [...pe.order];
+      for(let i=next.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [next[i], next[j]] = [next[j], next[i]];
+      }
+    } while(next.join(',') === before && WORDS.length > 1);
+    pe.order = next;
+    renderPE();
+    const orderLabel = pe.order.map(id => LABEL[id]).join(' ');
+    actionCaption.innerHTML = pe.mode === 'none'
+      ? `已打亂成「${orderLabel}」——權重完全沒變,因為不加位置編碼本來就不看位置,只看牌本身是誰。`
+      : `已打亂成「${orderLabel}」——「${LABEL[pe.focus]}」跟其他牌的相對距離變了,權重也跟著<b>正確反映新的距離</b>(離得近的權重變大)。`;
+  });
+
+  document.getElementById('shiftBtn').addEventListener('click', () => {
+    const before = weightsFor(pe.focus);
+    pe.startPos = (pe.startPos + 1) % (MAX_SHIFT + 1);
+    const after = weightsFor(pe.focus);
+    const diff = totalVariation(before, after);
+    renderPE();
+    if(pe.mode === 'none'){
+      actionCaption.innerHTML = `整句右移一格——不加位置編碼本來就不看位置,右移當然沒差:<b>差距 ${diff.toFixed(1)} 個百分點</b>。`;
+    } else if(pe.mode === 'sin'){
+      actionCaption.innerHTML = `整句右移一格——相對距離沒變,但正弦波是「疊加」進內容向量,權重<b>有輕微飄動</b>(差距 ${diff.toFixed(1)} 個百分點):相對距離只是間接可推,不是算式保證。`;
+    } else {
+      actionCaption.innerHTML = `整句右移一格——RoPE 的關聯分數天生只看「轉了幾度的差」:<b>差距 ${diff.toFixed(1)} 個百分點</b>,幾乎完全不變。`;
+    }
+  });
+
+  document.getElementById('resetPeBtn').addEventListener('click', () => {
+    pe.mode = 'none'; pe.order = ['cat','chase','mouse']; pe.startPos = 0; pe.focus = 'chase';
+    renderPE();
+    actionCaption.innerHTML = '已重置——按「打亂順序」或「整句右移一格」,看權重怎麼變(或不變)。';
+  });
+
+  renderPE();
+</script>
+</body>
+</html>
