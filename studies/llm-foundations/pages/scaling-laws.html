@@ -242,8 +242,8 @@ render_with_liquid: false
       <div class="exclusion"><b>算力小的時候差不了多少</b> — 算力預算還很小時,兩種配方分出來的
         N/D 配比差異不明顯,loss 差距也小;配方選錯的代價是隨著算力變大才逐漸放大的
         (這條「差距隨算力擴大」的曲線畫法本身是本頁的教學示意,不是論文量出來的精確斜率)。</div>
-      <div class="exclusion"><b>GPT-3 那一點是推論,不是論文原始對照</b> — GPT-3(175B 参数,約
-        300B token)是照 Kaplan 配方练的代表模型;圖上「换成 Chinchilla 配方理論上能换到更低
+      <div class="exclusion"><b>GPT-3 那一點是推論,不是論文原始對照</b> — GPT-3(175B 參數,約
+        300B token)是照 Kaplan 配方練的代表模型;圖上「換成 Chinchilla 配方理論上能換到更低
         loss」是順著 Chinchilla 論文結論反推的教學推論,論文並沒有真的重練一個「Chinchilla 版
         GPT-3」做直接對照。</div>
       <div class="exclusion"><b>Gopher vs Chinchilla 才是真的實驗對照組</b> — 這一段是 Hoffmann
@@ -288,7 +288,7 @@ render_with_liquid: false
         <div class="ref-head">原始論文</div>
         <a href="https://arxiv.org/abs/2001.08361">Kaplan, McCandlish, Henighan et al., 2020 — Scaling Laws for Neural Language Models(原始 scaling laws 論文,N/D/C 三條冪律關係與 N_optimal ∝ C^0.73 / D_optimal ∝ C^0.27 配方的出處)</a>
         <a href="https://arxiv.org/abs/2203.15556">Hoffmann, Borgeaud, Mensch et al., 2022 — Training Compute-Optimal Large Language Models(Chinchilla 論文,NeurIPS 2022;等比例放大的修正結論、Chinchilla vs Gopher 對照、MMLU 67.5% 出處)</a>
-        <a href="https://arxiv.org/abs/2005.14165">Brown et al., 2020 — Language Models are Few-Shot Learners(GPT-3 論文,175B 参数、約 300B token 訓練資料量的出處)</a>
+        <a href="https://arxiv.org/abs/2005.14165">Brown et al., 2020 — Language Models are Few-Shot Learners(GPT-3 論文,175B 參數、約 300B token 訓練資料量的出處)</a>
         <a href="https://arxiv.org/abs/2404.10102">Besiroglu, Erdil et al., 2024 — Chinchilla Scaling: A replication attempt(對 Hoffmann et al. 原始係數的方法學質疑與重新擬合)</a>
       </div>
       <div class="ref-group">
@@ -350,14 +350,14 @@ render_with_liquid: false
       title: 'Kaplan 配方(偏重堆參數)',
       formula: 'N_optimal ∝ C^0.73 · D_optimal ∝ C^0.27',
       note: '算力每增加十倍,模型大小該漲得比資料量快得多——背後論證是大模型「樣本效率」更高,同樣資料大模型能榨出更多東西,所以資料相對少一點、甚至提早停止訓練也划算。',
-      example: '代表模型:GPT-3(175B 参数,約 300B token)。'
+      example: '代表模型:GPT-3(175B 參數,約 300B token)。'
     },
     chinchilla: {
       color: 'var(--green)',
       title: 'Chinchilla 配方(參數/資料等比放大)',
       formula: 'N 跟 D 接近等比例一起放大(模型翻倍,資料也該跟著翻倍)',
       note: 'Kaplan 配方讓資料餵太少;同樣算力下,把資料量拉高、模型做小一點,可以換到更低的 loss——用四分之一大小的模型,打贏四倍大、資料餵不夠的模型。',
-      example: '代表模型:Chinchilla(70B 参数,1.4 兆 token)。'
+      example: '代表模型:Chinchilla(70B 參數,1.4 兆 token)。'
     }
   };
   const COMPUTE_STEPS = [
@@ -366,12 +366,12 @@ render_with_liquid: false
       caption: '算力預算還小的時候,兩種配方分出來的 N/D 配比差異不明顯,loss 差距也還小——配方選錯的代價,是隨算力變大才逐漸顯現的。'
     },
     {
-      label: 'GPT-3 級', kapLabel: 'GPT-3\n175B / ~300B token', chinLabel: '(同算力换配方,教學推論)',
-      caption: 'GPT-3(175B 参数,約 300B token)是照 Kaplan 配方练出來的代表模型,落在 Kaplan 曲線上。「同樣算力换成 Chinchilla 配方理論上能换到更低 loss」是順著 Chinchilla 結論反推的教學推論——論文並沒有真的重練一個「Chinchilla 版 GPT-3」做直接對照。'
+      label: 'GPT-3 級', kapLabel: 'GPT-3\n175B / ~300B token', chinLabel: '(同算力換配方,教學推論)',
+      caption: 'GPT-3(175B 參數,約 300B token)是照 Kaplan 配方練出來的代表模型,落在 Kaplan 曲線上。「同樣算力換成 Chinchilla 配方理論上能換到更低 loss」是順著 Chinchilla 結論反推的教學推論——論文並沒有真的重練一個「Chinchilla 版 GPT-3」做直接對照。'
     },
     {
       label: 'Gopher / Chinchilla 級(論文實測對照組)', kapLabel: 'Gopher\n280B / ~300B token', chinLabel: 'Chinchilla\n70B / 1.4T token',
-      caption: '這是 Hoffmann et al. 論文裡真的做出來的對照組:同樣算力預算下,Chinchilla(70B 参数,1.4 兆 token)MMLU 平均正確率 67.5%,比 Gopher(280B 参数,約 300B token)高超過 7 個百分點——不是外推,是論文實測結果。'
+      caption: '這是 Hoffmann et al. 論文裡真的做出來的對照組:同樣算力預算下,Chinchilla(70B 參數,1.4 兆 token)MMLU 平均正確率 67.5%,比 Gopher(280B 參數,約 300B token)高超過 7 個百分點——不是外推,是論文實測結果。'
     },
     {
       label: '再往上一級(外推示意)', kapLabel: '(外推示意)', chinLabel: '(外推示意)',
