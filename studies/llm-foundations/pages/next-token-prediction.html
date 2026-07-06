@@ -1,0 +1,667 @@
+---
+title: Next-token Prediction — 為什麼猜下一個字能生出聰明的東西(互動圖解)
+summary: 五個區塊——目標定義是什麼(填空遊戲卡片)、壓縮論證(死背 vs 抓規律,同一句沒看過的話兩種模式猜出的機率長條對照)、GPT-2 案例校驗(問答/翻譯/摘要三種網路文字裡天生藏著的任務形狀)、emergent abilities mirage(連續量尺 vs 不連續量尺切換的示意圖表,demonstrate 全有全無的評測怎麼把平滑進步壓成看似忽然開竅)、目標定義本身就鎖死 autoregressive(舒芙蕾 vs 沙拉靜態對照卡)。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - interactive
+  - next-token-prediction
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Next-token Prediction:為什麼「猜下一個字」這個笨方法練得出聰明的東西,
+  又為什麼這個目標本身天生綁定 autoregressive。可長期回看的教學頁(pages/ genre,
+  發布於 /llm-foundations/next-token-prediction/),不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-04-next-token-prediction.md(唯一真相來源:目標定義、壓縮論證、
+      GPT-2 案例校驗、emergent abilities mirage)
+    ../docs/2026-07-04-llm-primitives.md(區塊 5「目標鎖死 autoregressive」的推導依據——
+      該篇的舒芙蕾/沙拉比喻與「next-token 目標定義本身已經寫死 AR 順序」的論證;
+      這個連結是本頁自己做的整理，不是 next-token-prediction.md 逐字內容)
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁，並更新這個日期。
+  What it is:
+    區塊 1(目標定義)— 三張卡片:定義是什麼（填空遊戲）/ 怎麼練 / 容器是什麼
+      （Transformer，不展開細節，指回 101 頁）。
+    區塊 2(壓縮論證)— 「死背」vs「抓規律」chip 切換 + 同一句沒在語料裡逐字出現過的話，
+      兩種模式各自猜出的下一字機率長條對照：死背模式退化成接近隨機（沒看過就沒信號），
+      抓規律模式即使沒看過這句話也能猜得又準又集中。權重數字為教學示意，非真實模型輸出。
+    區塊 3(GPT-2 案例校驗)— 三張卡片：問答形狀 / 翻譯形狀 / 摘要形狀，點卡片看網路文字
+      裡天生就有的任務示範（教學示意片段，非真實 WebText 逐字內容），呼應論文的
+      log-linear 漸進成長曲線敘述。
+    區塊 4(emergent abilities mirage)— chip 切換「連續量尺（每 token 機率）」vs
+      「不連續量尺（整題全對才算分）」+ 四段模型規模的 log 座標示意圖表，用
+      q = p^L（教學示意的簡化模型，不是論文精確公式）具體演示同一條平滑曲線，套用
+      不同量尺會不會看起來像「忽然開竅」。
+    區塊 5(目標鎖死 autoregressive，靜態對照)— 「Next-token = 舒芙蕾」vs
+      「Masked/denoising = 沙拉」兩張卡片，講清楚選了 next-token 目標，AR 生成順序
+      是定義本身逼出來的，不是另外多做一次選擇。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Next-token Prediction — 猜下一個字，為什麼能生出聰明的東西</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+  .tagline a{color:var(--accent)}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+  .sec-sub a{color:var(--accent)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:wrap}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:13px;font-family:var(--mono);flex:0 0 auto;padding:0 4px}
+  .node{flex:1;min-width:220px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .deeper a{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:190px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .chip.rose.active{border-color:var(--rose);box-shadow:0 0 0 2px rgba(176,74,106,.16),var(--shadow)}
+  .chip.grn.active{border-color:var(--green);box-shadow:0 0 0 2px rgba(12,122,89,.16),var(--shadow)}
+  .swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:12px;text-align:center}
+
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:60px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+
+  .round-caption{margin-top:12px;padding:10px 14px;background:var(--bg);border-left:3px solid var(--rose);
+    border-radius:0 10px 10px 0;font-size:13px}
+
+  /* bars */
+  .bars{display:flex;flex-direction:column;gap:9px;max-width:520px;margin:0 auto}
+  .bar-row{display:grid;grid-template-columns:64px 1fr 46px;align-items:center;gap:12px;
+    border-radius:9px;padding:5px 8px;transition:background .12s ease}
+  .bar-row.picked{background:rgba(154,107,46,.10)}
+  .bar-row .tok{font-family:var(--mono);font-size:13.5px;text-align:right}
+  .bar-track{background:var(--line-soft);border-radius:999px;height:13px;overflow:hidden;border:1px solid var(--line)}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--accent));border-radius:999px 0 0 999px;transition:width .22s ease}
+  .bar-row .pct{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations · Next-token Prediction</div>
+    <h1>猜下一個字，為什麼能生出聰明的東西</h1>
+    <p class="tagline">
+      101 頁圖 A 第④站「對牌庫打分」，說的就是這一頁的主角——<b>next-token prediction</b>：
+      給模型一段文字的前半段，叫它猜下一個字牌是什麼。這個目標本身完全不懂文法、不懂事實、
+      不懂邏輯，但要把這個填空遊戲玩準，反過來會逼模型內化文法、事實、邏輯——這叫壓縮論證。
+      這頁依序講：這個目標到底在幹嘛、壓縮論證怎麼運作、GPT-2 怎麼校驗這個論證、
+      「規模一大能力就忽然冒出來」這個敘事為什麼要打折扣，最後補一段：選了這個目標，
+      其實也同時鎖死了模型只能一個字接一個字生成（autoregressive）——不是另外多做一次選擇。
+    </p>
+  </header>
+
+  <!-- ============ 區塊 1: 目標定義 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 1 · 這個訓練目標到底在幹嘛</div>
+    <div class="sec-title">一個聽起來很笨的填空遊戲</div>
+    <p class="sec-sub">
+      沒有人告訴模型「這是文法規則」「這是一個事實」「這是一段邏輯推理」——它從頭到尾
+      只被要求做一件事：<b>猜下一個字</b>。點卡片看定義、怎麼練、跑在什麼容器裡。
+    </p>
+
+    <div class="row" id="objRow">
+      <div class="node" data-key="def">
+        <div class="idx">01 · 定義</div>
+        <h3>填空遊戲</h3>
+        <div class="q">給前半段文字，猜下一個字牌是什麼</div>
+      </div>
+      <div class="node" data-key="train">
+        <div class="idx">02 · 怎麼練</div>
+        <h3>猜錯調整，猜對加強</h3>
+        <div class="q">在夠大的語料上重複幾兆次</div>
+      </div>
+      <div class="node" data-key="container">
+        <div class="idx">03 · 容器</div>
+        <h3>Transformer</h3>
+        <div class="q">這個目標推得到多大規模，容器決定一大半</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelObj">
+      <p class="placeholder">↑ 點一張卡片，看說明。</p>
+    </div>
+  </section>
+
+  <!-- ============ 區塊 2: 壓縮論證 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 2 · 為什麼這麼簡單的目標，能生出這麼廣的能力</div>
+    <div class="sec-title">壓縮論證 — 猜得準是果，理解是因</div>
+    <p class="sec-sub">
+      要把「猜下一個字」做到準，不是靠死背——語料庫太大背不完；唯一的辦法是<b>找出文字
+      背後真正的規律</b>（文法規則、世界知識、甚至因果/邏輯關係），內化成參數，才能在
+      <b>沒看過的句子</b>上也猜得準。下面這句話沒有逐字出現在訓練語料裡（教學示意）：
+      切換「死背」跟「抓規律」，看兩種模式各自猜出來的下一個字機率差多少。
+    </p>
+
+    <div class="chips" id="compChips">
+      <div class="chip active" data-comp="memorize"><h4>死背</h4><div class="sub">只認得看過的原句</div></div>
+      <div class="chip" data-comp="generalize"><h4>抓規律</h4><div class="sub">內化了文法/世界知識</div></div>
+    </div>
+
+    <div class="scene-box">
+      <div style="text-align:center;font-family:var(--mono);font-size:16px;margin-bottom:6px">
+        小明打開冰箱，拿出一瓶<span style="color:var(--accent)">___</span>
+      </div>
+      <div class="scene-note" style="margin-top:0;margin-bottom:14px">這句話沒有逐字出現在訓練語料裡——教學示意，非真實模型輸出</div>
+      <div class="bars" id="compBars"></div>
+      <div class="scene-note" id="compNote"></div>
+    </div>
+
+    <div class="panel" id="panelComp"></div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>目標本身不獎勵「理解」</b> — next-token prediction 這個目標定義裡完全沒有「理解」兩個字；但要把猜字準確率做好，理解是唯一的捷徑，這是壓縮論證的核心。</div>
+      <div class="exclusion"><b>「壓縮論證」是這篇筆記的重建</b> — 呼應業界常見的「預測是壓縮的一種形式，壓縮需要理解」說法，這個框架常被歸到 Ilya Sutskever 的公開演講，但沒有逐字查證原始措辭，不作為引用來源，只作為思路來源標註。</div>
+    </div>
+  </section>
+
+  <!-- ============ 區塊 3: GPT-2 案例校驗 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 3 · 案例校驗</div>
+    <div class="sec-title">GPT-2 — 網路文字本身就是人類任務的副產品</div>
+    <p class="sec-sub">
+      GPT-2 完全沒有被特別訓練去做翻譯、摘要、問答，純粹只做「猜下一個字」——但訓練語料
+      （WebText，從網路上刮下來的網頁）裡本來就散布著大量這幾種<b>自然存在的示範</b>。
+      模型要把這些位置的下一個字猜準，就<b>順便</b>把這些任務的模式也學了進去，完全沒人
+      特別標註「這是一個翻譯任務」。點卡片看三種常見的形狀（教學示意片段，非真實 WebText
+      逐字內容）。
+    </p>
+
+    <div class="row" id="caseRow">
+      <div class="node" data-key="qa">
+        <div class="idx">形狀 1 · 問答</div>
+        <h3>Q: … A: …</h3>
+        <div class="q">FAQ、討論區裡到處都是這種格式</div>
+      </div>
+      <div class="node" data-key="translate">
+        <div class="idx">形狀 2 · 翻譯</div>
+        <h3>一句話 + 括號翻譯</h3>
+        <div class="q">雙語對照網頁、字幕檔常見的排法</div>
+      </div>
+      <div class="node" data-key="summary">
+        <div class="idx">形狀 3 · 摘要</div>
+        <h3>全文 + 「摘要：」段落</h3>
+        <div class="q">新聞網站、部落格常附的收尾段落</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelCase">
+      <p class="placeholder">↑ 點一張卡片，看網路文字裡的任務形狀。</p>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>零特別訓練，零特別標註</b> — 這些任務的表現隨模型規模拉大，論文量到大致呈現 <b>log-linear</b>（粗略等距翻倍規模，表現等距進步）的成長曲線——是<b>漸進的</b>，不是一次性跳過某個門檻。這條平滑曲線，正是下一區塊要打折扣的「忽然開竅」敘事的反例。</div>
+    </div>
+  </section>
+
+  <!-- ============ 區塊 4: Emergent abilities mirage ============ -->
+  <section>
+    <div class="sec-kicker">區塊 4 · 誠實提醒</div>
+    <div class="sec-title">「規模一大能力就忽然冒出來」，這個敘事要打折扣</div>
+    <p class="sec-sub">
+      網路上常見的敘事是「小模型完全不會、一過某個規模門檻能力忽然冒出來（emergent
+      abilities）」，聽起來像量變到某個點忽然質變。Schaeffer et al. 2023 指出：這個
+      「忽然跳」的形狀，有很大成分是<b>評測指標選得不好造成的錯覺</b>——如果用的是
+      非線性/不連續的指標（例如「整題答對才算分」這種全有全無的量尺），表現曲線會被
+      壓平成一條貼著 0 的線，直到某個規模才猛然拉起來；但換成線性/連續的指標
+      （例如每個 token 的機率誤差），同一個模型系列的進步其實是平滑、可預測的。
+      下面用同一條底層能力曲線，套用兩種量尺，看看形狀差多少。
+    </p>
+
+    <div class="chips" id="mirageChips">
+      <div class="chip grn active" data-mirage="continuous">
+        <h4><span class="swatch" style="background:var(--green)"></span>連續量尺</h4>
+        <div class="sub">每個 token 的機率誤差</div>
+      </div>
+      <div class="chip rose" data-mirage="discrete">
+        <h4><span class="swatch" style="background:var(--rose)"></span>不連續量尺</h4>
+        <div class="sub">整題答對才算分（全有全無）</div>
+      </div>
+    </div>
+
+    <div class="ctl-row" id="mirageStepCtl">
+      <span class="ctl-label">模型規模</span>
+      <span class="pill" data-mstep="0">小模型</span>
+      <span class="pill" data-mstep="1">中模型</span>
+      <span class="pill" data-mstep="2">大模型（門檻附近）</span>
+      <span class="pill active" data-mstep="3">超大模型</span>
+    </div>
+
+    <div class="scene-box" style="margin-top:16px">
+      <div id="mirageChart" style="display:flex;justify-content:center"></div>
+      <div class="scene-note">曲線與座標軸單位是教學示意，q = p^L（這裡設 L=25 步）是本頁自己設計的簡化演示模型，不是論文的精確公式</div>
+    </div>
+
+    <div class="panel" id="panelMirage"></div>
+    <div class="round-caption" id="mirageCaption"></div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>不是否認規模拉大表現會變好</b> — Schaeffer et al. 否認的是「有一個神奇門檻，過了就質變」這個更強的說法，不是否認規模效應本身。</div>
+      <div class="exclusion"><b>GPT-2 的 log-linear 曲線，就是反敘事的證據</b> — 區塊 3 那條平滑成長曲線，正好呼應「換成連續量尺看，進步其實一路平滑」這個判斷。</div>
+    </div>
+  </section>
+
+  <!-- ============ 區塊 5: 目標鎖死 autoregressive ============ -->
+  <section>
+    <div class="sec-kicker">區塊 5 · 選了目標，等於順便選了生成順序</div>
+    <div class="sec-title">Next-token 目標的定義本身，就已經寫死了「一個接一個生成」</div>
+    <p class="sec-sub">
+      這一段不是 next-token-prediction.md 逐字內容，是本頁自己做的整理，依據
+      <a href="../docs/2026-07-04-llm-primitives.md">llm-primitives.md</a> 裡「訓練目標
+      決定解碼順序的開放度」那段推導：next-token prediction 的定義就是「給定前面
+      <b>全部</b>，猜下一個」——選了這個目標，等於<b>同時</b>選了 autoregressive
+      （一個字接一個字生成）的方式，不是另外多做一次選擇。點卡片看跟另一種目標
+      （masked/denoising）的對照。
+    </p>
+
+    <div class="row" id="bindRow">
+      <div class="node active" data-key="ar">
+        <div class="idx">目標 1 · Next-token</div>
+        <h3>= 舒芙蕾</h3>
+        <div class="q">拌合順序被材料的化學性質鎖死，沒得選</div>
+      </div>
+      <div class="arrow">vs</div>
+      <div class="node" data-key="mask">
+        <div class="idx">目標 2 · Masked / Denoising</div>
+        <h3>= 沙拉</h3>
+        <div class="q">先切哪個都行，順序是額外自己選的</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelBind"></div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      跟本頁對應的完整技術筆記（含逐條信心等級標記），見
+      <a href="../docs/2026-07-04-next-token-prediction.md">2026-07-04-next-token-prediction.md</a>。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">原始論文</div>
+        <a href="https://arxiv.org/abs/1706.03762">Vaswani et al., 2017 — Attention Is All You Need（Transformer 原始論文，這個目標推得到多大規模的容器）</a>
+        <a href="https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf">Radford et al., 2019 — Language Models are Unsupervised Multitask Learners（GPT-2 論文，WebText 語料、zero-shot 多工能力、log-linear 規模曲線的出處）</a>
+        <a href="https://arxiv.org/abs/2304.15004">Schaeffer, Miranda &amp; Koyejo, 2023 — Are Emergent Abilities of Large Language Models a Mirage?（NeurIPS 2023，「emergent abilities 可能是量尺選擇造成的錯覺」的出處）</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">同主題筆記</div>
+        <a href="../docs/2026-07-04-next-token-prediction.md">next-token-prediction.md（本頁對應的完整筆記，含出處與誠實聲明）</a>
+        <a href="../docs/2026-07-04-llm-primitives.md">llm-primitives.md（區塊 5「目標鎖死 autoregressive」舒芙蕾/沙拉比喻的出處）</a>
+        <a href="../docs/2026-07-04-in-context-learning.md">in-context-learning.md（訓練階段講完之後的下一步：推論時不改參數也能「當場學會」新任務）</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 區塊 1：目標定義 ============ */
+  const OBJ = {
+    def: {
+      tag: '01 · 定義', title: '填空遊戲',
+      what: '給模型一段文字的前半段，叫它猜下一個字（嚴格說是下一個 token）是什麼。沒有人告訴它「這是文法規則」「這是一個事實」「這是一段邏輯推理」——它從頭到尾只被要求做一件事：猜下一個字。',
+      ex: '對應 101 頁核心迴圈第④站「對牌庫打分」：讀牌全部結束後，模型對牌庫裡每一張牌打一個「接在後面有多合適」的分數。',
+      deeper: '聽起來很笨——但「笨」指的是目標的字面內容，不是它逼出來的結果，見區塊 2 的壓縮論證。'
+    },
+    train: {
+      tag: '02 · 怎麼練', title: '猜錯調整，猜對加強',
+      what: '猜錯了就往正確答案的方向調整參數，猜對了機率就往上加強。這件事在一份夠大的文字語料上重複幾兆次，就是 GPT 系列從第一代到現在，最底層沒變過的訓練方式。',
+      ex: '訓練用的參數優化方法（backpropagation + gradient descent）本身跟這個目標是分開的兩件事——這篇不展開優化細節，只聚焦「猜下一個字」這個目標本身。',
+      deeper: '規模一大（更多參數、更多資料、更多算力），loss 會沿著平滑的冪律曲線下降——這部分留給 scaling-laws 那一頁。'
+    },
+    container: {
+      tag: '03 · 容器', title: 'Transformer',
+      what: '猜字這個目標，不管用什麼架構都能訓練，但 Transformer 能撐得住這個目標被推到很大的規模，關鍵在 self-attention：每猜一個字，模型可以直接「回頭看」前面任何位置的字，而且這個動作能對句子裡每個位置同時平行計算。',
+      ex: '這篇筆記把 Transformer 當「猜字遊戲跑在什麼容器裡」的答案，不展開 self-attention 的計算細節——那是另一層的技術問題，詳見 101 頁圖 B。',
+      deeper: '正是「容器能撐住大規模平行訓練」這個工程前提，讓區塊 2 的壓縮論證有機會在夠大的語料上真正發生。'
+    }
+  };
+  const panelObj = document.getElementById('panelObj');
+  function renderObj(key){
+    const d = OBJ[key];
+    document.querySelectorAll('#objRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelObj.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+      <div class="deeper"><b>更深一層</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelObj);
+  }
+  document.querySelectorAll('#objRow .node').forEach(el => el.addEventListener('click', () => renderObj(el.dataset.key)));
+
+  /* ============ 區塊 2：壓縮論證（死背 vs 抓規律）============ */
+  // 候選分佈皆為教學示意，非真實模型輸出
+  const COMPRESS = {
+    memorize: {
+      cands: [
+        { tok:'牛奶', pct:18 }, { tok:'水', pct:17 }, { tok:'鞋子', pct:17 },
+        { tok:'石頭', pct:16 }, { tok:'果汁', pct:16 }, { tok:'彩虹', pct:16 }
+      ],
+      note: '沒看過這句話逐字出現過，死背模式沒有信號可用——猜出來的分佈接近隨機，合理的「牛奶」跟不合理的「石頭」機率差不多。',
+      tag: '模式 1 · 死背', title: '沒看過就沒信號，退化成隨機亂猜',
+      what: '死背模式只認得訓練時看過的原句——語料庫太大背不完，遇到沒逐字出現過的句子，完全沒有依據判斷哪個字比較合理。',
+      deeper: '這正是壓縮論證的反面案例：如果猜字準確率只能靠背誦，遇到語料庫裡幾乎不會重複出現的長句子，模型會全面失準。'
+    },
+    generalize: {
+      cands: [
+        { tok:'牛奶', pct:52 }, { tok:'水', pct:23 }, { tok:'果汁', pct:14 },
+        { tok:'啤酒', pct:8 }, { tok:'鞋子', pct:2 }, { tok:'石頭', pct:1 }
+      ],
+      note: '雖然沒看過這句話，但「內化了規律」的模式知道冰箱裡通常放什麼、常見的飲料是什麼，猜出來的分佈又準又集中。',
+      tag: '模式 2 · 抓規律', title: '沒看過這句話，也能猜得又準又集中',
+      what: '抓規律模式把訓練語料裡的規律內化成參數——世界知識（冰箱裡放什麼）、常見搭配（拿出一瓶＋飲料），即使沒看過這句話逐字出現，也能推出合理排序。',
+      deeper: '猜字準不準，是果；有沒有真的理解文字背後的結構，是因——目標本身不獎勵「理解」，但要把目標做好，理解是唯一的捷徑。'
+    }
+  };
+  const compBars = document.getElementById('compBars');
+  const compNote = document.getElementById('compNote');
+  const panelComp = document.getElementById('panelComp');
+  function renderCompress(mode){
+    const d = COMPRESS[mode];
+    document.querySelectorAll('#compChips .chip').forEach(c => c.classList.toggle('active', c.dataset.comp === mode));
+    compBars.innerHTML = '';
+    d.cands.forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = `<div class="tok">${c.tok}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${c.pct}%"></div></div>
+        <div class="pct">${c.pct}%</div>`;
+      compBars.appendChild(row);
+    });
+    compNote.textContent = d.note;
+    panelComp.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      <div class="deeper"><b>壓縮論證</b> — ${d.deeper}</div>
+    `;
+    fadeIn(compBars);
+    fadeIn(panelComp);
+  }
+  document.querySelectorAll('#compChips .chip').forEach(c => c.addEventListener('click', () => renderCompress(c.dataset.comp)));
+
+  /* ============ 區塊 3：GPT-2 案例校驗 ============ */
+  const CASES = {
+    qa: {
+      tag: '形狀 1 · 問答', title: 'Q: … A: …',
+      snippet: 'Q: 台灣的首都是哪裡？<br>A: 台北。',
+      what: '這種「Q: … A: …」的格式在 FAQ 頁面、討論區裡到處都是——網路文字本身就自然存在這種形狀，不需要任何人特別標註「這是一個問答任務」。',
+      deeper: '模型要把「A:」後面那個字接對，等於順便學會怎麼回答問題——這不是換了一套機制在「回答」，是同一套打分機制，遇到這個文字形狀該接的東西剛好是答案。'
+    },
+    translate: {
+      tag: '形狀 2 · 翻譯', title: '一句話 + 括號翻譯',
+      snippet: 'The weather is nice today.（今天天氣很好。）',
+      what: '雙語對照網頁、字幕檔常見「一句話後面接著它的翻譯」這種排法——這是網路文字裡自然存在的示範，翻譯任務的訓練訊號就藏在裡面。',
+      deeper: '模型要接對括號裡的下一個字，等於順便把兩種語言的對應關係也學了進去，完全沒人特別標註「這是一個翻譯任務」。'
+    },
+    summary: {
+      tag: '形狀 3 · 摘要', title: '全文 + 「摘要：」段落',
+      snippet: '［新聞全文……］<br><br>摘要：本文報導……',
+      what: '新聞網站、部落格常在文章後面附一段摘要——這篇文章後面接著就是它的摘要，這種結構在網路上非常普遍。',
+      deeper: '模型要把「摘要：」後面的字接對，等於順便學會怎麼把長文章壓縮成短摘要——同一套「猜下一個字」的機制，遇到不同文字形狀，會表現成不同的「任務」。'
+    }
+  };
+  const panelCase = document.getElementById('panelCase');
+  function renderCase(key){
+    const d = CASES[key];
+    document.querySelectorAll('#caseRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelCase.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="ex" style="font-family:var(--mono)">${d.snippet}</div>
+      <div class="meta" style="margin-top:12px"><b>在做什麼</b><span>${d.what}</span></div>
+      <div class="deeper"><b>更深一層</b> — ${d.deeper}</div>
+      <p style="margin-top:10px;font-size:11.5px;color:var(--faint)">教學示意片段，非真實 WebText 逐字內容。</p>
+    `;
+    fadeIn(panelCase);
+  }
+  document.querySelectorAll('#caseRow .node').forEach(el => el.addEventListener('click', () => renderCase(el.dataset.key)));
+
+  /* ============ 區塊 4：Emergent abilities mirage ============ */
+  const state4 = { mirage: 'continuous', step: 3 };
+  const L_STEPS = 25; // 教學示意的簡化模型：整題全對 = 每一步都對，L 步相乘
+  function perStepAcc(f){ return 0.3 + 0.68 * f; }      // 連續量尺：平滑上升
+  function wholeAcc(f){ return Math.pow(perStepAcc(f), L_STEPS); } // 不連續量尺：全有全無
+
+  const MIRAGE_STEPS = [
+    { label:'小模型', f:0.15 },
+    { label:'中模型', f:0.45 },
+    { label:'大模型（門檻附近）', f:0.75 },
+    { label:'超大模型', f:0.95 }
+  ];
+
+  const TOP4 = 46, BOTTOM4 = 264, X04 = 78, X14 = 600;
+  function valToY(v){ return BOTTOM4 - v * (BOTTOM4 - TOP4 - 20); }
+  function xPix4(f){ return X04 + f * (X14 - X04); }
+  function pathFor4(fn){
+    let d = '';
+    for(let i = 0; i <= 32; i++){
+      const f = i / 32;
+      const x = xPix4(f), y = valToY(fn(f));
+      d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+    }
+    return d.trim();
+  }
+  function pctStr(v){
+    const p = v * 100;
+    if(p < 0.05) return '< 0.1%';
+    return (p >= 10 ? Math.round(p) : p.toFixed(1)) + '%';
+  }
+
+  function mirageChartSVG(){
+    const isCont = state4.mirage === 'continuous';
+    const step = MIRAGE_STEPS[state4.step];
+    const f = step.f;
+    const xk = xPix4(f);
+    const yCont = valToY(perStepAcc(f));
+    const yDisc = valToY(wholeAcc(f));
+
+    const xTicks = [0, 0.25, 0.5, 0.75, 1].map((t, i) => {
+      const x = xPix4(t);
+      return `<line x1="${x}" y1="${BOTTOM4}" x2="${x}" y2="${BOTTOM4+5}" stroke="var(--faint)" stroke-width="1"/>
+        <text x="${x}" y="${BOTTOM4+18}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--faint)">10${'¹²³⁴⁵'[i]}</text>`;
+    }).join('');
+
+    return `<svg width="640" height="300" viewBox="0 0 640 300">
+      <line x1="${X04}" y1="${TOP4-8}" x2="${X04}" y2="${BOTTOM4}" stroke="var(--faint)" stroke-width="1.4"/>
+      <line x1="${X04}" y1="${BOTTOM4}" x2="${X14+8}" y2="${BOTTOM4}" stroke="var(--faint)" stroke-width="1.4"/>
+      ${xTicks}
+      <text x="${(X04+X14)/2}" y="292" text-anchor="middle" font-size="11.5" fill="var(--muted)">模型規模（log 座標，相對尺度，教學示意）→</text>
+      <text x="20" y="${(TOP4+BOTTOM4)/2}" text-anchor="middle" font-size="11.5" fill="var(--muted)" transform="rotate(-90 20 ${(TOP4+BOTTOM4)/2})">表現（越高越好）</text>
+
+      <path d="${pathFor4(perStepAcc)}" fill="none" stroke="var(--green)" stroke-width="${isCont ? 3.2 : 1.8}" opacity="${isCont ? 1 : 0.4}" stroke-dasharray="${isCont ? '0' : '5 4'}"/>
+      <path d="${pathFor4(wholeAcc)}" fill="none" stroke="var(--rose)" stroke-width="${!isCont ? 3.2 : 1.8}" opacity="${!isCont ? 1 : 0.4}" stroke-dasharray="${!isCont ? '0' : '5 4'}"/>
+
+      <line x1="${xk}" y1="${TOP4-8}" x2="${xk}" y2="${BOTTOM4}" stroke="var(--faint)" stroke-width="1.3" stroke-dasharray="4 4"/>
+      <circle cx="${xk}" cy="${yCont}" r="6" fill="var(--panel)" stroke="var(--green)" stroke-width="2.4"/>
+      <circle cx="${xk}" cy="${yDisc}" r="6" fill="var(--panel)" stroke="var(--rose)" stroke-width="2.4"/>
+
+      <text x="${Math.min(xk+12, 634)}" y="${yCont - 10}" font-size="10.5" font-family="var(--mono)" fill="var(--green)" text-anchor="${xk > 480 ? 'end' : 'start'}">連續：${pctStr(perStepAcc(f))}</text>
+      <text x="${Math.min(xk+12, 634)}" y="${yDisc + 18}" font-size="10.5" font-family="var(--mono)" fill="var(--rose)" text-anchor="${xk > 480 ? 'end' : 'start'}">不連續：${pctStr(wholeAcc(f))}</text>
+
+      <text x="${(X04+X14)/2}" y="26" text-anchor="middle" font-size="11.5" fill="var(--faint)">實線=目前選中的量尺 · 虛線淡色=另一種量尺（同一條底層能力曲線）</text>
+    </svg>`;
+  }
+
+  const mirageChart = document.getElementById('mirageChart');
+  const panelMirage = document.getElementById('panelMirage');
+  const mirageCaption = document.getElementById('mirageCaption');
+
+  const MIRAGE_INFO = {
+    continuous: {
+      tag: '連續量尺', title: '每個 token 的機率誤差',
+      note: '直接顯示模型在每一步猜測上的準確程度——隨模型規模拉大，平滑地從「猜得普通」進步到「猜得很準」。GPT-2 量到的 log-linear 曲線（見區塊 3）就是這種平滑的形狀。',
+      color: 'var(--green)'
+    },
+    discrete: {
+      tag: '不連續量尺', title: '整題答對才算分（全有全無）',
+      note: '這裡把「整題」教學示意成需要串起 25 個步驟才算數，只要有一步猜錯，整題就算失敗（q = p^25，本頁自己設計的簡化演示模型）。同一條底層能力曲線，換算成「整題全對機率」之後，在規模還不夠大時幾乎貼著 0，直到每一步的準確率都逼近滿分，乘出來的整題機率才會忽然拉起來——看起來像「忽然開竅」，其實是量尺選得不好，把平滑的進步壓成了一條看不出變化的線。',
+      color: 'var(--rose)'
+    }
+  };
+
+  const MIRAGE_CAPTIONS = [
+    '這個規模下，連續量尺已經量到 40% 左右的逐步準確率——看得出模型不是什麼都不會；但整題全對（25 步全部串起來）算出來的機率趨近於 0%，乍看像是「完全沒有這個能力」。',
+    '逐步準確率繼續平滑爬升到 61%，整題全對機率卻還是趨近於 0%——這正是評測曲線被「壓平成貼著 0 的線」的原因：多步驟相乘，對「不夠準」極度不寬容。',
+    '逐步準確率來到 81%，整題全對機率終於離開 0，來到 0.5% 左右——曲線開始翹起來，但看起來還是幾乎沒有能力。',
+    '逐步準確率只是穩穩爬到 95%，整題全對機率卻從 0.5% 猛跳到 25%——這一段「看起來忽然開竅」，實際上底層的逐步能力從頭到尾都在平滑地進步，沒有任何魔法門檻被跨過。'
+  ];
+
+  function renderMirage(){
+    mirageChart.innerHTML = mirageChartSVG();
+    fadeIn(mirageChart);
+    document.querySelectorAll('#mirageChips .chip').forEach(c => c.classList.toggle('active', c.dataset.mirage === state4.mirage));
+    document.querySelectorAll('#mirageStepCtl .pill').forEach((p, i) => p.classList.toggle('active', i === state4.step));
+
+    const d = MIRAGE_INFO[state4.mirage];
+    panelMirage.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2 style="color:${d.color}">${d.title}</h2>
+      <div class="ex">${d.note}</div>
+    `;
+    fadeIn(panelMirage);
+    mirageCaption.textContent = MIRAGE_CAPTIONS[state4.step];
+  }
+  document.querySelectorAll('#mirageChips .chip').forEach(c => c.addEventListener('click', () => { state4.mirage = c.dataset.mirage; renderMirage(); }));
+  document.querySelectorAll('#mirageStepCtl .pill').forEach((p, i) => p.addEventListener('click', () => { state4.step = i; renderMirage(); }));
+
+  /* ============ 區塊 5：目標鎖死 autoregressive ============ */
+  const BIND = {
+    ar: {
+      tag: '目標 1 · Next-token Prediction', title: '= 舒芙蕾——拌合順序被鎖死',
+      what: '定義是「給定前面<b>全部</b>，猜下一個」。這個定義本身就已經寫死「只能照順序、一個接一個生成」——選了這個目標，等於<b>同時</b>選了 autoregressive 順序，不是另外多做一次選擇。',
+      ex: '就像做舒芙蕾：蛋白打發、拌入蛋黃糊、進烤箱，順序不是廚師「決定」的，是材料的化學性質逼出來的，拌早了會消泡，順序被鎖死，沒得選。',
+      deeper: '這也解釋了為什麼 autoregressive 天生跟 tool use 這類 agent 技巧合拍——接到一半可以停下來等工具結果，見 <a href="../docs/2026-07-04-autoregressive-vs-nonautoregressive-for-agents.md">autoregressive-vs-nonautoregressive-for-agents.md</a>。'
+    },
+    mask: {
+      tag: '目標 2 · Masked / Denoising', title: '= 沙拉——順序是額外自己選的',
+      what: '定義是「隨機蓋住某些位置，猜被蓋住的是什麼」。目標本身<b>沒有要求任何生成順序</b>——蓋住哪個位置是隨機的，理論上可以任意順序甚至同時猜。',
+      ex: '就像做沙拉：小黃瓜、番茄、生菜，先切哪個都行，菜本身不要求任何順序；但廚師還是可以自己選擇先切不容易氧化的、再切香草，這個順序是廚師額外加上去的，不是沙拉這道菜逼的。',
+      deeper: '工程上還是可以自己選擇加一個順序（例如 block-wise diffusion，先做完一塊才做下一塊）——這是為了品質（避免內部不連貫）、效率（能重用計算），不是目標逼你這樣做。'
+    }
+  };
+  const panelBind = document.getElementById('panelBind');
+  function renderBind(key){
+    const d = BIND[key];
+    document.querySelectorAll('#bindRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelBind.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>目標定義</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+      <div class="deeper"><b>延伸</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelBind);
+  }
+  document.querySelectorAll('#bindRow .node').forEach(el => el.addEventListener('click', () => renderBind(el.dataset.key)));
+
+  /* 初始狀態 */
+  renderObj('def');
+  renderCompress('memorize');
+  renderCase('qa');
+  renderMirage();
+  renderBind('ar');
+</script>
+</body>
+</html>

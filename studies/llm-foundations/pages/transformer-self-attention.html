@@ -1,0 +1,833 @@
+---
+title: LLM Foundations Transformer 詳解 — 互動圖解
+summary: Transformer≠LLM 家族樹(encoder-decoder 拆成 encoder-only/decoder-only 兩條路線,點節點看訓練目標差異)、讀牌三角色 Query/Key/Value 圖解、multi-head「先投影才不會白做工」互動demo(有無先投影對比三個 head 的關聯比例)、疊層與殘差連接示意圖表(有無殘差、可調層數看資訊保留比例);另有為什麼特別適合套在猜下一個字上的三張原因卡片。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - transformer
+  - self-attention
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — LLM Foundations Transformer 詳解:比 101 頁圖 B 更深一層的技術細節。可長期
+  回看的教學頁(pages/ genre,發布於 /llm-foundations/transformer-self-attention/),不是
+  disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-04-transformer-self-attention.md
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。
+  分工說明:101 頁圖 B 已經有「整排一起看」的簡化互動模擬(點牌看關聯比例、換眼光、按輪次)——
+  這頁不重做那個 demo,只做簡短回顧並連結回 101,把篇幅留給 101 沒展開的技術細節(Q/K/V 三個
+  角色、multi-head 為什麼要先投影、殘差連接具體長什麼樣)。
+  What it is:
+    圖解一(起手式回顧)— 傳話遊戲的兩個問題 + 整排一起看解法,三張卡片;連結回 101 圖B。
+    圖解二(Transformer≠LLM 家族樹)— SVG 節點圖:原始 encoder-decoder → encoder-only
+      (BERT)/decoder-only(GPT),點節點看各自訓練目標差異,含「LLM=decoder-only+causal
+      mask+next-token prediction」三條件的精確定義。
+    圖解三(為什麼特別適合)— 三張卡片:跟 teacher forcing 卡榫卡得準、長距依賴一步直達、
+      苦澀的教訓(the bitter lesson)這個哲學層原因。
+    圖解四(讀牌的三個角色)— SVG 場景圖解 Query(提問)/Key(索引)/Value(內容)三個角色
+      怎麼合作算出「整排一起看」的一輪結果,權重為教學示意。
+    圖解五(Multi-head)— 靜態寬度流程圖(輸入→各自投影成窄版本→各自算 attention→串接+
+      線性合併)+ 互動demo:切換「有先投影 vs 沒先投影」,比較三個 head 算出來的關聯比例是
+      不同還是幾乎一樣(白做工)。
+    圖解六(疊層與殘差連接)— 「有殘差 vs 沒有殘差」切換 + 可調層數(8/16/32/96),線圖
+      示意資訊保留比例隨層數變化,非嚴謹數學模擬。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Transformer 詳解 — Query/Key/Value、Multi-head、殘差連接</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+  .tagline a{color:var(--accent)}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+  .sec-sub a{color:var(--accent)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:16px;flex:0 0 auto;padding:0 1px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:170px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .zone{cursor:pointer}
+  .zone .st{transition:stroke .15s ease}
+  .zone .stf{transition:fill .15s ease}
+  .zone:hover .st,.zone.active .st{stroke:currentColor}
+  .zone:hover .stf,.zone.active .stf{fill:currentColor}
+  .zone.active .fillable{fill:color-mix(in srgb,currentColor 8%,var(--panel))}
+  .zone.active text{fill:currentColor}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:10px;text-align:center}
+
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:74px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:650;padding:7px 14px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s ease}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
+
+  .round-caption{margin-top:12px;padding:10px 14px;background:var(--bg);border-left:3px solid var(--rose);
+    border-radius:0 10px 10px 0;font-size:13px}
+
+  /* multi-head mini panels */
+  .heads-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin-top:18px}
+  .head-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:14px}
+  .head-card h5{font-size:12.5px;font-weight:660}
+  .head-card .hbar-row{display:grid;grid-template-columns:34px 1fr 34px;align-items:center;gap:7px;margin-top:7px}
+  .head-card .hbar-row .tok{font-family:var(--mono);font-size:11px;text-align:right;color:var(--muted)}
+  .head-card .hbar-track{background:var(--line-soft);border-radius:999px;height:9px;overflow:hidden;border:1px solid var(--line)}
+  .head-card .hbar-fill{height:100%;border-radius:999px 0 0 999px;transition:width .22s ease}
+  .head-card .hbar-row .hpct{font-size:10.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+  .head-flag{margin-top:14px;padding:10px 14px;border-radius:0 10px 10px 0;font-size:12.5px}
+  .head-flag.warn{background:rgba(176,74,106,.08);border-left:3px solid var(--rose)}
+  .head-flag.ok{background:rgba(12,122,89,.08);border-left:3px solid var(--green)}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations · Transformer 詳解</div>
+    <h1>Transformer 詳解 — 為什麼「整排一起看」特別適合拿來做 LLM</h1>
+    <p class="tagline">
+      Transformer 不是天生為 LLM 而生的:2017 年剛發表時是拿來做機器翻譯,「語言模型」還沒跟它
+      畫上等號。它後來被 LLM 選中,是因為 self-attention 這個「整排一起看」的機制,剛好跟
+      「猜下一個字」這個訓練目標要推到多大規模,對上了——尤其是能不能平行運算這一點,是關鍵中的
+      關鍵。101 頁圖 B 已經有「整排一起看」的簡化互動模擬;這頁把 Query/Key/Value 三個角色、
+      multi-head 為什麼要先投影、疊層與殘差連接這些技術細節攤開來看。
+    </p>
+  </header>
+
+  <!-- ============ 圖解一:起手式回顧 ============ -->
+  <section>
+    <div class="sec-kicker">圖解一 · 起手式回顧</div>
+    <div class="sec-title">傳話遊戲的兩個麻煩,整排一起看怎麼解</div>
+    <p class="sec-sub">
+      在 Transformer 之前,主流做法(RNN/LSTM)處理一句話,像玩傳話遊戲:每個字只能把自己知道的
+      濃縮成一句話告訴下一個字,一個接一個往後傳。這造成兩個麻煩,點卡片看細節——101 頁圖 B 有這
+      部分的簡化互動模擬(點牌看關聯比例、換一副眼光、按輪次),這裡不重做一次,只做簡短回顧,把
+      篇幅留給後面更深的技術細節;想直接看簡化版,點<a href="../101/">這裡</a>。
+    </p>
+
+    <div class="row" id="recapRow">
+      <div class="node" data-key="lag">
+        <div class="idx">問題 1 · 傳話遊戲</div>
+        <h3>傳到後面資訊會失真</h3>
+        <div class="q">句子一長,前後關聯就難抓住</div>
+      </div>
+      <div class="node" data-key="serial">
+        <div class="idx">問題 2 · 傳話遊戲</div>
+        <h3>只能一個一個傳</h3>
+        <div class="q">沒辦法同時處理,訓練推不動大規模</div>
+      </div>
+      <div class="node" data-key="solution">
+        <div class="idx">解法 · Self-attention</div>
+        <h3>整排一起看</h3>
+        <div class="q">每張牌同時看整排牌,不用排隊</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelRecap">
+      <p class="placeholder">↑ 點一張卡片,看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ 圖解二:Transformer≠LLM 家族樹 ============ -->
+  <section>
+    <div class="sec-kicker">圖解二 · 一張設計圖,被拆成兩條路線</div>
+    <div class="sec-title">Transformer ≠ LLM — encoder-decoder 拆成兩條路線</div>
+    <p class="sec-sub">
+      Transformer 本身是一張「萬用積木設計圖」,不等於 LLM。原始論文(<a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">Vaswani et al., 2017</a>)
+      是 encoder-decoder 雙塔架構,拿來做翻譯——這張圖後來被拆開重組成不同路線。點下面的節點看
+      各自的訓練目標。
+    </p>
+
+    <div class="scene-box">
+      <svg id="familySvg" viewBox="0 0 680 270" style="width:100%;height:auto;display:block">
+        <defs>
+          <marker id="arrFam" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#b9ad9c"/></marker>
+        </defs>
+        <line x1="340" y1="86" x2="185" y2="150" stroke="#b9ad9c" stroke-width="1.8" marker-end="url(#arrFam)"/>
+        <line x1="340" y1="86" x2="495" y2="150" stroke="#b9ad9c" stroke-width="1.8" marker-end="url(#arrFam)"/>
+
+        <g class="zone" data-key="orig" style="color:#9a6b2e">
+          <rect class="st fillable" x="240" y="18" width="200" height="66" rx="12" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="340" y="46" text-anchor="middle" font-size="13" font-weight="650" font-family="var(--sans)" fill="var(--ink)">原始 Transformer(2017)</text>
+          <text x="340" y="66" text-anchor="middle" font-size="11.5" font-family="var(--mono)" fill="var(--muted)">Encoder-Decoder 雙塔 · 機器翻譯</text>
+          <text x="340" y="100" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">① 一張萬用積木設計圖</text>
+        </g>
+
+        <g class="zone" data-key="encoder" style="color:#2f6f9e">
+          <rect class="st fillable" x="60" y="150" width="250" height="80" rx="12" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="185" y="180" text-anchor="middle" font-size="13" font-weight="650" font-family="var(--sans)" fill="var(--ink)">Encoder-only</text>
+          <text x="185" y="200" text-anchor="middle" font-size="11.5" font-family="var(--mono)" fill="var(--muted)">填空式訓練 → BERT</text>
+          <text x="185" y="248" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">② 只留前半</text>
+        </g>
+
+        <g class="zone" data-key="decoder" style="color:#0c7a59">
+          <rect class="st fillable" x="370" y="150" width="250" height="80" rx="12" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="495" y="176" text-anchor="middle" font-size="13" font-weight="650" font-family="var(--sans)" fill="var(--ink)">Decoder-only + causal mask</text>
+          <text x="495" y="196" text-anchor="middle" font-size="11.5" font-family="var(--mono)" fill="var(--muted)">Next-token prediction → GPT 系列</text>
+          <text x="495" y="248" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">③ 只留後半(現在 LLM 的配方)</text>
+        </g>
+      </svg>
+      <div class="scene-note">點任一節點,看它的做法跟訓練目標</div>
+    </div>
+
+    <div class="panel" id="panelFamily">
+      <p class="placeholder">↑ 點一個節點,看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ 圖解三:為什麼特別適合 ============ -->
+  <section>
+    <div class="sec-kicker">圖解三 · 為什麼特別適合套在猜下一個字上</div>
+    <div class="sec-title">兩個機制面原因,加一個哲學層原因</div>
+    <p class="sec-sub">Transformer 後來被 LLM 選中不是偶然——點卡片看三個原因。</p>
+
+    <div class="row" id="reasonRow">
+      <div class="node" data-key="hook">
+        <div class="idx">原因 1 · 卡榫</div>
+        <h3>跟 teacher forcing 卡榫卡得很準</h3>
+        <div class="q">整排一起看讓所有位置同時打分,不用排隊</div>
+      </div>
+      <div class="node" data-key="longrange">
+        <div class="idx">原因 2 · 長距依賴</div>
+        <h3>語言的關聯常跨很遠距離</h3>
+        <div class="q">一步直達,不會因為距離遠就聯繫變弱</div>
+      </div>
+      <div class="node" data-key="bitter">
+        <div class="idx">原因 3 · 哲學層</div>
+        <h3>苦澀的教訓(the bitter lesson)</h3>
+        <div class="q">預設越少、越靠資料自己長出結構</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelReason">
+      <p class="placeholder">↑ 點一張卡片,看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ 圖解四:讀牌的三個角色 Q/K/V ============ -->
+  <section>
+    <div class="sec-kicker">圖解四 · 讀牌時的三個角色</div>
+    <div class="sec-title">Query / Key / Value — 「整排一起看」裡到底在比對什麼</div>
+    <p class="sec-sub">
+      上面講的「整排一起看」,拆進單一輪的計算裡,每張牌同時扮演三個角色。以「今天天氣很好」讀到
+      「很」這張牌為例(下面的比例是<b>教學示意,不是真實模型算出來的值</b>),點角色看定義。
+    </p>
+
+    <div class="scene-box">
+      <svg id="kvSvg" viewBox="0 0 640 430" style="width:100%;height:auto;display:block">
+        <!-- query -> key lines -->
+        <line x1="320" y1="68" x2="140" y2="108" stroke="var(--rose)" stroke-width="6.5" opacity=".55"/>
+        <line x1="320" y1="68" x2="260" y2="108" stroke="var(--rose)" stroke-width="8" opacity=".55"/>
+        <line x1="320" y1="68" x2="380" y2="108" stroke="var(--rose)" stroke-width="22" opacity=".55"/>
+        <line x1="320" y1="68" x2="500" y2="108" stroke="var(--rose)" stroke-width="9.5" opacity=".55"/>
+        <text x="140" y="98" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="var(--rose)">10%</text>
+        <text x="260" y="98" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="var(--rose)">15%</text>
+        <text x="380" y="98" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="var(--rose)">55%(含自己)</text>
+        <text x="500" y="98" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="var(--rose)">20%</text>
+
+        <!-- key -> value lines (same weights) -->
+        <line x1="140" y1="162" x2="140" y2="202" stroke="var(--green)" stroke-width="6.5" opacity=".5"/>
+        <line x1="260" y1="162" x2="260" y2="202" stroke="var(--green)" stroke-width="8" opacity=".5"/>
+        <line x1="380" y1="162" x2="380" y2="202" stroke="var(--green)" stroke-width="22" opacity=".5"/>
+        <line x1="500" y1="162" x2="500" y2="202" stroke="var(--green)" stroke-width="9.5" opacity=".5"/>
+
+        <!-- value -> result lines -->
+        <line x1="140" y1="256" x2="320" y2="306" stroke="var(--accent)" stroke-width="6.5" opacity=".5"/>
+        <line x1="260" y1="256" x2="320" y2="306" stroke="var(--accent)" stroke-width="8" opacity=".5"/>
+        <line x1="380" y1="256" x2="320" y2="306" stroke="var(--accent)" stroke-width="22" opacity=".5"/>
+        <line x1="500" y1="256" x2="320" y2="306" stroke="var(--accent)" stroke-width="9.5" opacity=".5"/>
+
+        <g class="zone" data-key="query" style="color:#b04a6a">
+          <rect class="st fillable" x="270" y="14" width="100" height="54" rx="10" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="320" y="36" text-anchor="middle" font-size="13" font-family="var(--mono)" fill="var(--ink)">很</text>
+          <text x="320" y="53" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="var(--muted)">Query</text>
+          <text x="320" y="88" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">① 提問:我想找什麼</text>
+        </g>
+
+        <g class="zone" data-key="key" style="color:#2f6f9e">
+          <rect class="st fillable" x="90" y="108" width="100" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="140" y="131" text-anchor="middle" font-size="12" font-family="var(--mono)" fill="var(--ink)">今天</text>
+          <text x="140" y="148" text-anchor="middle" font-size="9.5" font-family="var(--mono)" fill="var(--muted)">Key</text>
+          <rect class="st fillable" x="210" y="108" width="100" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="260" y="131" text-anchor="middle" font-size="12" font-family="var(--mono)" fill="var(--ink)">天氣</text>
+          <text x="260" y="148" text-anchor="middle" font-size="9.5" font-family="var(--mono)" fill="var(--muted)">Key</text>
+          <rect class="st fillable" x="330" y="108" width="100" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="380" y="131" text-anchor="middle" font-size="12" font-family="var(--mono)" fill="var(--ink)">很</text>
+          <text x="380" y="148" text-anchor="middle" font-size="9.5" font-family="var(--mono)" fill="var(--muted)">Key</text>
+          <rect class="st fillable" x="450" y="108" width="100" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="500" y="131" text-anchor="middle" font-size="12" font-family="var(--mono)" fill="var(--ink)">好</text>
+          <text x="500" y="148" text-anchor="middle" font-size="9.5" font-family="var(--mono)" fill="var(--muted)">Key</text>
+          <text x="320" y="182" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">② Key — 我能提供什麼(用來比對)</text>
+        </g>
+
+        <g class="zone" data-key="value" style="color:#0c7a59">
+          <rect class="st fillable" x="90" y="202" width="100" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="140" y="225" text-anchor="middle" font-size="12" font-family="var(--mono)" fill="var(--ink)">今天</text>
+          <text x="140" y="242" text-anchor="middle" font-size="9.5" font-family="var(--mono)" fill="var(--muted)">Value</text>
+          <rect class="st fillable" x="210" y="202" width="100" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="260" y="225" text-anchor="middle" font-size="12" font-family="var(--mono)" fill="var(--ink)">天氣</text>
+          <text x="260" y="242" text-anchor="middle" font-size="9.5" font-family="var(--mono)" fill="var(--muted)">Value</text>
+          <rect class="st fillable" x="330" y="202" width="100" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="380" y="225" text-anchor="middle" font-size="12" font-family="var(--mono)" fill="var(--ink)">很</text>
+          <text x="380" y="242" text-anchor="middle" font-size="9.5" font-family="var(--mono)" fill="var(--muted)">Value</text>
+          <rect class="st fillable" x="450" y="202" width="100" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="500" y="225" text-anchor="middle" font-size="12" font-family="var(--mono)" fill="var(--ink)">好</text>
+          <text x="500" y="242" text-anchor="middle" font-size="9.5" font-family="var(--mono)" fill="var(--muted)">Value</text>
+          <text x="320" y="276" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">③ Value — 真正被混進來的內容</text>
+        </g>
+
+        <g class="zone" data-key="result" style="color:#9a6b2e">
+          <rect class="st fillable" x="250" y="306" width="140" height="60" rx="10" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="320" y="332" text-anchor="middle" font-size="13" font-weight="650" font-family="var(--sans)" fill="var(--ink)">新的「很」</text>
+          <text x="320" y="350" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--muted)">依比例混合後的理解</text>
+          <text x="320" y="386" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">④ 依關聯比例混合 Value</text>
+        </g>
+      </svg>
+      <div class="scene-note">「很」的 Query 對每張牌的 Key 算出關聯比例,再依比例混合每張牌的 Value——比例為教學示意,非真實模型輸出。</div>
+    </div>
+
+    <div class="panel" id="panelKV">
+      <p class="placeholder">↑ 點一個角色,看定義。</p>
+    </div>
+  </section>
+
+  <!-- ============ 圖解五:Multi-head ============ -->
+  <section>
+    <div class="sec-kicker">圖解五 · Multi-head — 一層裡不是只算一組</div>
+    <div class="sec-title">先各自投影,才不會白做工</div>
+    <p class="sec-sub">
+      每一層不是只算一組「相關度」,是同時跑 N 組各自獨立的小型 attention(head,GPT-2 small
+      是 12 組,大模型可到 96 組)。關鍵在輸入端:每個 head 有自己的一套 Q/K/V 投影矩陣,同一份
+      輸入先被各自重新投影成窄版本(寬度是原本的 1/N)。下面先看寬度怎麼流動,點節點看每一步;
+      再往下有互動 demo 直接比較「有沒有先投影」的差別。
+    </p>
+
+    <div class="scene-box">
+      <svg id="mhSvg" viewBox="0 0 640 390" style="width:100%;height:auto;display:block">
+        <line x1="320" y1="64" x2="135" y2="110" stroke="#b9ad9c" stroke-width="1.6"/>
+        <line x1="320" y1="64" x2="320" y2="110" stroke="#b9ad9c" stroke-width="1.6"/>
+        <line x1="320" y1="64" x2="505" y2="110" stroke="#b9ad9c" stroke-width="1.6"/>
+        <line x1="135" y1="164" x2="135" y2="214" stroke="#b9ad9c" stroke-width="1.6"/>
+        <line x1="320" y1="164" x2="320" y2="214" stroke="#b9ad9c" stroke-width="1.6"/>
+        <line x1="505" y1="164" x2="505" y2="214" stroke="#b9ad9c" stroke-width="1.6"/>
+        <line x1="135" y1="268" x2="320" y2="306" stroke="#b9ad9c" stroke-width="1.6"/>
+        <line x1="320" y1="268" x2="320" y2="306" stroke="#b9ad9c" stroke-width="1.6"/>
+        <line x1="505" y1="268" x2="320" y2="306" stroke="#b9ad9c" stroke-width="1.6"/>
+
+        <g class="zone" data-key="input" style="color:#2f6f9e">
+          <rect class="st fillable" x="220" y="14" width="200" height="50" rx="10" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="320" y="36" text-anchor="middle" font-size="12.5" font-family="var(--sans)" font-weight="650" fill="var(--ink)">輸入(embedding)</text>
+          <text x="320" y="52" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="var(--muted)">寬度 d</text>
+          <text x="320" y="92" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">① 每張牌的收納位置</text>
+        </g>
+
+        <g class="zone" data-key="project" style="color:#b04a6a">
+          <rect class="st fillable" x="50" y="110" width="170" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="135" y="132" text-anchor="middle" font-size="11" font-family="var(--sans)" font-weight="650" fill="var(--ink)">Head 1 投影</text>
+          <text x="135" y="148" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--muted)">Q₁K₁V₁(d/3)</text>
+          <rect class="st fillable" x="235" y="110" width="170" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="320" y="132" text-anchor="middle" font-size="11" font-family="var(--sans)" font-weight="650" fill="var(--ink)">Head 2 投影</text>
+          <text x="320" y="148" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--muted)">Q₂K₂V₂(d/3)</text>
+          <rect class="st fillable" x="420" y="110" width="170" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="505" y="132" text-anchor="middle" font-size="11" font-family="var(--sans)" font-weight="650" fill="var(--ink)">Head 3 投影</text>
+          <text x="505" y="148" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--muted)">Q₃K₃V₃(d/3)</text>
+          <text x="320" y="188" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">② 各自投影成窄版本 — 這步不能省</text>
+        </g>
+
+        <g class="zone" data-key="headcalc" style="color:#0c7a59">
+          <rect class="st fillable" x="50" y="214" width="170" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="135" y="236" text-anchor="middle" font-size="11" font-family="var(--sans)" font-weight="650" fill="var(--ink)">Head 1 算 attention</text>
+          <text x="135" y="252" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--muted)">窄輸出(d/3)</text>
+          <rect class="st fillable" x="235" y="214" width="170" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="320" y="236" text-anchor="middle" font-size="11" font-family="var(--sans)" font-weight="650" fill="var(--ink)">Head 2 算 attention</text>
+          <text x="320" y="252" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--muted)">窄輸出(d/3)</text>
+          <rect class="st fillable" x="420" y="214" width="170" height="54" rx="9" fill="var(--panel)" stroke="#b9ad9c" stroke-width="1.8"/>
+          <text x="505" y="236" text-anchor="middle" font-size="11" font-family="var(--sans)" font-weight="650" fill="var(--ink)">Head 3 算 attention</text>
+          <text x="505" y="252" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--muted)">窄輸出(d/3)</text>
+          <text x="320" y="292" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">③ 各自獨立算完自己的加權混合</text>
+        </g>
+
+        <g class="zone" data-key="merge" style="color:#9a6b2e">
+          <rect class="st fillable" x="220" y="306" width="200" height="54" rx="10" fill="var(--panel)" stroke="#b9ad9c" stroke-width="2"/>
+          <text x="320" y="328" text-anchor="middle" font-size="12.5" font-family="var(--sans)" font-weight="650" fill="var(--ink)">串接回 d</text>
+          <text x="320" y="345" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="var(--muted)">→ 過線性層合併</text>
+          <text x="320" y="382" text-anchor="middle" font-size="10.5" font-family="var(--mono)" fill="#8a7d6e">④ 這才是這層真正的輸出</text>
+        </g>
+      </svg>
+      <div class="scene-note">點任一節點,看那一步在做什麼</div>
+    </div>
+
+    <div class="panel" id="panelMH">
+      <p class="placeholder">↑ 點一個節點,看細節。</p>
+    </div>
+
+    <div class="chips" id="projChips">
+      <div class="chip active" data-proj="yes"><h4>有先投影</h4><div class="sub">每個 head 各自不同</div></div>
+      <div class="chip" data-proj="no"><h4>沒有先投影</h4><div class="sub">3 個 head 都算一樣的東西</div></div>
+    </div>
+
+    <div class="heads-grid" id="headsGrid"></div>
+    <div id="headFlag"></div>
+  </section>
+
+  <!-- ============ 圖解六:疊層與殘差連接 ============ -->
+  <section>
+    <div class="sec-kicker">圖解六 · 疊層與殘差連接</div>
+    <div class="sec-title">整套重複幾十次,靠殘差連接不被稀釋光</div>
+    <p class="sec-sub">
+      上面這整套(multi-head attention + 合併 + 前饋層)是<b>一層</b>,模型把幾十層疊起來
+      (GPT-3 是 96 層),每層的輸入是上一層的輸出——第一層抓得到的多半是局部、表面的關聯,疊多層
+      之後,才逐步摻進間接、迂迴的關聯(A 參照過 B、B 參照過 C,下一層 A 就間接帶著 C 的資訊)。
+      層與層之間有<b>殘差連接</b>(這一層的輸出 = 輸入 + 這層算出來的修正量),讓疊幾十層也不會
+      把最原始的資訊稀釋光。下面的圖表是<b>教學示意,不是嚴謹的數學模擬</b>——用來說明「有沒有
+      殘差連接」對資訊保留的影響方向。
+    </p>
+
+    <div class="chips" id="residualChips">
+      <div class="chip active" data-res="yes"><h4>有殘差連接</h4><div class="sub">輸出 = 輸入 + 修正量</div></div>
+      <div class="chip" data-res="no"><h4>沒有殘差連接</h4><div class="sub">每層直接覆蓋上一層</div></div>
+    </div>
+
+    <div class="ctl-row" id="layerCtl">
+      <span class="ctl-label">疊幾層</span>
+      <span class="pill" data-n="8">8 層</span>
+      <span class="pill" data-n="16">16 層</span>
+      <span class="pill active" data-n="32">32 層</span>
+      <span class="pill" data-n="96">96 層(GPT-3)</span>
+    </div>
+
+    <div class="scene-box" style="margin-top:16px">
+      <div id="resChart" style="display:flex;justify-content:center"></div>
+      <div class="scene-note">縱軸「原始資訊保留比例」是教學示意的相對數值,不是真實模型量出來的指標</div>
+    </div>
+    <div class="round-caption" id="resCaption"></div>
+  </section>
+
+  <!-- ============ 誠實提醒 ============ -->
+  <section>
+    <div class="sec-kicker">誠實提醒</div>
+    <div class="sec-title">幾個容易被過度腦補的地方</div>
+    <div class="exclusions">
+      <div class="exclusion"><b>殘差圖表是教學示意</b> — 上面「有殘差 vs 沒有殘差」的曲線是為了說明方向而畫的示意圖,不是嚴謹的數學模擬或真實模型量出來的指標。</div>
+      <div class="exclusion"><b>「一個 head 管語法、一個管語意」是教學簡化</b> — 每個 head 學到什麼角度是訓練自己長出來的,實際上很多 head 抓的模式人類讀不懂,不保證對應到人類看得懂的分類。</div>
+      <div class="exclusion"><b>兩個框架是這篇筆記自己的轉述</b> — 「傳話遊戲 vs 整排一起看」的講法、「苦澀的教訓」這個框架的具體措辭跟例子,是筆記自己的推導與轉述;「the bitter lesson」這個名詞本身是業界常見引用,但沒有逐字查證 Sutton 部落格原文的措辭。</div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">原始論文與講解</div>
+        <a href="https://arxiv.org/abs/1706.03762">Vaswani et al., 2017 — Attention Is All You Need(Transformer 架構原始論文,原本是機器翻譯任務;multi-head 與殘差連接的機制描述也出自這篇)</a>
+        <a href="https://jalammar.github.io/illustrated-transformer/">Jay Alammar — The Illustrated Transformer(multi-head「各自投影 → 各自算 → 串接 → 線性合併」流程的標準視覺化講解,本頁 multi-head 一節的敘述順序參考它)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">同主題筆記</div>
+        <a href="../docs/2026-07-04-transformer-self-attention.md">2026-07-04-transformer-self-attention.md(本頁對應的完整筆記,含出處與誠實聲明)</a>
+        <a href="../docs/2026-07-04-next-token-prediction.md">next-token-prediction.md(teacher forcing、猜下一個字訓練目標的細節)</a>
+        <a href="../101/">101 頁(核心迴圈五站 + 圖 B「整排一起看」簡化互動模擬)</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 圖解一:起手式回顧 ============ */
+  const RECAP = {
+    lag: {
+      tag: '問題 1 · 傳話遊戲', title: '傳到後面資訊會失真',
+      what: '句子一長,前面的詞跟後面的詞之間的關聯就難抓住,就像傳話傳到第 50 個人,第 1 個人講的細節早就模糊了。'
+    },
+    serial: {
+      tag: '問題 2 · 傳話遊戲', title: '只能一個一個傳',
+      what: '第 50 個人一定要等前面 49 個人都傳完才輪到他,訓練時沒辦法平行運算,推不動大規模。'
+    },
+    solution: {
+      tag: '解法 · Self-attention', title: '整排一起看',
+      what: 'Transformer 換了一種做法:不再傳話接龍,改成整排一起看——每個字同時看得到整句裡的每一個字(含自己),各自算出「哪些字跟我現在要做的事最相關」,按相關度把對方的資訊混進自己的理解;不管距離多遠都一步直達,而且所有字同時、各自獨立進行,不用排隊。這解決了「傳話失真」跟「只能排隊算」兩個麻煩。'
+    }
+  };
+  const panelRecap = document.getElementById('panelRecap');
+  function renderRecap(key){
+    const d = RECAP[key];
+    document.querySelectorAll('#recapRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelRecap.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在說什麼</b><span>${d.what}</span></div>
+    `;
+    fadeIn(panelRecap);
+  }
+  document.querySelectorAll('#recapRow .node').forEach(el => el.addEventListener('click', () => renderRecap(el.dataset.key)));
+
+  /* ============ 圖解二:Transformer≠LLM 家族樹 ============ */
+  const FAMILY = {
+    orig: {
+      tag: '原始設計 · 2017', title: 'Transformer(Encoder-Decoder 雙塔)',
+      what: '拿來做機器翻譯的雙塔架構:encoder 負責讀懂輸入語言的整句,decoder 負責一步步生成輸出語言。這張圖後來被拆開重組成不同路線。'
+    },
+    encoder: {
+      tag: '路線 1 · 只留前半', title: 'Encoder-only → BERT',
+      what: '只留前半(encoder-only)+ 填空式訓練 → BERT 這種模型,不是一個字一個字往後生成的。'
+    },
+    decoder: {
+      tag: '路線 2 · 只留後半(現在所有 LLM 的配方)', title: 'Decoder-only → GPT 系列',
+      what: '只留後半(decoder-only)+ 加上「只能往前看,不能偷看未來」的限制(causal mask)+ next-token prediction 訓練 → GPT 系列一路走到現在所有 LLM 的配方。',
+      ex: '精確地說:<b>LLM = Transformer 的 decoder-only 變體 + causal mask + 猜下一個字的訓練目標</b>,三個條件缺一個都不是現在講的 LLM(詳見 <a href="../docs/2026-07-04-next-token-prediction.md">next-token-prediction.md</a>)。'
+    }
+  };
+  const panelFamily = document.getElementById('panelFamily');
+  function activeForFamily(key){
+    document.querySelectorAll('#familySvg [data-key]').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+  }
+  function renderFamily(key){
+    const d = FAMILY[key];
+    activeForFamily(key);
+    panelFamily.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      ${d.ex ? `<div class="ex">${d.ex}</div>` : ''}
+    `;
+    fadeIn(panelFamily);
+  }
+  document.querySelectorAll('#familySvg .zone').forEach(el => el.addEventListener('click', () => renderFamily(el.dataset.key)));
+
+  /* ============ 圖解三:為什麼特別適合 ============ */
+  const REASONS = {
+    hook: {
+      tag: '原因 1 · 卡榫', title: '跟 teacher forcing 卡榫卡得很準',
+      what: '訓練時要對一整句話裡每一個位置都同時算「猜得準不準」(teacher forcing),整排一起看讓所有位置可以同時各自算、同時打分,不用排隊等前面算完——這直接決定了能不能把訓練規模推得很大。RNN 理論上也能做「猜下一個字」,但排隊的特性讓它推不動這麼大的規模。'
+    },
+    longrange: {
+      tag: '原因 2 · 長距依賴', title: '語言的關聯常跨很遠距離',
+      what: '語言本身的關聯常常跨很遠的距離(代名詞指代前面第幾句提到的人、文章開頭定的主題要影響到結尾),整排一起看讓相隔很遠的兩個字也能一步直達地互相參照,不會因為距離遠就聯繫變弱——這正好對上語言資料的特性。'
+    },
+    bitter: {
+      tag: '原因 3 · 哲學層', title: '苦澀的教訓(the bitter lesson)',
+      what: 'attention 對「資料長什麼樣」的預設很少。不像 CNN 預設「相鄰的東西比較重要」、不像 RNN 預設「最近發生的比較重要」,attention 這種「預設越少、越靠資料自己長出結構」的設計,配合越來越大的算力跟資料量,往往效果反而越好——業界常把這個現象叫「苦澀的教訓」(the bitter lesson,通常歸功於 Rich Sutton 2019 的同名部落格文章)。',
+      deeper: '「苦澀的教訓」這個框架的具體措辭跟例子,是這篇筆記自己的推導與轉述——這個名詞本身確實是業界常見引用,但沒有逐字查證 Sutton 部落格原文的措辭。'
+    }
+  };
+  const panelReason = document.getElementById('panelReason');
+  function renderReason(key){
+    const d = REASONS[key];
+    document.querySelectorAll('#reasonRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelReason.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在說什麼</b><span>${d.what}</span></div>
+      ${d.deeper ? `<div class="deeper"><b>誠實提醒</b> — ${d.deeper}</div>` : ''}
+    `;
+    fadeIn(panelReason);
+  }
+  document.querySelectorAll('#reasonRow .node').forEach(el => el.addEventListener('click', () => renderReason(el.dataset.key)));
+
+  /* ============ 圖解四:Query / Key / Value ============ */
+  const KV = {
+    query: {
+      tag: '角色 1 · Query', title: '提問向量 — 我現在想找什麼',
+      what: '讀到「很」這張牌時,它先算出一個「提問向量」(Query)——代表它現在想知道「誰跟我現在要做的事最相關」。這個提問只由「很」自己決定,不管其他牌怎麼想。'
+    },
+    key: {
+      tag: '角色 2 · Key', title: '索引向量 — 我能提供什麼',
+      what: '每一張牌(含「很」自己)都各自算出一個「索引向量」(Key)——代表這張牌「能被拿來比對什麼」。「很」的 Query 會逐一去跟每張牌的 Key 比對,比對出來的相似度就是這張牌對「很」的關聯分數,再正規化成關聯比例(圖中的百分比)。'
+    },
+    value: {
+      tag: '角色 3 · Value', title: '內容向量 — 真正被混進來的東西',
+      what: '每張牌還各自算出一個「內容向量」(Value)——代表這張牌真正要貢獻的資訊。關聯比例算出來之後,不是拿 Key 去混,是按比例把每張牌的 Value 加權混合,變成「很」讀完這一輪之後的新理解。'
+    },
+    result: {
+      tag: '混合結果', title: '新的「很」',
+      what: '「很」自己的 Query 去比對整排牌的 Key,得出關聯比例;再依比例混合整排牌的 Value——這一連串就是「整排一起看」在單一輪裡實際發生的事,對每一張牌同時進行。'
+    }
+  };
+  const panelKV = document.getElementById('panelKV');
+  function activeForKV(key){
+    document.querySelectorAll('#kvSvg [data-key]').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+  }
+  function renderKV(key){
+    const d = KV[key];
+    activeForKV(key);
+    panelKV.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+    `;
+    fadeIn(panelKV);
+  }
+  document.querySelectorAll('#kvSvg .zone').forEach(el => el.addEventListener('click', () => renderKV(el.dataset.key)));
+
+  /* ============ 圖解五:Multi-head ============ */
+  const MH = {
+    input: {
+      tag: '① 輸入', title: '輸入(每張牌的收納位置,寬度 d)',
+      what: '讀牌前,每張牌在牌櫃裡的收納位置(embedding)是一份固定寬度 d 的向量——這是要被送進 N 組 head 的原始材料。'
+    },
+    project: {
+      tag: '② 第一步 · 各自投影', title: '每個 head 各自投影成窄版本(d/N)',
+      what: '每個 head 有自己的一套 Q/K/V 投影矩陣,同一份輸入先被各自重新投影成窄版本(寬度是原本的 1/N)——因為投影不同,同一排字才會被各 head 讀出不同的關聯模式。如果不先各自投影,N 組算出來的結果會長得差不多,多頭就白做了(下面有互動 demo 可以直接比較)。'
+    },
+    headcalc: {
+      tag: '③ 第二步 · 各自算 attention', title: '每個 head 獨立算完自己的加權混合',
+      what: '每個 head 拿自己投影出來的窄版 Q/K/V,獨立跑一次「整排一起看」,算出自己的加權混合結果——輸出也是窄的(d/N),跟其他 head 互不干涉。'
+    },
+    merge: {
+      tag: '④ 第三步 · 串接 + 線性合併', title: 'N 份窄輸出串接回 d,再過線性層合併',
+      what: 'N 份窄輸出(各 d/N)按位置對齊串接回標準寬度 d,再過一層線性轉換合併——這才是這一層 attention 真正的輸出。',
+      deeper: '每個 head 學到什麼角度是訓練自己長出來的,「一個管語法、一個管語意」是教學簡化,實際上很多 head 抓的模式人類讀不懂。'
+    }
+  };
+  const panelMH = document.getElementById('panelMH');
+  function activeForMH(key){
+    document.querySelectorAll('#mhSvg [data-key]').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+  }
+  function renderMH(key){
+    const d = MH[key];
+    activeForMH(key);
+    panelMH.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      ${d.deeper ? `<div class="deeper"><b>誠實提醒</b> — ${d.deeper}</div>` : ''}
+    `;
+    fadeIn(panelMH);
+  }
+  document.querySelectorAll('#mhSvg .zone').forEach(el => el.addEventListener('click', () => renderMH(el.dataset.key)));
+
+  /* Multi-head:有無先投影的互動demo */
+  const MH_TOKENS = ['今天','天氣','很','好'];
+  const HEADS_PROJ = [
+    { name: 'Head 1', color: 'var(--accent)', w: [0.10, 0.15, 0.55, 0.20] },
+    { name: 'Head 2', color: 'var(--green)', w: [0.35, 0.10, 0.15, 0.40] },
+    { name: 'Head 3', color: 'var(--blue)',  w: [0.25, 0.30, 0.20, 0.25] }
+  ];
+  const HEADS_NOPROJ_W = [0.20, 0.20, 0.35, 0.25];
+  const HEADS_NOPROJ = [
+    { name: 'Head 1', color: 'var(--faint)', w: HEADS_NOPROJ_W },
+    { name: 'Head 2', color: 'var(--faint)', w: HEADS_NOPROJ_W },
+    { name: 'Head 3', color: 'var(--faint)', w: HEADS_NOPROJ_W }
+  ];
+
+  const headsGrid = document.getElementById('headsGrid');
+  const headFlag = document.getElementById('headFlag');
+  let hasProj = true;
+
+  function renderHeads(){
+    const data = hasProj ? HEADS_PROJ : HEADS_NOPROJ;
+    headsGrid.innerHTML = data.map(h => `
+      <div class="head-card">
+        <h5 style="color:${h.color}">${h.name}(讀「很」)</h5>
+        ${h.w.map((wt, i) => `
+          <div class="hbar-row">
+            <div class="tok">${MH_TOKENS[i]}</div>
+            <div class="hbar-track"><div class="hbar-fill" style="width:${Math.round(wt*100)}%;background:${h.color}"></div></div>
+            <div class="hpct">${Math.round(wt*100)}%</div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+    fadeIn(headsGrid);
+    headFlag.innerHTML = hasProj
+      ? `<div class="head-flag ok">因為三個 head 各自用不同的投影矩陣,同一排字被讀出三種不同的關聯比例——這才是多頭真正有意義的地方。(權重為教學示意,不是真實模型算出來的值)</div>`
+      : `<div class="head-flag warn">3 個 head 算出來的關聯比例幾乎一樣——沒有先各自投影,多頭就形同虛設,等於把同一組計算重複跑三次,白做工。</div>`;
+    fadeIn(headFlag);
+  }
+  document.querySelectorAll('#projChips .chip').forEach(c => {
+    c.addEventListener('click', () => {
+      hasProj = c.dataset.proj === 'yes';
+      document.querySelectorAll('#projChips .chip').forEach(x => x.classList.toggle('active', x === c));
+      renderHeads();
+    });
+  });
+
+  /* ============ 圖解六:疊層與殘差連接 ============ */
+  const state6 = { residual: true, layers: 32 };
+
+  function retentionWith(n){ return Math.max(0, 100 - n * 0.15); }
+  function retentionWithout(n){ return 100 * Math.pow(0.93, n); }
+
+  const RC_TOP = 30, RC_BOTTOM = 210, RC_X0 = 60, RC_X1 = 600;
+  function rcX(n, N){ return RC_X0 + (n / N) * (RC_X1 - RC_X0); }
+  function rcY(v){ return RC_TOP + (1 - v / 100) * (RC_BOTTOM - RC_TOP); }
+
+  function rcPath(fn, N){
+    let d = '';
+    for(let i = 0; i <= 40; i++){
+      const n = (i / 40) * N;
+      const x = rcX(n, N), y = rcY(fn(n));
+      d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+    }
+    return d.trim();
+  }
+
+  function resChartSVG(){
+    const N = state6.layers;
+    const withOn = state6.residual;
+    const yTicks = [0, 25, 50, 75, 100].map(v => {
+      const y = rcY(v);
+      return `<line x1="${RC_X0-4}" y1="${y}" x2="${RC_X1}" y2="${y}" stroke="var(--line-soft)" stroke-width="1"/>
+        <text x="${RC_X0-10}" y="${y+3}" text-anchor="end" font-size="9.5" font-family="var(--mono)" fill="var(--faint)">${v}%</text>`;
+    }).join('');
+    const finalWith = retentionWith(N), finalWithout = retentionWithout(N);
+    return `<svg width="640" height="234" viewBox="0 0 640 234">
+      <line x1="${RC_X0}" y1="${RC_TOP-6}" x2="${RC_X0}" y2="${RC_BOTTOM}" stroke="var(--faint)" stroke-width="1.3"/>
+      <line x1="${RC_X0}" y1="${RC_BOTTOM}" x2="${RC_X1}" y2="${RC_BOTTOM}" stroke="var(--faint)" stroke-width="1.3"/>
+      ${yTicks}
+      <text x="${(RC_X0+RC_X1)/2}" y="228" text-anchor="middle" font-size="11" fill="var(--muted)">第幾層(共 ${N} 層)→</text>
+
+      <path d="${rcPath(retentionWith, N)}" fill="none" stroke="var(--green)" stroke-width="${withOn ? 3.2 : 1.6}" opacity="${withOn ? 1 : 0.35}" stroke-dasharray="${withOn ? '0' : '5 4'}"/>
+      <path d="${rcPath(retentionWithout, N)}" fill="none" stroke="var(--rose)" stroke-width="${!withOn ? 3.2 : 1.6}" opacity="${!withOn ? 1 : 0.35}" stroke-dasharray="${!withOn ? '0' : '5 4'}"/>
+
+      <circle cx="${rcX(N,N)}" cy="${rcY(finalWith)}" r="5" fill="var(--panel)" stroke="var(--green)" stroke-width="2.2"/>
+      <text x="${rcX(N,N)-8}" y="${rcY(finalWith)-8}" text-anchor="end" font-size="10.5" font-family="var(--mono)" fill="var(--green)">有殘差 ${finalWith.toFixed(1)}%</text>
+      <circle cx="${rcX(N,N)}" cy="${rcY(finalWithout)}" r="5" fill="var(--panel)" stroke="var(--rose)" stroke-width="2.2"/>
+      <text x="${rcX(N,N)-8}" y="${rcY(finalWithout)+16}" text-anchor="end" font-size="10.5" font-family="var(--mono)" fill="var(--rose)">沒殘差 ${finalWithout.toFixed(2)}%</text>
+
+      <text x="${(RC_X0+RC_X1)/2}" y="16" text-anchor="middle" font-size="11" fill="var(--faint)">實線 = 目前選中的情境 · 虛線淡色 = 對照組(同樣層數)</text>
+    </svg>`;
+  }
+
+  const resChart = document.getElementById('resChart');
+  const resCaption = document.getElementById('resCaption');
+  function renderResidual(){
+    resChart.innerHTML = resChartSVG();
+    fadeIn(resChart);
+    document.querySelectorAll('#residualChips .chip').forEach(c => c.classList.toggle('active', (c.dataset.res === 'yes') === state6.residual));
+    document.querySelectorAll('#layerCtl .pill').forEach(p => p.classList.toggle('active', +p.dataset.n === state6.layers));
+    const N = state6.layers;
+    const rw = retentionWith(N).toFixed(1);
+    const rwo = retentionWithout(N).toFixed(2);
+    resCaption.textContent = state6.residual
+      ? `疊 ${N} 層之後,有殘差連接的路線還留著約 ${rw}% 的原始資訊——因為每一層是「輸入 + 修正量」疊加,原始資訊不會被整層覆蓋掉。`
+      : `疊 ${N} 層之後,沒有殘差連接的路線只剩約 ${rwo}% 的原始資訊——因為每一層直接覆蓋上一層的內容,層數一多,最原始的資訊幾乎被稀釋光。這條曲線的斜率是教學示意,不是嚴謹的數學模擬。`;
+  }
+  document.querySelectorAll('#residualChips .chip').forEach(c => {
+    c.addEventListener('click', () => {
+      state6.residual = c.dataset.res === 'yes';
+      renderResidual();
+    });
+  });
+  document.querySelectorAll('#layerCtl .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      state6.layers = +p.dataset.n;
+      renderResidual();
+    });
+  });
+
+  /* 初始狀態 */
+  renderRecap('solution');
+  renderFamily('decoder');
+  renderReason('hook');
+  renderKV('query');
+  renderMH('project');
+  renderHeads();
+  renderResidual();
+</script>
+</body>
+</html>

@@ -1,0 +1,591 @@
+---
+title: In-Context Learning Under Diffusion — 換成 Diffusion 生成,ICL 為什麼還在?(互動圖解)
+summary: 實證結果 stat 對照(LLaDA/Dream 7B vs 同量級 AR 模型,TriviaQA 5-shot 62% 追平
+  LLaMA3 8B)+ 論文原句引用;「架構軸 vs 生成順序軸」兩張卡對照,講清楚 ICL 掛在哪條軸上;
+  核心「凍結鷹架」互動 demo——prompt 區(few-shot QA 範例)從頭到尾不變,答案區用「去噪一輪」
+  stepper 逐輪解封,可切換 diffusion(信心順序,非由左到右)vs AR(依序接字)兩種揭露順序
+  對照;Piskorz et al. 發現用兩情境卡片切換(AR 模型微調 diffusion loss vs 從頭 diffusion
+  訓練,偏向強弱不同);單次 ICL(靜態凍結)vs 多輪 agent 迴圈(凍結區逐輪增長)兩欄對照,
+  右欄小型「下一輪」互動;誠實聲明卡片標註各出處的信心等級。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - in-context-learning
+  - diffusion
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — In-Context Learning Under Diffusion:non-autoregressive 的 diffusion
+  語言模型,少樣本 ICL 追平甚至打贏同量級的自迴歸模型——意外的結果,回頭看並不意外。
+  可長期回看的教學頁(pages/ genre,發布於 /llm-foundations/in-context-learning-under-diffusion/),
+  不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-04-in-context-learning-under-diffusion.md
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    區塊 1(意外的實證結果)— LLaDA 8B vs LLaMA3 8B 的 TriviaQA 5-shot stat 對照卡
+      (62% ≈ 62%)+ LLaDA 論文自己的結論引句 + Dream 7B 的補充說明。
+    區塊 2(為什麼不意外——另一條軸)— 「架構軸(attention 怎麼讀 context)」vs
+      「生成順序軸(AR vs NAR)」兩張卡切換,講清楚 in-context-learning.md 的三套理論靠的
+      是前者,diffusion 只是換了後者。
+    區塊 3(核心機制:凍結的鷹架 + 雙向 attention)— 先講訓練階段(隨機遮罩比例 t~U[0,1],
+      BERT 填空題的廣義版),再上主 demo:prompt 區(few-shot QA 範例,含查詢)從頭到尾完全
+      不變,答案區是一排字牌卡,初始全部遮罩;chips 切換 diffusion(去噪一輪,依信心順序
+      解封,非由左到右)vs AR(依序接字,強制由左到右)兩種模式,對照揭露順序。
+    區塊 4(機制研究細節:Piskorz et al.)— 兩情境卡片切換:AR 模型 + diffusion loss 微調
+      (偏向還在)vs 從頭用 diffusion 目標訓練(偏向較弱)——證據指向偏向來自訓練資料本身,
+      不是訓練目標本身。
+    區塊 5(澄清:單次 ICL 是靜態的,凍結區增長是多輪 agent 才有的事)— 左欄靜態說明單次
+      ICL 凍結區不會變大(回指區塊 3 demo),右欄小型「下一輪」互動,模擬多輪 agent 對話
+      凍結區逐輪併入新 block,連到 autoregressive-vs-nonautoregressive.html 的 block-wise
+      diffusion 滑桿(不重複做那個 demo)。
+    References(誠實聲明 + 出處)— 逐條信心等級標記(VERIFIED/LIKELY),carry over 自 doc
+      的「出處」段落,含這篇筆記自己的推導聲明。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>In-Context Learning Under Diffusion — 換成 Diffusion 生成,ICL 為什麼還在?</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+  .tagline b{color:var(--ink)}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+  .sec-sub a{color:var(--accent)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:13px;font-family:var(--mono);flex:0 0 auto;padding:0 4px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .deeper a{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:170px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:20px}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:10px;text-align:center}
+
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center;justify-content:center}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:650;padding:7px 14px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s ease}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  /* 區塊 1:實證結果 stat callout */
+  .stat-row{display:flex;align-items:center;gap:16px;margin-top:20px;flex-wrap:wrap;justify-content:center}
+  .stat-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:18px 26px;text-align:center;min-width:190px}
+  .stat-card .stat-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em}
+  .stat-card .stat-num{font-size:32px;font-weight:700;color:var(--accent);margin-top:8px;font-variant-numeric:tabular-nums}
+  .stat-card .stat-sub{font-size:12px;color:var(--muted);margin-top:4px}
+  .stat-vs{font-family:var(--mono);font-size:16px;color:var(--faint);flex:0 0 auto}
+  .quote-box{margin-top:16px;padding:14px 18px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px;font-style:italic}
+
+  /* 區塊 3:凍結鷹架 demo */
+  .scaffold-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;margin-bottom:9px}
+  .qa-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .qa-chip{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 14px;font-size:12.5px;font-family:var(--mono)}
+  .qa-chip .q{color:var(--muted)}
+  .qa-chip .a{color:var(--ink);font-weight:650}
+  .qa-chip.query{border-color:var(--accent);background:rgba(154,107,46,.06)}
+  .scaffold-divider{text-align:center;margin:16px 0;font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .ans-row{display:flex;gap:10px;justify-content:center}
+  .ans-tok{width:54px;height:54px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:20px;font-weight:650;border:1.6px solid var(--line);background:var(--panel);
+    transition:all .25s ease}
+  .ans-tok.masked{background:repeating-linear-gradient(135deg,var(--line-soft),var(--line-soft) 4px,var(--panel) 4px,var(--panel) 8px);
+    color:var(--faint);border-style:dashed}
+  .ans-tok.revealed{border-color:var(--green);background:rgba(12,122,89,.08);color:var(--green)}
+  .ans-tok.revealed.ar{border-color:var(--accent);background:rgba(154,107,46,.08);color:var(--accent)}
+  .scaffold-note{margin-top:14px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--rose);
+    border-radius:0 10px 10px 0;font-size:13px;text-align:left}
+
+  /* 區塊 5:單次 vs 多輪 */
+  .clarify-cols{display:flex;gap:16px;margin-top:20px;flex-wrap:wrap}
+  .clarify-col{flex:1;min-width:280px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:18px 20px}
+  .clarify-col .ch{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em}
+  .clarify-col h4{font-size:14.5px;font-weight:660;margin-top:6px}
+  .clarify-col p{font-size:12.5px;color:var(--muted);margin-top:8px}
+  .block-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .block-chip{padding:9px 13px;border-radius:9px;border:1.6px dashed var(--line);font-size:11.5px;
+    color:var(--faint);background:var(--panel);transition:all .2s ease;flex:1;min-width:110px;text-align:center}
+  .block-chip.frozen{border-style:solid;border-color:var(--accent);background:rgba(154,107,46,.08);color:var(--ink);font-weight:650}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+  .conf{display:inline-block;font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.03em;
+    padding:1px 6px;border-radius:5px;margin-left:6px;vertical-align:middle}
+  .conf.verified{background:rgba(12,122,89,.14);color:var(--green)}
+  .conf.likely{background:rgba(47,111,158,.14);color:var(--blue)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+    .clarify-cols{flex-direction:column}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations · In-Context Learning Under Diffusion</div>
+    <h1>換成 Diffusion 生成,In-Context Learning 為什麼還在?</h1>
+    <p class="tagline">
+      意外的是:non-autoregressive(NAR)的 diffusion 語言模型,少樣本(few-shot)ICL 表現
+      追平甚至打贏同量級的自迴歸(AR)模型——上一篇才講「AR 天生適合 agent」,這篇看起來像
+      在打臉。回頭看並不意外:<b>ICL 靠的是 attention 怎麼讀 context</b>,是「架構軸」在管的事,
+      幾乎跟「AR vs NAR」這條「生成順序軸」無關。具體機制是:few-shot 範例被當成一塊從頭到尾
+      不變、雙向 attention 全程可見的<b>「凍結鷹架」</b>,答案的每個位置從第一輪去噪就能直接
+      看到全部範例。
+    </p>
+  </header>
+
+  <!-- ============ 區塊 1:意外的實證結果 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 1 · 意外的實證結果</div>
+    <div class="sec-title">Diffusion 語言模型,少樣本 ICL 追平同量級的 AR 模型</div>
+    <p class="sec-sub">
+      <a href="https://arxiv.org/abs/2502.09992">Nie et al., 2025 — Large Language Diffusion
+      Models</a>(LLaDA,8B)在 15 項標準 zero/few-shot 評測上大多打贏 LLaMA2 7B、追平 LLaMA3 8B。
+    </p>
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-label">LLaDA 8B · Diffusion</div>
+        <div class="stat-num">62%</div>
+        <div class="stat-sub">TriviaQA 5-shot</div>
+      </div>
+      <div class="stat-vs">≈</div>
+      <div class="stat-card">
+        <div class="stat-label">LLaMA3 8B · AR</div>
+        <div class="stat-num">62%</div>
+        <div class="stat-sub">同量級自迴歸模型</div>
+      </div>
+    </div>
+
+    <div class="quote-box">
+      「Non-autoregressive 模型可以擁有 in-context learning、instruction-following 這些核心
+      LLM 能力,挑戰了『語言智能必須靠自迴歸建模』這個常見假設。」—— LLaDA 論文自己的結論。
+    </div>
+
+    <p class="sec-sub" style="margin-top:14px">
+      <a href="https://arxiv.org/pdf/2508.15487">Ye &amp; Xie et al., 2025 — Dream 7B</a>在
+      few-shot 設定下,同樣贏過同量級的 AR 模型——不是 LLaDA 一篇的孤例。
+    </p>
+  </section>
+
+  <!-- ============ 區塊 2:為什麼不意外——另一條軸 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 2 · 為什麼不意外</div>
+    <div class="sec-title">ICL 掛在另一條軸上——跟 AR/NAR 幾乎正交</div>
+    <p class="sec-sub">
+      <a href="../docs/2026-07-04-in-context-learning.md">in-context-learning.md</a> 講的三套
+      理論(induction heads / 隱式梯度下降 / 隱式貝氏推論),講的都是「模型怎麼看 prompt 裡的
+      範例」——這是 attention 怎麼處理輸入 context 的能力。點卡片看兩條軸分別問的是什麼問題。
+    </p>
+
+    <div class="row" id="axisRow">
+      <div class="node active" data-key="arch">
+        <div class="idx">這條軸 · 架構軸</div>
+        <h3>Attention 怎麼讀 context</h3>
+        <div class="q">ICL 掛在這裡</div>
+      </div>
+      <div class="arrow">vs</div>
+      <div class="node" data-key="order">
+        <div class="idx">這條軸 · 生成順序軸</div>
+        <h3>AR vs NAR</h3>
+        <div class="q">跟 ICL 幾乎無關</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelAxis"></div>
+  </section>
+
+  <!-- ============ 區塊 3:核心機制 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 3 · 具體機制</div>
+    <div class="sec-title">凍結的鷹架 + 雙向 attention</div>
+    <p class="sec-sub">
+      <b>訓練階段(forward process)</b>:拿一段乾淨文字,用隨機比例 t ~ U[0,1] 去蓋住其中一部分
+      字牌,練模型「看剩下沒被蓋住的,猜被蓋住的原本是什麼」——這是 BERT 填空題的廣義版:BERT
+      固定蓋 15%,這裡蓋的比例每次不一樣,從蓋一點點到蓋到全部都可能。
+    </p>
+    <p class="sec-sub">
+      <b>使用階段(reverse process)</b>:prompt(含 few-shot 範例)整段從頭到尾原封不動、完全
+      不蓋;真正要生成的答案部分一開始整段蓋起來,然後重複「同時對所有還蓋著的位置猜答案 →
+      挑信心最高的幾個位置定案 → 剩下的繼續蓋著」直到全部定案。下面自己動手跑跑看,跟 AR 比
+      揭露順序差在哪。
+    </p>
+
+    <div class="scene-box">
+      <div class="scaffold-label">Prompt 區(few-shot 範例 + 查詢)· 凍結鷹架,從頭到尾不變</div>
+      <div class="qa-row" id="qaRow"></div>
+
+      <div class="scaffold-divider">↕ 雙向 attention,答案區每個空格從第一輪就能看到整個 prompt</div>
+
+      <div class="scaffold-label" style="text-align:center">答案區(要生成的部分)</div>
+      <div class="ans-row" id="ansRow"></div>
+
+      <div class="chips" id="scaffoldChips" style="margin-top:20px">
+        <div class="chip active" data-m="diffusion"><h4>Diffusion · 去噪</h4><div class="sub">依信心順序解封,非由左到右</div></div>
+        <div class="chip" data-m="ar"><h4>AR · 接龍</h4><div class="sub">強制由左到右,一次一個</div></div>
+      </div>
+
+      <div class="ctl-row">
+        <button class="btn primary" id="scaffoldBtn">去噪第 1 輪 →</button>
+        <button class="btn" id="scaffoldResetBtn">重來</button>
+      </div>
+
+      <div class="scaffold-note" id="scaffoldNote"></div>
+      <div class="scene-note">Q/A 範例與答案字牌皆為教學示意,非真實模型輸出</div>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>結構上比 AR 更直接</b> — 因為 attention 是雙向的(沒有 causal
+        mask),答案裡的每一個位置,在第一輪去噪就已經可以直接看到整個 prompt——結構上甚至比
+        AR(只能往回看)對 context 的存取更直接、更平等。</div>
+    </div>
+  </section>
+
+  <!-- ============ 區塊 4:Piskorz et al. ============ -->
+  <section>
+    <div class="sec-kicker">區塊 4 · 機制研究的細節</div>
+    <div class="sec-title">AR 式的偏向還在,但來源不是訓練目標</div>
+    <p class="sec-sub">
+      <a href="https://transformerstheory.github.io/pdf/14_piskorz_et_al.pdf">Piskorz et al. —
+      In-Context Learning in Diffusion Language Models</a> 直接做了控制實驗:DLM 在 ICL 評測上
+      追平 AR,但還是帶有「偏近、偏左」的傾向(recency bias、left-directedness),只是比較弱。
+      點卡片看兩個情境怎麼拆解出偏向的來源。
+    </p>
+
+    <div class="row" id="piskorzRow">
+      <div class="node active" data-key="ft">
+        <div class="idx">情境一 · 微調</div>
+        <h3>AR 模型 + Diffusion Loss 微調</h3>
+        <div class="q">偏向還在</div>
+      </div>
+      <div class="arrow">vs</div>
+      <div class="node" data-key="scratch">
+        <div class="idx">情境二 · 從頭訓練</div>
+        <h3>從頭用 Diffusion 目標訓練</h3>
+        <div class="q">偏向比較弱</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelPiskorz"></div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>來源指向訓練資料,不是訓練目標</b> — 這個傾向追根究底來自訓練
+        資料本身的統計特性(人類正常寫的文字本來就有「越靠近越相關、由左到右鋪陳」的結構),
+        不是來自 AR 這個訓練目標本身。</div>
+    </div>
+  </section>
+
+  <!-- ============ 區塊 5:單次 vs 多輪 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 5 · 容易搞混的一點</div>
+    <div class="sec-title">單次 ICL 是靜態的,「凍結區增長」是多輪 agent 才有的事</div>
+    <p class="sec-sub">
+      單次 few-shot ICL,凍結區在生成過程中不會變大——一次決定好放幾個範例,一次凍結,然後對
+      答案去噪。「凍結區一直長大」真正發生的地方,是
+      <a href="../docs/2026-07-04-autoregressive-vs-nonautoregressive-for-agents.md">autoregressive-vs-nonautoregressive-for-agents.md</a>
+      講的多輪 agent 迴圈。
+    </p>
+
+    <div class="clarify-cols">
+      <div class="clarify-col">
+        <div class="ch">單次 ICL · 靜態</div>
+        <h4>一次到位,凍結後重複讀很多次</h4>
+        <p>就是上面區塊 3 那個 demo——prompt 從頭到尾是同一塊,不會因為去噪跑了幾輪就多長出
+        範例。「一次到位、凍結後重複讀很多次」,不是「邊生成邊長大」。</p>
+      </div>
+      <div class="clarify-col">
+        <div class="ch">多輪 Agent 迴圈 · 動態</div>
+        <h4>每完成一個 block,就併入凍結區</h4>
+        <p>每完成一輪對話、一次工具呼叫的結果,這個 block 就併入凍結區,下一個 block 站在
+        變大後的凍結區上繼續生成——這正是 block-wise diffusion(BD3-LM、Fast-dLLM v2)的實際
+        做法,跟 AR 的 KV cache 隨對話輪數增加是同一個精神,只是單位從「一個 token」換成
+        「一個 block」。</p>
+        <div class="block-row" id="turnRow"></div>
+        <div class="ctl-row">
+          <button class="btn primary" id="turnBtn">下一輪 →</button>
+          <button class="btn" id="turnResetBtn">重來</button>
+        </div>
+        <p id="turnNote" style="margin-top:8px"></p>
+      </div>
+    </div>
+
+    <p class="sec-sub" style="margin-top:16px">
+      兩者疊在一起看:多輪 agent 場景其實是很多次「單次 ICL」疊起來——每一輪內部都是靜態的
+      一次性讀取,但輪與輪之間,凍結區確實在累積長大。Block 大小怎麼選的 tradeoff,見
+      <a href="autoregressive-vs-nonautoregressive.html">autoregressive-vs-nonautoregressive.html</a>
+      的滑桿 demo(這裡不重複做)。
+    </p>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      完整推導、查證出處與誠實聲明見
+      <a href="../docs/2026-07-04-in-context-learning-under-diffusion.md" style="color:var(--accent)">in-context-learning-under-diffusion.md</a>。
+    </p>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>誠實聲明</b> — 「ICL 掛在架構軸、幾乎跟 AR/NAR 無關」這個
+        區分,以及「單次 ICL 靜態 vs 多輪 agent 凍結區增長是同一機制的不同尺度」這個整合,
+        是這篇筆記自己的推導——建立在已查證的事實上,但不是某篇論文的現成結論。</div>
+    </div>
+
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">出處 · 信心等級</div>
+        <a href="https://arxiv.org/abs/2502.09992">Nie et al., 2025 — Large Language Diffusion Models(LLaDA)<span class="conf verified">VERIFIED</span><br>TriviaQA 5-shot 62%、追平 LLaMA3 8B、「non-autoregressive 也能做 ICL」的核心結論經 WebSearch 交叉確認。</a>
+        <a href="https://arxiv.org/pdf/2508.15487">Ye &amp; Xie et al., 2025 — Dream 7B: Diffusion Large Language Models<span class="conf likely">LIKELY</span><br>核心比較結論經 WebSearch 摘要確認,未逐篇精讀原始評測表格。</a>
+        <a href="https://transformerstheory.github.io/pdf/14_piskorz_et_al.pdf">Piskorz et al. — In-Context Learning in Diffusion Language Models<span class="conf likely">LIKELY</span><br>標題與核心發現經 WebSearch 摘要確認,這是一篇 workshop 論文,未取得完整內文逐段核對。</a>
+        <span style="display:block;font-size:12.5px;color:var(--muted);padding:5px 0 5px 14px">Masked diffusion 的 forward/reverse process、prompt 永遠不被遮罩、雙向 attention 全程可見<span class="conf likely">LIKELY</span><br>經 WebSearch 交叉確認多個 2025-2026 來源一致描述,未逐篇精讀原始論文的公式推導。</span>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">同主題筆記</div>
+        <a href="../docs/2026-07-04-in-context-learning.md">in-context-learning.md(ICL 的三套不互斥理論——這篇論證的是它們都靠「架構軸」)</a>
+        <a href="../docs/2026-07-04-autoregressive-vs-nonautoregressive-for-agents.md">autoregressive-vs-nonautoregressive-for-agents.md(AR/NAR 這條軸、block-wise diffusion、多輪 agent 凍結區增長的完整討論)</a>
+        <a href="in-context-learning.html">in-context-learning.html(ICL 現象本身與三套理論的互動圖解)</a>
+        <a href="autoregressive-vs-nonautoregressive.html">autoregressive-vs-nonautoregressive.html(AR vs NAR、block-wise diffusion 滑桿 demo)</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 區塊 2:架構軸 vs 生成順序軸 ============ */
+  const AXIS = {
+    arch: {
+      tag: '這條軸 · 架構軸', title: 'Attention 怎麼讀 context —— ICL 掛在這裡',
+      what: 'in-context-learning.md 講的三套理論(induction heads / 隱式梯度下降 / 隱式貝氏推論),講的都是「模型怎麼看 prompt 裡的範例」——這是 attention 怎麼處理輸入 context 的能力,是架構軸在管的事,不是生成順序軸在管的事。',
+      ex: 'Diffusion 模型生成輸出時,一樣要對整個輸入 context(包含 few-shot 範例)做 attention——只是輸出的解碼順序換了,讀入 context 的方式沒有變。'
+    },
+    order: {
+      tag: '這條軸 · 生成順序軸', title: 'AR vs NAR —— 跟 ICL 幾乎無關',
+      what: '這條軸問的是「輸出的各個位置,決定的順序/依賴關係長什麼樣」——接龍(一次一個,由左到右)還是去噪(一次一大片,反覆修正)。上一篇 autoregressive-vs-nonautoregressive.html 講的 tool use 問題,掛的正是這條軸。',
+      ex: 'ICL 成不成立,問的是「context 裡的範例有沒有被有效利用」,跟「輸出是接龍生成還是平行去噪」是兩個不同的問題——這也是為什麼上一篇的結論(AR 天生適合 agent)跟這一篇的結果(NAR 也能做好 ICL)不衝突。'
+    }
+  };
+  const panelAxis = document.getElementById('panelAxis');
+  function renderAxis(key){
+    const d = AXIS[key];
+    document.querySelectorAll('#axisRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelAxis.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>問的是什麼</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+    `;
+    fadeIn(panelAxis);
+  }
+  document.querySelectorAll('#axisRow .node').forEach(el => el.addEventListener('click', () => renderAxis(el.dataset.key)));
+  renderAxis('arch');
+
+  /* ============ 區塊 3:凍結鷹架 demo ============ */
+  const QA_EXAMPLES = [
+    { q: '地球有幾顆天然衛星?', a: '1 顆' },
+    { q: '水的化學式是?', a: 'H₂O' }
+  ];
+  const QUERY_Q = '台灣最高峰叫什麼?';
+  const ANSWER_TOKENS = ['玉', '山', '。'];
+  const DIFFUSION_ORDER = [1, 0, 2];   // 依「信心」順序解封,不是由左到右
+  const AR_ORDER = [0, 1, 2];          // AR 強制由左到右
+
+  const scaffold = { mode: 'diffusion', round: 0 };
+  const MAX_ROUND = ANSWER_TOKENS.length;
+
+  function renderQaRow(){
+    const qaRow = document.getElementById('qaRow');
+    const exHtml = QA_EXAMPLES.map(e => `<div class="qa-chip"><span class="q">Q: ${e.q}</span> <span class="a">A: ${e.a}</span></div>`).join('');
+    const queryHtml = `<div class="qa-chip query"><span class="q">Q: ${QUERY_Q}</span> <span class="a">A: →</span></div>`;
+    qaRow.innerHTML = exHtml + queryHtml;
+  }
+
+  function renderScaffold(){
+    const order = scaffold.mode === 'diffusion' ? DIFFUSION_ORDER : AR_ORDER;
+    const revealedIdx = new Set(order.slice(0, scaffold.round));
+    const ansRow = document.getElementById('ansRow');
+    ansRow.innerHTML = ANSWER_TOKENS.map((t, i) => {
+      const revealed = revealedIdx.has(i);
+      const cls = revealed ? `revealed${scaffold.mode === 'ar' ? ' ar' : ''}` : 'masked';
+      return `<div class="ans-tok ${cls}">${revealed ? t : '?'}</div>`;
+    }).join('');
+
+    const btn = document.getElementById('scaffoldBtn');
+    if(scaffold.round >= MAX_ROUND){
+      btn.textContent = '已全部定案';
+      btn.disabled = true;
+    } else {
+      btn.textContent = scaffold.mode === 'diffusion'
+        ? `去噪第 ${scaffold.round + 1} 輪 →`
+        : `AR 接第 ${scaffold.round + 1} 個字 →`;
+      btn.disabled = false;
+    }
+
+    const note = document.getElementById('scaffoldNote');
+    if(scaffold.mode === 'diffusion'){
+      note.innerHTML = scaffold.round === 0
+        ? '尚未去噪——但答案的每個空格,此刻已經看得到<b>整個 prompt</b>(雙向 attention,沒有 causal mask,對應 101 頁講的「整排一起看」)。'
+        : `第 ${scaffold.round} 輪:挑信心最高的位置定案——這一輪定案的不一定是最左邊那格。定案順序是教學腳本,不是真實模型的信心分數。`;
+    } else {
+      note.innerHTML = scaffold.round === 0
+        ? 'AR 模式:接龍規則——必須從最左邊的空格開始,一個一個往右接上。'
+        : `第 ${scaffold.round} 個字定案——AR 只能按位置順序來,右邊的空格得等左邊都定案才輪得到它。`;
+    }
+
+    document.querySelectorAll('#scaffoldChips .chip').forEach(c => c.classList.toggle('active', c.dataset.m === scaffold.mode));
+    fadeIn(ansRow);
+  }
+
+  document.getElementById('scaffoldBtn').addEventListener('click', () => {
+    if(scaffold.round < MAX_ROUND){ scaffold.round++; renderScaffold(); }
+  });
+  document.getElementById('scaffoldResetBtn').addEventListener('click', () => {
+    scaffold.round = 0; renderScaffold();
+  });
+  document.querySelectorAll('#scaffoldChips .chip').forEach(c => {
+    c.addEventListener('click', () => { scaffold.mode = c.dataset.m; scaffold.round = 0; renderScaffold(); });
+  });
+
+  renderQaRow();
+  renderScaffold();
+
+  /* ============ 區塊 4:Piskorz et al. ============ */
+  const PISKORZ = {
+    ft: {
+      tag: '情境一 · 微調', title: 'AR 模型 + Diffusion Loss 微調 —— 偏向還在',
+      what: '拿一個已經訓練好的自迴歸模型,用 diffusion loss 重新微調成 diffusion 生成方式。結果:「偏近、偏左」的傾向(recency bias、left-directedness)不會完全消失。',
+      ex: '如果偏向的來源是訓練目標(diffusion vs AR)造成的,微調成 diffusion loss 應該要讓偏向消失或大幅改變——但沒有。'
+    },
+    scratch: {
+      tag: '情境二 · 從頭訓練', title: '從頭用 Diffusion 目標訓練 —— 偏向比較弱',
+      what: '不是拿 AR 模型改造,是從零開始就用 diffusion 目標訓練出來的模型。結果:同樣的「偏近、偏左」傾向還在,但比前一種情境弱。',
+      ex: '兩相對照,指向偏向的來源是<b>訓練資料本身</b>(人類正常寫的文字本來就有「越靠近越相關、由左到右鋪陳」的結構),不是 AR 這個訓練目標本身寫進去的。'
+    }
+  };
+  const panelPiskorz = document.getElementById('panelPiskorz');
+  function renderPiskorz(key){
+    const d = PISKORZ[key];
+    document.querySelectorAll('#piskorzRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelPiskorz.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>怎麼測的</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+    `;
+    fadeIn(panelPiskorz);
+  }
+  document.querySelectorAll('#piskorzRow .node').forEach(el => el.addEventListener('click', () => renderPiskorz(el.dataset.key)));
+  renderPiskorz('ft');
+
+  /* ============ 區塊 5:多輪 agent 凍結區增長 ============ */
+  const TURN_BLOCKS = ['第 1 輪:使用者提問', '第 2 輪:工具結果併入', '第 3 輪:模型依結果回覆'];
+  let turnCount = 1;
+  function renderTurns(){
+    document.getElementById('turnRow').innerHTML = TURN_BLOCKS.map((b, i) =>
+      `<div class="block-chip${i < turnCount ? ' frozen' : ''}">${b}</div>`).join('');
+    document.getElementById('turnBtn').disabled = turnCount >= TURN_BLOCKS.length;
+    document.getElementById('turnNote').textContent = turnCount >= TURN_BLOCKS.length
+      ? '三輪都併入凍結區——凍結區跟著對話輪數一路變大,跟 AR 的 KV cache 隨對話輪數增加是同一個精神,只是單位換成「一個 block」。'
+      : `目前凍結區含前 ${turnCount} 輪;按「下一輪」把新的一輪併進凍結區。`;
+  }
+  document.getElementById('turnBtn').addEventListener('click', () => {
+    if(turnCount < TURN_BLOCKS.length){ turnCount++; renderTurns(); }
+  });
+  document.getElementById('turnResetBtn').addEventListener('click', () => {
+    turnCount = 1; renderTurns();
+  });
+  renderTurns();
+</script>
+</body>
+</html>

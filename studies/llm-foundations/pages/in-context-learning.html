@@ -1,0 +1,520 @@
+---
+title: In-Context Learning — 塞幾個範例進 prompt,為什麼模型當場就學會了(互動圖解)
+summary: 現象本身兩張卡對比(傳統機器學習 vs ICL,點卡看「奇怪在哪」)+「即興爵士樂手認曲風」比喻卡;三套不互斥理論用 chips 切換,各自配一張示意圖——induction heads 的兩步驟電路(前一個字頭/歸納頭,可切換看單一步驟)、隱式梯度下降的等價路徑圖(前向運算 vs 梯度下降,收斂到同一輸出)、隱式貝氏推論的候選情境逐步收斂(按「看下一個範例」縮小候選集);末尾誠實提醒卡:三者不互斥、目前沒有統一定論。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - in-context-learning
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — In-Context Learning:塞幾個範例進 prompt,模型當場就學會了,而且完全沒改
+  任何參數。可長期回看的教學頁(pages/ genre,發布於 /llm-foundations/in-context-learning/),
+  不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-04-in-context-learning.md
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    圖解一(現象本身)— 「傳統機器學習」vs「In-context Learning」兩張卡對比(看到資料/範例
+      → 有沒有調參數 → 表現變好),點卡看 GPT-3 論文定義與「奇怪在哪」(推論當下權重凍結,
+      卻表現得像真的在學習)。下面附一張靜態的「打個比方」卡(即興爵士樂手認曲風),含誠實
+      聲明這是筆記自己的推導,不是論文原句。
+    圖解二(三套不互斥理論)— chips 切換三套解釋,各自配一張示意圖:
+      · Induction Heads(機制層級,Olsson et al. 2022)— SVG 字牌序列「A B C A」+ 兩道弧線,
+        兩個 pill 切換看「① 前一個字頭:定位上次 A 後面接的是什麼」「② 歸納頭:把 B 複製
+        過來接上」單一步驟。
+      · 隱式梯度下降(功能層級,von Oswald et al. 2023 / Dai et al. 2022)— 範例配對卡 + 新查詢
+        → 兩條並列路徑(前向運算 / 跑一次梯度下降)收斂到同一個預測輸出的示意圖,純示意
+        關係,不做真的數學運算。
+      · 隱式貝氏推論(功能層級,Xie et al. 2022)— 候選情境 chip 集合,按「看下一個範例」
+        逐步淘汰候選,收斂到一個情境,對應貝氏推論看到證據更新信念。
+    圖解三(誠實提醒)— 三套理論回答的不是同一個問題(機制層級 vs 兩種功能層級刻畫)、
+      可以同時成立、目前沒有一篇論文一統三者,ICL 為什麼有效仍是活躍研究題目。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>In-Context Learning — 塞幾個範例進 prompt,模型當場就學會了</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+  .tagline b{color:var(--ink)}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:13px;font-family:var(--mono);flex:0 0 auto;padding:0 4px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:170px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;align-items:center}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:10px;text-align:center}
+
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:74px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:650;padding:7px 14px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s ease}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  /* 圖解二:隱式梯度下降的等價路徑圖 */
+  .gd-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%}
+  .gd-examples{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .gd-card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 15px;
+    font-family:var(--mono);font-size:13px}
+  .gd-card.query{border-color:var(--accent);background:rgba(154,107,46,.08);font-weight:650;color:var(--accent)}
+  .gd-down{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+  .gd-branches{display:flex;flex-direction:column;gap:8px;width:100%;max-width:480px}
+  .gd-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;
+    font-size:13px;text-align:center;box-shadow:var(--shadow)}
+  .gd-box.alt{border-color:var(--blue);background:rgba(47,111,158,.06)}
+  .gd-box small{display:block;margin-top:4px;color:var(--muted);font-size:11px}
+  .gd-equiv{text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--rose)}
+  .gd-result{margin-top:2px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:650}
+
+  /* 圖解二:隱式貝氏推論的候選情境收斂圖 */
+  .bayes-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%}
+  .bayes-candidates{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;max-width:480px}
+  .bayes-chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 15px;
+    font-size:12.5px;transition:opacity .25s ease,border-color .2s ease,background .2s ease}
+  .bayes-chip.eliminated{opacity:.3;text-decoration:line-through;border-style:dashed}
+  .bayes-chip.survivor{border-color:var(--green);background:rgba(12,122,89,.10);font-weight:660;color:var(--green)}
+  .bayes-evidence{font-family:var(--mono);font-size:12.5px;color:var(--muted);min-height:18px;text-align:center}
+  .bayes-evidence b{color:var(--accent)}
+  .bayes-caption{font-size:12.5px;color:var(--muted);text-align:center;max-width:60ch}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations · In-Context Learning</div>
+    <h1>塞幾個範例進 prompt,為什麼模型當場就學會了</h1>
+    <p class="tagline">
+      In-context learning(ICL):在 prompt 裡塞幾個「範例輸入 → 範例輸出」,模型接下來就會
+      照著這個模式做新的輸入——<b>而且中間完全沒有任何梯度更新,沒有任何參數被改動</b>。這件事
+      乍看違反直覺:不改參數哪來的「學」?目前<b>沒有單一定論</b>,存在三套各自有實證支持、
+      彼此不互斥的解釋。這頁誠實列出三套,不假裝已經有共識答案。
+    </p>
+  </header>
+
+  <!-- ============ SECTION A: 現象本身 ============ -->
+  <section>
+    <div class="sec-kicker">圖解一 · 現象本身</div>
+    <div class="sec-title">推論當下權重是凍結的,卻表現得像真的在學習</div>
+    <p class="sec-sub">
+      傳統機器學習的「學習」,定義就是「看到資料 → 調整參數 → 表現變好」。ICL 完全沒有中間
+      那一步。點卡片看兩邊怎麼不一樣。
+    </p>
+
+    <div class="row" id="phenRow">
+      <div class="node" data-key="trad">
+        <div class="idx">對照組 · 傳統機器學習</div>
+        <h3>看到資料 → 調參數 → 表現變好</h3>
+        <div class="q">訓練或 fine-tuning,真的改動權重</div>
+      </div>
+      <div class="arrow">vs</div>
+      <div class="node active" data-key="icl">
+        <div class="idx">本篇主題 · In-Context Learning</div>
+        <h3>看到範例 → 權重不變 → 表現卻立刻變好</h3>
+        <div class="q">GPT-3 論文定義的現象,推論當下完全沒改參數</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelPhen"></div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="ph">打個比方 · 這篇筆記自己的推導,不是論文說法</div>
+      <h2>不是重新學樂器,是認出你要哪種風格</h2>
+      <div class="meta">
+        <b>樂手 =</b><span>一個資歷很深的即興爵士樂手,幾乎把所有常見曲式、和聲進行、各種樂風的「套路」都內化在身體裡了——這對應<b>訓練階段</b>。</span>
+        <b>你哼兩句 =</b><span>你現場哼兩小節給他聽,他不需要「重新學一種新樂器」或「重新練一種新技巧」,只是從內化的龐大曲庫裡<b>認出</b>你哼的接近哪一種調性/風格/套路,然後順著那個套路接下去彈。</span>
+        <b>範例做的事 =</b><span>「指認」,不是「教學」——它沒有塞進一個樂手原本不會的新技能,它做的是從樂手已經會的海量技能裡,<b>挑出</b>這次該用哪一種。</span>
+      </div>
+      <div class="ex">下面三套理論想解釋的正是這件事:「指認」這個動作,在模型內部具體是怎麼發生的?</div>
+    </div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>誠實聲明</b> — 「即興爵士樂手認曲風」的比喻是這篇筆記自己的推導,不是任何一篇論文的原句或官方說法——三篇論文都沒有用這套比喻描述自己的結論,只是拿來把三套理論放進同一個直覺畫面裡的橋接工具。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION B: 三套不互斥理論 ============ -->
+  <section>
+    <div class="sec-kicker">圖解二 · 三套不互斥的解釋</div>
+    <div class="sec-title">「指認」這個動作,在模型內部到底是怎麼發生的?</div>
+    <p class="sec-sub">
+      三套理論回答的不是同一個問題,但都想解釋上面「認曲風」這個動作。切換下面的 chips
+      看各自的機制與示意圖。
+    </p>
+
+    <div class="chips" id="theoryChips">
+      <div class="chip active" data-t="induction"><h4>Induction Heads</h4><div class="sub">機制層級 · Olsson et al. 2022</div></div>
+      <div class="chip" data-t="gd"><h4>隱式梯度下降</h4><div class="sub">功能層級 · von Oswald et al. 2023</div></div>
+      <div class="chip" data-t="bayes"><h4>隱式貝氏推論</h4><div class="sub">功能層級 · Xie et al. 2022</div></div>
+    </div>
+
+    <div class="panel" id="panelTheory" style="margin-top:20px"></div>
+
+    <div class="ctl-row" id="ihCtl" style="display:none">
+      <span class="ctl-label">看單一步驟</span>
+      <span class="pill active" data-step="1">① 前一個字頭</span>
+      <span class="pill" data-step="2">② 歸納頭</span>
+    </div>
+
+    <div class="scene-box" id="theorySceneBox">
+      <div id="theoryDiagram"></div>
+      <div class="scene-note" id="theoryNote"></div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION C: 誠實提醒 ============ -->
+  <section>
+    <div class="sec-kicker">圖解三 · 誠實提醒</div>
+    <div class="sec-title">三者不互斥,而且沒有定論</div>
+    <p class="sec-sub">
+      這三套解釋回答的不是同一個問題——但沒有誰推翻誰,而且目前沒有一篇論文一統三者。
+    </p>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>回答的問題不一樣</b> — Induction heads 講的是「內部長了什麼具體電路」(機制層級);隱式梯度下降講的是「這個計算過程數學上等價於哪種學習算法」(功能層級);隱式貝氏推論講的是「這個計算過程統計上對應哪種推論框架」(另一種功能層級的刻畫)。</div>
+      <div class="exclusion"><b>三者可以同時成立</b> — 一個具體電路,做出來的效果剛好同時可以被兩種不同的數學語言描述。目前沒有一篇論文一統這三者,業界對「ICL 為什麼有效」仍是活躍研究題目,不是已解決的問題——這篇筆記刻意不挑一個「最終答案」講,是因為現有材料本身就沒有收斂到單一答案。</div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      完整推導、查證出處與誠實聲明見
+      <a href="../docs/2026-07-04-in-context-learning.md" style="color:var(--accent)">in-context-learning.md</a>。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">現象定義</div>
+        <a href="https://arxiv.org/abs/2005.14165">Brown et al., 2020 — Language Models are Few-Shot Learners(GPT-3 論文,ICL 這個現象的原始命名與定義出處)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">三套理論的原始論文</div>
+        <a href="https://arxiv.org/abs/2209.11895">Olsson et al., 2022(Anthropic)— In-context Learning and Induction Heads(induction head 機制發現)</a>
+        <a href="https://arxiv.org/abs/2212.07677">von Oswald et al., 2023(ICML)— Transformers Learn In-Context by Gradient Descent(隱式梯度下降的等價性證明)</a>
+        <a href="https://arxiv.org/abs/2212.10559">Dai et al., 2022 — Why Can GPT Learn In-Context? Language Models Implicitly Perform Gradient Descent as Meta-Optimizers(同期相近框架)</a>
+        <a href="https://arxiv.org/abs/2111.02080">Xie et al., 2022(Stanford,ICLR)— An Explanation of In-context Learning as Implicit Bayesian Inference(隱式貝氏推論框架)</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 圖解一:現象本身 ============ */
+  const PHEN = {
+    trad: {
+      tag: '對照組 · 傳統機器學習', title: '看到資料 → 調整參數 → 表現變好',
+      what: '傳統機器學習裡「學習」的定義,就是這三步:看到訓練資料、根據誤差調整參數(梯度更新)、下一次表現變好。不管是完整訓練還是 fine-tuning,這個「調參數」的動作都會真的<b>改動模型的權重</b>。',
+      ex: '調完之後,新的行為被寫進權重裡,永久生效——就算之後再也看不到這批訓練資料,模型還是「記得」怎麼做。'
+    },
+    icl: {
+      tag: '本篇主題 · In-Context Learning', title: '看到範例 → 沒有任何參數改變 → 表現卻立刻變好',
+      what: 'Brown et al., 2020(GPT-3 論文)講的 ICL:在 prompt 裡塞幾個「範例輸入 → 範例輸出」(demonstration),不做任何 fine-tuning、不改任何權重,純粹靠 prompt 裡的文字,模型接下來的輸出就會照著範例的模式走。而且<b>模型越大,這個「靠示範就上手」的能力進步得越快</b>——比起完全不給範例的 zero-shot,few-shot 隨規模拉大,進步得更陡。',
+      ex: '奇怪在哪:推論當下權重是<b>凍結的</b>,這不是傳統定義下的「學習」,卻表現得像真的在學。這不是量變(記憶體更大所以背得更多能查),是質變——它利用範例的方式,看起來像真的在跑一套學習算法,只是這套算法<b>不改權重</b>。'
+    }
+  };
+  const panelPhen = document.getElementById('panelPhen');
+  function renderPhen(key){
+    const d = PHEN[key];
+    document.querySelectorAll('#phenRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelPhen.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+    `;
+    fadeIn(panelPhen);
+  }
+  document.querySelectorAll('#phenRow .node').forEach(el => el.addEventListener('click', () => renderPhen(el.dataset.key)));
+  renderPhen('icl');
+
+  /* ============ 圖解二:三套不互斥理論 ============ */
+  const THEORY = {
+    induction: {
+      tag: '解釋一 · 機制層級 · Induction Heads', title: '模型內部長了一個「找相似片段、抄它後面接什麼」的迴路',
+      what: 'Olsson et al., 2022(Anthropic)是第一篇直接打開模型內部去找機制的研究,不是靠外部行為推測。他們找到一組具體的注意力頭組合(induction head):由兩層注意力頭合作完成一個「複製-補全」的動作——前一層的頭負責定位「上一次看到類似 pattern 時,後面接的是什麼」,後一層的頭把那個「後面接的東西」複製過來、接在當下位置後面。',
+      ex: '下面示意一段重複出現 pattern 的字牌序列「A B C A」:讀到第二個 A 時,① 前一個字頭定位「上次 A 後面接的是 B」,② 歸納頭把 B 複製過來,接在當下位置後面,變成模型「猜」的下一張牌。點下面的 ① ② 切換看單一步驟。',
+      deeper: '這個迴路在 GPT-2、GPT-Neo、以及用不同隨機種子從頭訓練的模型上都獨立長出來過——不是巧合,是訓練這個目標下收斂出來的通用解法。'
+    },
+    gd: {
+      tag: '解釋二 · 功能層級 · 隱式梯度下降', title: '前向運算,數學上等價於「臨時跑了一次學習算法」',
+      what: 'von Oswald et al., 2023(ICML)從理論構造角度證明:一層 linear self-attention 對範例做的資料轉換,在數學上可以構造出跟對一個回歸問題跑一步梯度下降完全等價的權重組合。模型不是真的在推論時「動了參數」,但它的前向運算過程,在效果上等同於「用 prompt 裡的範例當訓練資料,臨時跑了一次學習算法」——這個「學習算法」被寫死在模型的前向計算路徑裡,不是外部真的在更新權重。',
+      ex: 'Dai et al., 2022 是同期獨立提出的相近框架,把 attention 直接類比成一種「meta-gradient」的更新規則。下面是示意性的等價關係圖——不是真的做數學運算:同一組範例配對 + 新查詢,走「一次前向運算」跟走「跑一次梯度下降」,理論上收斂到同一個預測輸出。',
+      deeper: '這一派理論回答的問題是:「指認」這個動作,在計算上等價於哪一種已知的學習算法?'
+    },
+    bayes: {
+      tag: '解釋三 · 功能層級 · 隱式貝氏推論', title: '範例是證據,模型在猜「現在是哪個情境」',
+      what: 'Xie et al., 2022(Stanford,ICLR)走的是不同角度:如果訓練語料裡本來就存在大量「長距離主題一致」的文件(同一篇文章前後文風格、主題、語氣是連貫的),模型要把「猜下一個字」做好,某種程度上必須先在心裡「猜這篇文章現在是哪個主題/哪種情境」,再根據這個猜測去預測下一個字。',
+      ex: '範例塞進 prompt,在這個框架下做的事是:提供證據,讓模型收斂到「現在是哪個情境」這個內部猜測上——跟貝氏推論「看到證據,更新對隱藏變數的信念」是同一個數學形狀。下面示意:每看一個範例,候選情境集合就縮小一點,直到收斂到一個情境。按「看下一個範例」試試看。',
+      deeper: '這一派理論回答的問題是:「指認」這個動作,在統計上對應哪一種已知的推論框架?'
+    }
+  };
+
+  const state = { theory: 'induction', ihStep: 1, bayesStep: 0 };
+  const panelTheory = document.getElementById('panelTheory');
+  const theoryDiagram = document.getElementById('theoryDiagram');
+  const theoryNote = document.getElementById('theoryNote');
+  const ihCtl = document.getElementById('ihCtl');
+
+  /* --- Induction heads SVG --- */
+  function renderIH(){
+    const boxes = [
+      {t:'A'}, {t:'B'}, {t:'C'}, {t:'A', cursor:true}, {t:'B', ghost:true}
+    ];
+    const y=110, w=54, h=50, gap=92, x0=34;
+    const cx = i => x0 + i*gap + w/2;
+    let boxesHtml='', arcs='';
+
+    const step1Active = state.ihStep === 1;
+    const step2Active = state.ihStep === 2;
+
+    // arc1: box3(current A) -> box1(B) — 前一個字頭
+    arcs += `<path d="M ${cx(3)} ${y} C ${cx(3)-30} ${y-72} ${cx(1)+30} ${y-72} ${cx(1)} ${y}" fill="none"
+      stroke="${step1Active?'var(--rose)':'var(--line)'}" stroke-width="${step1Active?2.6:1.6}" marker-end="url(#ihArrow1)"/>
+      <text x="${(cx(3)+cx(1))/2}" y="${y-80}" text-anchor="middle" font-size="10.5" font-family="var(--mono)"
+        fill="${step1Active?'var(--rose)':'var(--faint)'}">① 前一個字頭:上次 A 後面接的是？</text>`;
+
+    // arc2: box1(B) -> box4(ghost B) — 歸納頭
+    arcs += `<path d="M ${cx(1)} ${y+h} C ${cx(1)+15} ${y+h+55} ${cx(4)-55} ${y+h+55} ${cx(4)} ${y+h}" fill="none"
+      stroke="${step2Active?'var(--green)':'var(--line)'}" stroke-width="${step2Active?2.6:1.6}" marker-end="url(#ihArrow2)"/>
+      <text x="${(cx(1)+cx(4))/2}" y="${y+h+70}" text-anchor="middle" font-size="10.5" font-family="var(--mono)"
+        fill="${step2Active?'var(--green)':'var(--faint)'}">② 歸納頭:把 B 複製過來接上</text>`;
+
+    boxes.forEach((b,i)=>{
+      const x = x0 + i*gap;
+      const stroke = b.ghost ? 'var(--faint)' : 'var(--accent)';
+      const dash = b.ghost ? ' stroke-dasharray="4 4"' : '';
+      const fill = b.cursor ? 'rgba(154,107,46,.10)' : 'var(--panel)';
+      boxesHtml += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="1.8"${dash}/>
+        <text x="${x+w/2}" y="${y+h/2+6}" text-anchor="middle" font-family="var(--mono)" font-size="17"
+          fill="${b.ghost?'var(--faint)':'var(--ink)'}">${b.t}</text>`;
+      if(b.cursor){
+        boxesHtml += `<text x="${x+w/2}" y="${y-16}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--accent)">目前讀到這</text>`;
+      }
+      if(b.ghost){
+        boxesHtml += `<text x="${x+w/2}" y="${y+h+22}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--faint)">模型猜的下一張</text>`;
+      }
+    });
+
+    return `<svg width="540" height="270" viewBox="0 0 540 270">
+      <defs>
+        <marker id="ihArrow1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--rose)"/></marker>
+        <marker id="ihArrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--green)"/></marker>
+      </defs>
+      ${arcs}${boxesHtml}
+    </svg>`;
+  }
+
+  /* --- 隱式梯度下降:等價路徑圖 --- */
+  function renderGD(){
+    return `<div class="gd-wrap">
+      <div class="gd-examples">
+        <div class="gd-card">2 → 4</div>
+        <div class="gd-card">3 → 6</div>
+        <div class="gd-card">5 → 10</div>
+        <div class="gd-card query">4 → ?（新查詢)</div>
+      </div>
+      <div class="gd-down">↓ prompt 裡塞好這幾組範例 + 新查詢</div>
+      <div class="gd-branches">
+        <div class="gd-box">Transformer 前向運算一次<small>推論當下,權重完全不變</small></div>
+        <div class="gd-equiv">≡ von Oswald et al. 2023 構造性證明:數學上等價</div>
+        <div class="gd-box alt">把範例當訓練資料,對回歸問題跑一次梯度下降<small>Dai et al. 2022:類比成 meta-gradient 更新</small></div>
+      </div>
+      <div class="gd-result">兩條路徑 → 收斂到同一個預測輸出 ŷ ≈ 8</div>
+    </div>`;
+  }
+
+  /* --- 隱式貝氏推論:候選情境收斂 --- */
+  const BAYES_CANDS = ['翻譯','摘要','算術','問答','分類','改寫'];
+  const BAYES_STEPS = [
+    { evidence: '尚未看任何範例——候選情境還很大', survivors: BAYES_CANDS.slice() },
+    { evidence: '看到範例 1:「2 + 2 = 4」', survivors: ['算術','分類','改寫'] },
+    { evidence: '看到範例 2:「3 + 5 = 8」', survivors: ['算術','改寫'] },
+    { evidence: '看到範例 3:「7 + 1 = 8」', survivors: ['算術'] }
+  ];
+  function renderBayes(){
+    const step = BAYES_STEPS[state.bayesStep];
+    const converged = step.survivors.length === 1;
+    const chips = BAYES_CANDS.map(c => {
+      const alive = step.survivors.includes(c);
+      const cls = !alive ? 'eliminated' : (converged ? 'survivor' : '');
+      return `<span class="bayes-chip ${cls}">${c}</span>`;
+    }).join('');
+    return `<div class="bayes-wrap">
+      <div class="bayes-candidates">${chips}</div>
+      <div class="bayes-evidence"><b>證據</b> — ${step.evidence}</div>
+      <div class="ctl-row" style="margin-top:0">
+        <button class="btn primary" id="bayesNextBtn" ${state.bayesStep >= BAYES_STEPS.length-1 ? 'disabled' : ''}>看下一個範例 →</button>
+        <button class="btn" id="bayesResetBtn">重來</button>
+      </div>
+      <div class="bayes-caption">看到證據,候選情境範圍逐步縮小——這對應貝氏推論「看到證據,更新對隱藏變數的信念」的數學形狀。</div>
+    </div>`;
+  }
+
+  function renderTheory(){
+    const d = THEORY[state.theory];
+    document.querySelectorAll('#theoryChips .chip').forEach(c => c.classList.toggle('active', c.dataset.t === state.theory));
+    panelTheory.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+      <div class="deeper"><b>更深一層</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelTheory);
+
+    ihCtl.style.display = state.theory === 'induction' ? 'flex' : 'none';
+
+    if(state.theory === 'induction'){
+      theoryDiagram.innerHTML = renderIH();
+      theoryNote.textContent = '示意的字牌序列與電路連線,教學示意,非真實模型的注意力權重';
+    } else if(state.theory === 'gd'){
+      theoryDiagram.innerHTML = renderGD();
+      theoryNote.textContent = '示意性的等價關係圖,沒有真的做數學運算;數字與範例皆為教學示意';
+    } else {
+      theoryDiagram.innerHTML = renderBayes();
+      theoryNote.textContent = '候選情境與淘汰順序為教學示意腳本,非真實模型的內部推論過程';
+      bindBayesEvents();
+    }
+    fadeIn(theoryDiagram);
+  }
+
+  function bindBayesEvents(){
+    const nextBtn = document.getElementById('bayesNextBtn');
+    const resetBtn = document.getElementById('bayesResetBtn');
+    if(nextBtn){
+      nextBtn.addEventListener('click', () => {
+        if(state.bayesStep < BAYES_STEPS.length - 1){ state.bayesStep++; theoryDiagram.innerHTML = renderBayes(); bindBayesEvents(); fadeIn(theoryDiagram); }
+      });
+    }
+    if(resetBtn){
+      resetBtn.addEventListener('click', () => {
+        state.bayesStep = 0; theoryDiagram.innerHTML = renderBayes(); bindBayesEvents(); fadeIn(theoryDiagram);
+      });
+    }
+  }
+
+  document.querySelectorAll('#theoryChips .chip').forEach(c => {
+    c.addEventListener('click', () => {
+      state.theory = c.dataset.t;
+      if(state.theory === 'bayes') state.bayesStep = 0;
+      renderTheory();
+    });
+  });
+  document.querySelectorAll('#ihCtl .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      state.ihStep = +p.dataset.step;
+      document.querySelectorAll('#ihCtl .pill').forEach(x => x.classList.toggle('active', x === p));
+      theoryDiagram.innerHTML = renderIH();
+      fadeIn(theoryDiagram);
+    });
+  });
+
+  renderTheory();
+</script>
+</body>
+</html>

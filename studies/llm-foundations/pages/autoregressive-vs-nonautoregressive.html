@@ -1,0 +1,732 @@
+---
+title: Autoregressive vs Non-Autoregressive — 換成 Diffusion,Tool Use 還撐得住嗎?(互動圖解)
+summary: 兩層分類卡(Skills 不受影響 vs Tool use 會出問題)+ 實測證據;Multimodality problem
+  互動 demo——AR/NAR 兩個 chip 切換生成「Thank you very much.」的德文翻譯,示範 NAR 各位置獨立
+  決定怎麼拼出「Danke Dank.」「Vielen schön.」四不像(對應 Gu et al. 2018);真實世界 vs AR 生成
+  雙軌時間線對照(因果同構);五個優勢卡片(點看細節);block 大小滑桿看 block-wise diffusion 的
+  tradeoff;Transformer vs Mamba 與 AR vs NAR 兩條獨立軸的 2×2 對照表。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - autoregressive
+  - diffusion
+  - agent
+  - interactive
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Autoregressive vs Non-Autoregressive:換成 diffusion,tool use 還撐得住嗎。
+  可長期回看的教學頁(pages/ genre,發布於 /llm-foundations/autoregressive-vs-nonautoregressive/),
+  不是 disposable mockup。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-04-autoregressive-vs-nonautoregressive-for-agents.md
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    區塊 1(先分兩層)— Skills(靠 context 驅動,幾乎不受影響)vs Tool use(需要中途暫停,
+      diffusion 目前確實出問題)兩張卡片,點看比喻與說明。
+    區塊 2(實測證據)— The Bitter Lesson of Diffusion Language Models for Agentic Workflows
+      量到的系統性失敗行為 + DiffusionGemma 官方在嘗試的反例,不是空想的架構摩擦。
+    區塊 3(更根本的分界線:AR vs NAR + multimodality problem 互動 demo)— 「Thank you
+      very much.」翻德文,AR/NAR 兩個 chip 切換;AR 模式下位置 2 的分布要等位置 1 定案後才
+      算出來(條件機率),永遠生出合法翻譯;NAR 模式下兩個位置各自獨立平行決定,示範怎麼拼出
+      「Danke Dank.」「Vielen schön.」這種四不像——機率為教學示意,對應 Gu et al. 2018。
+    區塊 4(為什麼 AR 天生跟世界因果結構同構)— 查蘋果股價的比喻 + 真實世界時間線 vs AR
+      生成時間線的雙軌對照,兩排完全對齊。
+    區塊 5(五個具體優勢)— 卡片列,點看細節(暫停點、KV cache、工具呼叫內部一致性、
+      訓練資料形狀、出錯後重新決策)。
+    區塊 6(block-wise diffusion 的 tradeoff)— block 大小滑桿,兩條 meter(局部依賴保留度 /
+      平行效率)即時消長,三段式文字說明 block 太小 / 甜蜜點 / 太大分別代表什麼。
+    區塊 7(容易混在一起但其實獨立的一條軸)— Transformer/Mamba × AR/NAR 2×2 對照表,
+      + 後續修正提示(causal mask 是被解碼順序決定的,不是架構自由選項,詳見 llm-primitives.md)。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>AR vs NAR — 換成 Diffusion,Tool Use 還撐得住嗎?</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+  .tagline b{color:var(--ink)}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+  .sec-sub a{color:var(--accent)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:nowrap}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:13px;font-family:var(--mono);flex:0 0 auto;padding:0 4px}
+  .node{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .step-chip{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:12px 10px;text-align:center}
+  .step-chip .idx{font-family:var(--mono);font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.02em}
+  .step-chip h4{font-size:13px;font-weight:650;margin-top:5px;line-height:1.3}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .deeper a{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:150px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:12px;text-align:center}
+
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:52px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:650;padding:7px 14px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s ease}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fffdf8}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  .slider-row{display:flex;align-items:center;gap:14px;margin-top:16px;flex-wrap:wrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--accent)}
+  .temp-val{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:650;min-width:78px;text-align:right}
+
+  .bars{display:flex;flex-direction:column;gap:9px;max-width:280px;margin:0 auto}
+  .bar-row{display:grid;grid-template-columns:56px 1fr 42px;align-items:center;gap:10px;
+    border-radius:9px;padding:5px 8px;transition:background .12s ease,opacity .15s ease}
+  .bar-row.picked{background:rgba(154,107,46,.12)}
+  .bar-row .tok{font-family:var(--mono);font-size:13px;text-align:right}
+  .bar-track{background:var(--line-soft);border-radius:999px;height:13px;overflow:hidden;border:1px solid var(--line)}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--accent));border-radius:999px 0 0 999px;transition:width .22s ease}
+  .bar-row .pct{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+
+  .stepper{margin-top:22px;padding:20px;border-radius:14px;background:var(--panel);border:1px solid var(--line);
+    box-shadow:var(--shadow);text-align:center}
+  .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .draw-history{margin-top:16px}
+  .draw-history .pill{cursor:default;border-width:1.4px;font-family:var(--mono)}
+  .draw-history .row-pills{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  .runnote{font-size:12.5px;color:var(--muted);margin-top:10px;min-height:20px}
+
+  .round-caption{margin-top:14px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--rose);
+    border-radius:0 10px 10px 0;font-size:13px}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+
+  .matrix{margin-top:20px;display:grid;grid-template-columns:130px 1fr 1fr;gap:1px;background:var(--line);
+    border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+  .matrix > div{background:var(--panel);padding:14px 16px;font-size:13px}
+  .matrix .hd{font-weight:660;text-align:center;color:var(--ink)}
+  .matrix .rh{font-weight:660;display:flex;align-items:center;color:var(--accent)}
+  .matrix .empty{color:var(--muted);font-style:italic;font-size:12.5px}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+    .matrix{grid-template-columns:90px 1fr 1fr;font-size:11.5px}
+    .matrix > div{padding:10px 8px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations · Autoregressive vs Non-Autoregressive</div>
+    <h1>換成 Diffusion,Tool Use 這些 Agent 技巧還撐得住嗎?</h1>
+    <p class="tagline">
+      分層看差很多。<b>Skills</b> 這種「靠 context 內容驅動」的技巧,幾乎不受影響。<b>Tool use</b>
+      這種「需要中途暫停、等外部結果、再繼續」的迴圈,實測下來確實會出系統性問題——不是空想的
+      架構摩擦。深挖下去,真正的分界線不是「是不是 diffusion」,是更根本的
+      <b>autoregressive(AR)vs non-autoregressive(NAR)</b>:AR 的生成順序跟真實世界資訊到達
+      的順序同構,這是它天生適合 agent 的根本原因。
+    </p>
+  </header>
+
+  <!-- ============ SECTION 1: 先分兩層 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 1 · 先分兩層</div>
+    <div class="sec-title">哪些技巧只是「靠 context 驅動」,哪些需要「中途暫停」</div>
+    <p class="sec-sub">
+      不管生成機制是接龍還是去噪,「context 裡放了什麼會影響輸出」是兩種架構共通的基礎能力;
+      但「講到一半先停下來聽結果,再接著講」就不是所有架構都天生會的事。點卡片看差在哪。
+    </p>
+
+    <div class="row" id="layerRow">
+      <div class="node active" data-key="skills">
+        <div class="idx">技巧 1 · 靠 Context 驅動</div>
+        <h3>Skills</h3>
+        <div class="q">幾乎不受影響</div>
+      </div>
+      <div class="arrow">vs</div>
+      <div class="node" data-key="tooluse">
+        <div class="idx">技巧 2 · 需要中途暫停</div>
+        <h3>Tool use</h3>
+        <div class="q">目前實測下來,diffusion 撐得比較辛苦</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelLayer"></div>
+  </section>
+
+  <!-- ============ SECTION 2: 實測證據 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 2 · 不是空想的摩擦</div>
+    <div class="sec-title">實測證據:diffusion agent 論文量到的系統性失敗</div>
+    <p class="sec-sub">
+      <a href="https://arxiv.org/abs/2601.12979">The Bitter Lesson of Diffusion Language Models
+      for Agentic Workflows: A Comprehensive Reality Check</a>(2026)直接測了這件事。
+    </p>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>多輪互動</b> — 目前的 diffusion LLM 拿去當 agent 骨幹,在多輪
+        互動場景會出現系統性失敗行為。</div>
+      <div class="exclusion"><b>Tool-calling</b> — 呼叫不精準、不穩定,導致執行失敗。</div>
+      <div class="exclusion"><b>具身(embodied)agent</b> — 甚至會重複做同一個動作,而不是換個
+        做法探索。</div>
+    </div>
+
+    <div class="panel">
+      <div class="ph">但也不是做不到</div>
+      <h2>業界有廠商在實際嘗試</h2>
+      <div class="meta"><b>反例</b><span>Google 的
+        <a href="https://ai.google.dev/gemma/docs/diffusiongemma/model_card" style="color:var(--accent)">DiffusionGemma model card</a>
+        寫明「原生支援結構化工具呼叫」。</span></div>
+      <div class="ex">只是自迴歸的 tool use 已經被業界磨了三年(見 <code>tool-use</code> 主題的
+        <code>tool-use-origins.md</code>),diffusion 版本才剛起步。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 3: 更根本的分界線 + multimodality demo ============ -->
+  <section>
+    <div class="sec-kicker">區塊 3 · 更根本的分界線</div>
+    <div class="sec-title">不是「是不是 diffusion」,是 AR vs NAR</div>
+    <p class="sec-sub">
+      Diffusion 只是 NAR(non-autoregressive)陣營裡目前最紅的一種具體做法,問題的根源是
+      AR/NAR 這條軸。這件事有比 diffusion LM 早了快十年的歷史證據:
+      <a href="https://arxiv.org/abs/1711.02281">Gu et al., 2018, Non-Autoregressive Neural
+      Machine Translation</a>(ICLR 2018)撞過一模一樣的牆,叫 <b>multimodality problem</b>——
+      「Thank you very much.」翻成德文,「Danke schön.」跟「Vielen Dank.」都對,但如果各個
+      位置獨立平行決定,模型可能把兩種正確答案的碎片混在一起,吐出「Danke Dank.」這種四不像。
+      下面自己動手生成看看,AR 跟 NAR 差在哪一步。
+    </p>
+
+    <div class="chips" id="mmChips">
+      <div class="chip active" data-mm="ar"><h4>AR(依序生成)</h4><div class="sub">位置 1 定案後,才決定位置 2</div></div>
+      <div class="chip" data-mm="nar"><h4>NAR(平行生成)</h4><div class="sub">兩個位置各自獨立、同時決定</div></div>
+    </div>
+
+    <div class="scene-box">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center">
+        <div style="min-width:220px">
+          <div class="ctl-label" style="margin-bottom:8px;text-align:center">位置 1</div>
+          <div class="bars" id="pos1Bars"></div>
+        </div>
+        <div style="min-width:220px">
+          <div class="ctl-label" style="margin-bottom:8px;text-align:center">位置 2</div>
+          <div class="bars" id="pos2Bars"></div>
+        </div>
+      </div>
+      <div class="scene-note">機率為教學示意,不是真實模型輸出——「Thank you very much.」的德文翻譯</div>
+    </div>
+
+    <div class="round-caption" id="mmResult" style="display:none"></div>
+
+    <div class="stepper">
+      <div class="controls">
+        <button class="btn primary" id="mmBtn">① 生成位置 1 →</button>
+        <button class="btn" id="mmClearBtn">清空紀錄</button>
+      </div>
+      <div class="draw-history" id="mmHistory"></div>
+    </div>
+
+    <div class="panel" id="panelMM"></div>
+  </section>
+
+  <!-- ============ SECTION 4: 為什麼 AR 天生同構 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 4 · 根因</div>
+    <div class="sec-title">為什麼 AR 天生適合 agent:跟真實世界因果結構同構</div>
+    <p class="sec-sub">
+      打個比方:你問朋友「猜蘋果現在股價多少」,他可以隨口猜;但如果他要「真的查一下」,查詢
+      動作必須先做、結果必須先出來,他才能根據真實數字繼續講——他不可能在結果出來前就把後面
+      整段話定案。這正是 AR 的結構:<b>每個字定案完,下一個字才輪到</b>,跟「每個動作做完才知道
+      結果,才能決定下一步」是同一種時間順序。
+    </p>
+
+    <div class="scene-box">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="row" style="margin-top:0">
+          <div class="step-chip"><div class="idx">真實世界</div><h4>隨口用猜的</h4></div>
+          <div class="arrow">或 →</div>
+          <div class="step-chip"><div class="idx">真實世界</div><h4>發出查詢動作</h4></div>
+          <div class="arrow">→</div>
+          <div class="step-chip"><div class="idx">真實世界</div><h4>等待結果出來</h4></div>
+          <div class="arrow">→</div>
+          <div class="step-chip"><div class="idx">真實世界</div><h4>看到真實數字,才能往下講</h4></div>
+        </div>
+        <div class="row" style="margin-top:0">
+          <div class="step-chip" style="border-color:var(--accent)"><div class="idx">AR 生成</div><h4>定案 tool_use 的 JSON</h4></div>
+          <div class="arrow">→</div>
+          <div class="step-chip" style="border-color:var(--accent)"><div class="idx">AR 生成</div><h4>停在乾淨的邊界,等外部結果</h4></div>
+          <div class="arrow">→</div>
+          <div class="step-chip" style="border-color:var(--accent)"><div class="idx">AR 生成</div><h4>結果接進 context</h4></div>
+          <div class="arrow">→</div>
+          <div class="step-chip" style="border-color:var(--accent)"><div class="idx">AR 生成</div><h4>看著結果,決定下一段字</h4></div>
+        </div>
+      </div>
+      <div class="scene-note">兩排完全對齊——這正是「AR 的因果結構跟真實世界資訊到達順序同構」的意思;先發生的事才能決定後發生的事,不能反過來。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 5: 五個優勢 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 5 · 從根因長出來的</div>
+    <div class="sec-title">五個具體優勢</div>
+    <p class="sec-sub">點卡片看每一項的細節。</p>
+
+    <div class="row" id="advRow">
+      <div class="node" data-key="pause"><div class="idx">01</div><h3>乾淨的暫停/恢復點</h3></div>
+      <div class="node" data-key="kv"><div class="idx">02</div><h3>KV cache 可以重用</h3></div>
+      <div class="node" data-key="consist"><div class="idx">03</div><h3>單一工具呼叫內部一致</h3></div>
+      <div class="node" data-key="data"><div class="idx">04</div><h3>訓練資料形狀天生同軸</h3></div>
+      <div class="node" data-key="redecide"><div class="idx">05</div><h3>出錯後能整個重新決策</h3></div>
+    </div>
+
+    <div class="panel" id="panelAdv">
+      <p class="placeholder">↑ 點一張卡片,看細節。</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 6: block-wise diffusion tradeoff ============ -->
+  <section>
+    <div class="sec-kicker">區塊 6 · 修法</div>
+    <div class="sec-title">Block-wise diffusion 借回「定案」性質——但不是免費午餐</div>
+    <p class="sec-sub">
+      業界的答案不是放棄 diffusion,是把輸出切成一塊一塊(<b>block-wise / semi-autoregressive
+      diffusion</b>,BD3-LM、Fast-dLLM v2、LLaDA 2.0 是具體案例):block 跟 block 之間嚴格
+      接龍(前一個 block 定案了,後一個才開始),block <b>內部</b>才做平行去噪。拖動下面的滑桿,
+      看 block 大小怎麼在「安全」跟「平行」之間拉扯。
+    </p>
+
+    <div class="slider-row">
+      <span class="ctl-label">Block 大小</span>
+      <input type="range" id="blockSlider" min="0" max="100" step="1" value="50">
+      <span class="temp-val" id="blockVal" style="min-width:230px">block-wise 甜蜜點</span>
+    </div>
+
+    <div class="scene-box">
+      <div style="display:flex;flex-direction:column;gap:14px;max-width:520px;margin:0 auto">
+        <div>
+          <div class="ctl-label" style="margin-bottom:6px">局部依賴保留度 / 定案安全性</div>
+          <div class="bar-track"><div class="bar-fill" id="localBarFill" style="width:50%"></div></div>
+        </div>
+        <div>
+          <div class="ctl-label" style="margin-bottom:6px">平行效率</div>
+          <div class="bar-track"><div class="bar-fill" id="parallelBarFill" style="width:50%;background:linear-gradient(90deg,var(--blue),var(--rose))"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="round-caption" id="blockCaption"></div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>不是切一刀就搞定的開關</b> — block 切太小,保留局部條件依賴,
+        但要跑很多輪去噪;block 切太大,平行度看起來變高,但容易做出過早的決定、快取一致性
+        也變差。</div>
+      <div class="exclusion"><b>活躍在解的問題</b> — 最新的做法(AdaBlock-dLLM、CtrlDiff)已經
+        把 block size 從訓練前定死的超參數,變成推論當下依樣本動態決定的問題,代表「切多大、
+        在哪裡切」仍沒有標準答案。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 7: Transformer vs Mamba 是獨立的軸 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 7 · 容易混在一起,但其實獨立</div>
+    <div class="sec-title">「Transformer vs Mamba」跟「AR vs NAR」是兩條互相獨立的軸</div>
+    <p class="sec-sub">
+      前者問「怎麼算出每個位置的表示」,後者問「輸出的各個位置,決定的順序/依賴關係長什麼樣」。
+      實務上兩兩都能組合——真正決定「tool use 好不好接」的是 AR/NAR 這條軸,不是
+      Transformer/Mamba 那條軸。
+    </p>
+
+    <div class="matrix">
+      <div></div>
+      <div class="hd">Transformer(attention)</div>
+      <div class="hd">Mamba / RWKV(狀態機)</div>
+      <div class="rh">AR</div>
+      <div>多數主流 LLM(GPT 系列)——接龍生成,用 attention 算每個位置的表示。</div>
+      <div>Mamba 語言模型——一樣是接龍生成,只是內部機制不是 attention。</div>
+      <div class="rh">NAR</div>
+      <div>多數 diffusion LM——內部其實也是拿 Transformer 的區塊在算,只是拿掉 causal mask、
+        改成雙向 + 迭代去噪。</div>
+      <div class="empty">筆記未點出具體案例——理論上兩軸可以自由組合,但這格不是本篇重點。</div>
+    </div>
+
+    <div class="round-caption">
+      <b style="color:var(--rose)">後續修正</b> — 上面「拿掉 causal mask、改成雙向」這個細節,
+      後來在 <a href="../docs/2026-07-04-llm-primitives.md" style="color:var(--accent)">llm-primitives.md</a>
+      用第一原理重新檢驗時發現不能輕輕帶過——causal mask 存不存在,其實是被解碼順序(AR/NAR)
+      <b>決定</b>的,不是架構軸自己能選的自由度。「混合機制(attention vs 狀態機)」才是真正
+      獨立於 AR/NAR 的架構原子,細節見該篇。
+    </div>
+
+    <p class="sec-sub" style="margin-top:14px">
+      也不是所有 agent 相關能力都掛在同一條軸上——in-context learning 就是一個反例,見
+      <a href="../docs/2026-07-04-in-context-learning-under-diffusion.md">in-context-learning-under-diffusion.md</a>。
+    </p>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      本頁對應的完整技術筆記(含逐條信心等級標記與誠實聲明),見
+      <a href="../docs/2026-07-04-autoregressive-vs-nonautoregressive-for-agents.md">2026-07-04-autoregressive-vs-nonautoregressive-for-agents.md</a>。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">出處</div>
+        <a href="https://arxiv.org/abs/2601.12979">The Bitter Lesson of Diffusion Language Models for Agentic Workflows: A Comprehensive Reality Check(2026)——diffusion agent 多輪互動、tool-calling、具身場景的系統性失敗行為</a>
+        <a href="https://ai.google.dev/gemma/docs/diffusiongemma/model_card">DiffusionGemma model card——原生支援結構化工具呼叫的官方廠商反例</a>
+        <a href="https://arxiv.org/abs/1711.02281">Gu, Bradbury, Xiong, Li &amp; Socher, 2018 — Non-Autoregressive Neural Machine Translation(ICLR 2018)——multimodality problem 的原始定義與「Danke Dank./Vielen schön.」例子</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">同主題筆記</div>
+        <a href="../docs/2026-07-04-beyond-transformer-architectures.md">beyond-transformer-architectures.md(Transformer vs Mamba/RWKV 這條軸的完整討論)</a>
+        <a href="../docs/2026-07-04-in-context-learning-under-diffusion.md">in-context-learning-under-diffusion.md(不是所有能力都掛在 AR/NAR 這條軸上的反例)</a>
+        <a href="../docs/2026-07-04-llm-primitives.md">llm-primitives.md(causal mask 由解碼順序決定,不是獨立架構自由度的修正)</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 區塊 1:Skills vs Tool use ============ */
+  const LAYER = {
+    skills: {
+      tag: '技巧 1 · 靠 Context 驅動', title: 'Skills — 幾乎不受影響',
+      what: 'Skill 的本質是「把一段程序性知識塞進 context,模型讀了就照著做」——不管生成機制是接龍還是去噪,「context 裡放了什麼會影響輸出」是兩種架構共通的基礎能力。',
+      ex: '這不是巧合:它不需要「中途暫停等外部結果」這個動作,純粹是讀 context、照著做,AR 跟 NAR 在這件事上沒有結構性差異。'
+    },
+    tooluse: {
+      tag: '技巧 2 · 需要中途暫停', title: 'Tool use — 真正會出問題的地方',
+      what: '打個比方:自迴歸生成像一個人一句一句講話——講到一半剛好可以停下來聽對方回答,再接著往下講。Diffusion(至少是最原始那種「一次對整段輸出反覆去噪」的版本)比較像盯著一張模糊照片,對整張照片同時反覆調焦——沒有一個乾淨的「調到一半先暫停,拿新資訊進來,再接著調」的節點。',
+      ex: '因為它做的不是「一格一格往後補」,是「整片一起慢慢變清楚」——沒有天然的中途暫停點。'
+    }
+  };
+  const panelLayer = document.getElementById('panelLayer');
+  function renderLayer(key){
+    const d = LAYER[key];
+    document.querySelectorAll('#layerRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelLayer.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>怎麼回事</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+    `;
+    fadeIn(panelLayer);
+  }
+  document.querySelectorAll('#layerRow .node').forEach(el => el.addEventListener('click', () => renderLayer(el.dataset.key)));
+  renderLayer('skills');
+
+  /* ============ 區塊 3:multimodality problem 互動 demo ============ */
+  const AR_POS1 = [{ tok: 'Danke', pct: 55 }, { tok: 'Vielen', pct: 45 }];
+  const AR_POS2_GIVEN = {
+    Danke:  [{ tok: 'schön', pct: 93 }, { tok: 'Dank', pct: 7 }],
+    Vielen: [{ tok: 'Dank', pct: 94 }, { tok: 'schön', pct: 6 }]
+  };
+  const NAR_POS1 = [{ tok: 'Danke', pct: 55 }, { tok: 'Vielen', pct: 45 }];
+  const NAR_POS2 = [{ tok: 'schön', pct: 50 }, { tok: 'Dank', pct: 50 }];
+
+  const mm = {
+    mode: 'ar',
+    ar: { step: 0, pos1: null, pos2: null, history: [] },
+    nar: { pos1: null, pos2: null, history: [] }
+  };
+
+  function weightedPick(list){
+    const r = Math.random() * 100;
+    let cum = 0;
+    for(const c of list){ cum += c.pct; if(r <= cum) return c.tok; }
+    return list[list.length - 1].tok;
+  }
+  function topPick(list){
+    return list.reduce((best, c) => c.pct > best.pct ? c : best, list[0]).tok;
+  }
+  function isValidPair(p1, p2){
+    return (p1 === 'Danke' && p2 === 'schön') || (p1 === 'Vielen' && p2 === 'Dank');
+  }
+  function barsHTML(list, pickedTok){
+    return list.map(c => `
+      <div class="bar-row${c.tok === pickedTok ? ' picked' : ''}">
+        <div class="tok">${c.tok}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${c.pct}%"></div></div>
+        <div class="pct">${c.pct}%</div>
+      </div>`).join('');
+  }
+
+  const MM_PANEL = {
+    ar: {
+      tag: 'AR · 依序生成', title: '位置 2 是看著已定案的位置 1 才決定的',
+      what: '位置 1 先定案(比如抽到「Danke」)——位置 2 這時候的分布不再是原本的均衡機率,而是已經被「已知位置 1 = Danke」這個條件重新算過,幾乎全部押在「schön」上。這保證了兩個位置最後兜出來的一定是同一句合法翻譯裡的字。',
+      deeper: '這正是 tool use 需要的性質:工具名稱先定案,參數 token 是看著這個已經定案的名稱在生成——保證決策物件內部連貫。'
+    },
+    nar: {
+      tag: 'NAR · 平行生成', title: '位置 2 從頭到尾不知道位置 1 選了什麼',
+      what: '兩個位置各自獨立、同時決定——位置 2 只能用「不看位置 1」的平均分布去猜(schön/Dank 各半)。如果位置 1 抽到「Danke」、位置 2 又剛好獨立抽到「Dank」,兩個正確答案的碎片就被硬拼在一起,變成「Danke Dank.」這種四不像。',
+      deeper: 'Gu et al., 2018 把這個現象叫 <b>multimodality problem</b>——這跟「diffusion LLM tool-calling 不精準/不穩定」是同一個病灶,只是換了個世代重新發作一次。'
+    }
+  };
+  const panelMM = document.getElementById('panelMM');
+
+  function renderMMPanel(){
+    const d = MM_PANEL[mm.mode];
+    panelMM.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在做什麼</b><span>${d.what}</span></div>
+      <div class="deeper"><b>對 agent 的意義</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelMM);
+  }
+
+  function renderMM(){
+    document.querySelectorAll('#mmChips .chip').forEach(c => c.classList.toggle('active', c.dataset.mm === mm.mode));
+    const isAr = mm.mode === 'ar';
+
+    const pos1Tok = isAr ? mm.ar.pos1 : mm.nar.pos1;
+    document.getElementById('pos1Bars').innerHTML = barsHTML(AR_POS1, pos1Tok);
+
+    const pos2Box = document.getElementById('pos2Bars');
+    if(isAr){
+      if(mm.ar.step >= 1){
+        pos2Box.innerHTML = barsHTML(AR_POS2_GIVEN[mm.ar.pos1], mm.ar.pos2);
+      } else {
+        pos2Box.innerHTML = '<div class="runnote">位置 1 還沒定案——AR 模式下位置 2 得先等位置 1 決定完才會算分布。</div>';
+      }
+    } else {
+      pos2Box.innerHTML = barsHTML(NAR_POS2, mm.nar.pos2);
+    }
+
+    const btn = document.getElementById('mmBtn');
+    if(isAr){
+      btn.textContent = mm.ar.step === 0 ? '① 生成位置 1 →'
+        : mm.ar.step === 1 ? `② 生成位置 2(已知位置 1 = ${mm.ar.pos1})→`
+        : '再生成一次 →';
+    } else {
+      btn.textContent = '平行生成(兩個位置同時決定)→';
+    }
+
+    const resultBox = document.getElementById('mmResult');
+    const done = isAr ? mm.ar.step === 2 : !!(mm.nar.pos1 && mm.nar.pos2);
+    if(done){
+      const p1 = isAr ? mm.ar.pos1 : mm.nar.pos1;
+      const p2 = isAr ? mm.ar.pos2 : mm.nar.pos2;
+      const valid = isValidPair(p1, p2);
+      resultBox.style.display = 'block';
+      resultBox.style.borderLeftColor = valid ? 'var(--green)' : 'var(--rose)';
+      resultBox.innerHTML = valid
+        ? `<b style="color:var(--green)">✓ 合法翻譯</b> — 「${p1} ${p2}.」是「Thank you very much.」的正確翻法之一。`
+        : `<b style="color:var(--rose)">✗ 四不像</b> — 「${p1} ${p2}.」不是任何一句合法翻譯——是兩個正確答案的碎片被獨立決定、硬拼在一起的結果(Gu et al. 2018 的 multimodality problem)。`;
+    } else {
+      resultBox.style.display = 'none';
+    }
+
+    renderMMHistory();
+    renderMMPanel();
+  }
+
+  function renderMMHistory(){
+    const cur = mm.mode === 'ar' ? mm.ar : mm.nar;
+    const hist = cur.history;
+    const el = document.getElementById('mmHistory');
+    if(hist.length === 0){
+      el.innerHTML = '<div class="runnote">還沒生成過——按上面的按鈕跑跑看,多跑幾次比較。</div>';
+      return;
+    }
+    const pills = hist.map(h => `<span class="pill" style="border-color:${h.valid ? 'var(--green)' : 'var(--rose)'};color:${h.valid ? 'var(--green)' : 'var(--rose)'}">${h.text}</span>`).join('');
+    const invalidCount = hist.filter(h => !h.valid).length;
+    const note = mm.mode === 'nar'
+      ? `已經生成 ${hist.length} 次,其中 ${invalidCount} 次是「四不像」——因為位置 2 從頭到尾不知道位置 1 選了什麼。`
+      : `已經生成 ${hist.length} 次,${invalidCount} 次「四不像」——AR 模式下位置 2 永遠看得到已定案的位置 1,結構上就不會兜不起來。`;
+    el.innerHTML = `<div class="row-pills">${pills}</div><div class="runnote">${note}</div>`;
+    fadeIn(el);
+  }
+
+  document.getElementById('mmBtn').addEventListener('click', () => {
+    if(mm.mode === 'ar'){
+      if(mm.ar.step === 0){
+        mm.ar.pos1 = weightedPick(AR_POS1);
+        mm.ar.step = 1;
+      } else if(mm.ar.step === 1){
+        // AR 位置 2 是「已知位置 1」之後的條件分布——這裡刻意用確定性的最高分,不是加權隨機,
+        // 因為這一段要示範的是「AR 天生保證合法」,不是「AR 也有小機率出錯」(那是另一個議題,
+        // 這個 demo 不處理)。長條圖仍照 93%/7% 顯示,只是實際選取永遠是最高分那個。
+        mm.ar.pos2 = topPick(AR_POS2_GIVEN[mm.ar.pos1]);
+        mm.ar.step = 2;
+        mm.ar.history.push({ text: `${mm.ar.pos1} ${mm.ar.pos2}.`, valid: isValidPair(mm.ar.pos1, mm.ar.pos2) });
+        if(mm.ar.history.length > 8) mm.ar.history.shift();
+      } else {
+        mm.ar.step = 0; mm.ar.pos1 = null; mm.ar.pos2 = null;
+      }
+    } else {
+      mm.nar.pos1 = weightedPick(NAR_POS1);
+      mm.nar.pos2 = weightedPick(NAR_POS2);
+      mm.nar.history.push({ text: `${mm.nar.pos1} ${mm.nar.pos2}.`, valid: isValidPair(mm.nar.pos1, mm.nar.pos2) });
+      if(mm.nar.history.length > 8) mm.nar.history.shift();
+    }
+    renderMM();
+  });
+  document.querySelectorAll('#mmChips .chip').forEach(c => {
+    c.addEventListener('click', () => { mm.mode = c.dataset.mm; renderMM(); });
+  });
+  document.getElementById('mmClearBtn').addEventListener('click', () => {
+    const cur = mm.mode === 'ar' ? mm.ar : mm.nar;
+    cur.history = [];
+    renderMMHistory();
+  });
+
+  /* ============ 區塊 5:五個優勢 ============ */
+  const ADV = {
+    pause: {
+      tag: '優勢 01', title: '乾淨的暫停/恢復點',
+      what: '定案後的字不會再變,自然有明確邊界(stop token、完整的 `tool_use` JSON)可以說「這裡先停,等結果,再繼續」。'
+    },
+    kv: {
+      tag: '優勢 02', title: 'KV cache 可以重用',
+      what: '已經定案的字,attention 計算結果可以直接快取,下一輪只需處理新內容,讓長迴圈的 agent 在計算上撐得住。如果前面的字隨時可能被後面收斂推翻(NAR 的情況),快取就沒有意義。'
+    },
+    consist: {
+      tag: '優勢 03', title: '單一個工具呼叫內部的一致性',
+      what: 'AR 先定案工具名稱,後面每個參數 token 都是看著這個已經定案的名稱在生成,保證決策物件內部連貫,不像獨立/平行決定容易出現「Danke Dank」式的自我矛盾。'
+    },
+    data: {
+      tag: '優勢 04', title: '訓練資料的形狀天生就是這個順序',
+      what: '工具呼叫訓練用的軌跡資料(問題 → 推理 → 呼叫 → 結果 → 答案)本身就是一條時間軸,AR 的訓練目標套上去完全不用轉譯。'
+    },
+    redecide: {
+      tag: '優勢 05', title: '出錯後可以整個重新決策',
+      what: '下一步生成本來就是重新看著真實發生的結果從頭決定,沒有「之前已經定案、現在要推翻」的包袱,對 agent 常見的「試了不行、換個做法」是結構上天生支援。'
+    }
+  };
+  const panelAdv = document.getElementById('panelAdv');
+  function renderAdv(key){
+    const d = ADV[key];
+    document.querySelectorAll('#advRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelAdv.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>為什麼成立</b><span>${d.what}</span></div>
+    `;
+    fadeIn(panelAdv);
+  }
+  document.querySelectorAll('#advRow .node').forEach(el => el.addEventListener('click', () => renderAdv(el.dataset.key)));
+
+  /* ============ 區塊 6:block size 滑桿 ============ */
+  const blockSlider = document.getElementById('blockSlider');
+  const blockVal = document.getElementById('blockVal');
+  const localBar = document.getElementById('localBarFill');
+  const parallelBar = document.getElementById('parallelBarFill');
+  const blockCaption = document.getElementById('blockCaption');
+
+  function renderBlock(){
+    const v = +blockSlider.value;
+    localBar.style.width = (100 - v) + '%';
+    parallelBar.style.width = v + '%';
+    let label, caption;
+    if(v <= 20){
+      label = 'block ≈ 1 token(接近純 AR)';
+      caption = 'block 切太小,幾乎等同純 AR——保留完整的局部條件依賴,安全,但要跑很多輪去噪,平行的優勢幾乎沒發揮出來。';
+    } else if(v >= 80){
+      label = 'block ≈ 整句(接近純 NAR)';
+      caption = 'block 切太大,平行度看起來變高,但容易做出過早的決定、快取一致性也變差——回到 Gu et al. 2018 撞過的老問題。';
+    } else {
+      label = 'block-wise 甜蜜點(block 間接龍,block 內平行)';
+      caption = 'block 跟 block 之間嚴格接龍——前一個 block 定案了,後一個才開始,可以重用前面的計算、可以在兩塊中間插入工具結果;block 內部才做平行去噪。這正是在 block 的粒度上,把 AR 的「定案」性質借回來。';
+    }
+    blockVal.textContent = label;
+    blockCaption.textContent = caption;
+  }
+  blockSlider.addEventListener('input', renderBlock);
+
+  /* 初始狀態 */
+  renderMM();
+  renderBlock();
+</script>
+</body>
+</html>

@@ -1,0 +1,464 @@
+---
+title: Transformer 是必須的嗎? — 換引擎,還是連目的地都換(互動圖解)
+summary: 兩張卡片(引擎 vs 目的地)釐清「不一定要 Transformer」藏著的兩層挑戰;核心圖表——句子長度滑桿拖動,看 Transformer 的平方成本曲線 vs Mamba/RWKV 類線性成本曲線差距怎麼被拉開;五張架構家族卡片(Transformer/Mamba/RWKV/RetNet/Diffusion,含 Falcon Mamba 存在證明、Mamba-2 SSD、Gemini Diffusion);誠實提醒卡(混血是現狀不是全面換血、基礎建設慣性、兩層挑戰都還沒推翻假設)。
+date: 2026-07-06
+tags:
+  - llm-foundations
+  - interactive
+  - architecture
+layout: none
+render_with_liquid: false
+---
+<!DOCTYPE html>
+<!--
+  INTERACTIVE — Transformer 是必須的嗎:Mamba、RWKV、RetNet、Diffusion 這些 rising star。
+  Derived from(內容真相來源;呈現/措辭允許不同,概念要一致):
+    ../docs/2026-07-04-beyond-transformer-architectures.md
+  Last synced: 2026-07-06 — docs 大改時回來更新這頁,並更新這個日期。
+  What it is:
+    區塊 1(兩層不同的「不一定要」)— 車的比喻:next-token prediction 是目的地、Transformer
+      是引擎。兩張卡片(換引擎,目的地不變 / 連目的地開法都換),點了看每一層在挑戰什麼。
+    區塊 2(核心圖表 · 眼見為憑)— 句子長度滑桿,即時重繪兩條曲線:Transformer 成本隨長度
+      平方成長、Mamba/RWKV 類線性方案成本隨長度線性成長,讀值標出兩者的示意比例差距。
+      座標與比例為教學示意,不是真實測量的效能數字。
+    區塊 3(架構家族卡片)— Transformer / Mamba / RWKV / RetNet / Diffusion 五張可點卡片,
+      各自的核心機制一句話 + 代價/優點(Falcon Mamba 存在證明、Mamba-2 SSD、Gemini
+      Diffusion 等具體案例)。
+    區塊 4(誠實提醒)— 混血是現狀不是全面換血(Jamba)、基礎建設慣性不完全是技術原因、
+      兩層挑戰都還在鬆動假設但還沒推翻旗艦模型仍是 Transformer 骨幹的現狀。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<title>Transformer 是必須的嗎? — 換引擎,還是連目的地都換</title>
+<style>
+  :root{
+    --bg:#f7f4ec; --panel:#fffdf8; --ink:#2a211c; --muted:#8a7d6e; --faint:#a99c8a;
+    --line:#e7e0d2; --line-soft:#efe9dd; --accent:#9a6b2e; --green:#0c7a59; --rose:#b04a6a;
+    --blue:#2f6f9e;
+    --shadow:0 1px 2px rgba(42,33,28,.04),0 14px 34px -20px rgba(42,33,28,.30);
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC','Microsoft JhengHei',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);background-image:radial-gradient(#ddd9cf 1px,transparent 1px);background-size:26px 26px;
+    color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 100px}
+  header{margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+  h1{font-size:27px;font-weight:680;letter-spacing:-.01em;margin-top:8px}
+  .tagline{color:var(--muted);font-size:14.5px;margin-top:8px;max-width:76ch}
+
+  section{margin-top:52px}
+  .sec-kicker{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .sec-title{font-size:20px;font-weight:680;margin-top:6px}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:74ch}
+  .sec-sub b{color:var(--ink)}
+
+  .row{display:flex;align-items:stretch;gap:10px;margin-top:22px;flex-wrap:wrap}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:13px;font-family:var(--mono);flex:0 0 auto;padding:0 4px}
+  .node{flex:1;min-width:180px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px 14px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+    text-align:left}
+  .node:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .node.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.18),var(--shadow)}
+  .node .idx{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .node h3{font-size:14.5px;font-weight:660;margin-top:5px;line-height:1.3}
+  .node .q{margin-top:7px;font-size:12px;color:var(--muted)}
+
+  .panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:22px 24px;min-height:110px}
+  .panel .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .panel h2{font-size:18px;font-weight:680;margin-top:8px}
+  .panel .meta{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .panel .meta b{color:var(--accent);font-weight:650;white-space:nowrap}
+  .panel .ex{margin-top:12px;padding:11px 14px;background:var(--bg);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;font-size:13.5px}
+  .panel .deeper{margin-top:10px;padding:11px 14px;background:rgba(47,111,158,.07);border-left:3px solid var(--blue);
+    border-radius:0 10px 10px 0;font-size:13px}
+  .panel .deeper b{color:var(--blue)}
+  .panel .placeholder{color:var(--muted);font-size:14px}
+
+  .exclusions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .exclusion{flex:1;min-width:280px;background:rgba(176,74,106,.07);border:1px dashed var(--rose);
+    border-radius:10px;padding:11px 14px;font-size:12.5px}
+  .exclusion b{color:var(--rose)}
+
+  .chips{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;flex:1;min-width:150px}
+  .chip:hover{transform:translateY(-2px)}
+  .chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(154,107,46,.16),var(--shadow)}
+  .chip h4{font-size:13.5px;font-weight:660}
+  .chip .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  .scene-box{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px}
+  .scene-note{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:12px;text-align:center}
+
+  .ctl-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+  .ctl-label{font-family:var(--mono);font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;
+    flex:0 0 auto;min-width:74px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    cursor:pointer;transition:border-color .15s ease}
+  .pill:hover{border-color:var(--accent)}
+  .pill.active{border-color:var(--accent);background:rgba(154,107,46,.10);font-weight:650}
+
+  .slider-row{display:flex;align-items:center;gap:14px;margin-top:16px;flex-wrap:wrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--accent)}
+  .temp-val{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:650;min-width:150px;text-align:right}
+
+  .round-caption{margin-top:12px;padding:10px 14px;background:var(--bg);border-left:3px solid var(--rose);
+    border-radius:0 10px 10px 0;font-size:13px}
+
+  .refs{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ref-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px}
+  .ref-head{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;
+    letter-spacing:.03em;margin-bottom:10px}
+  .ref-group a{display:block;font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 0 5px 14px;
+    position:relative;line-height:1.5;border-radius:6px}
+  .ref-group a::before{content:"↗";position:absolute;left:0;color:var(--faint);font-size:11px}
+  .ref-group a:hover{color:var(--accent)}
+  .ref-group a:hover::before{color:var(--accent)}
+  .ref-group p{font-size:12.5px;color:var(--muted);line-height:1.6}
+
+  footer{margin-top:40px;color:var(--faint);font-size:12px}
+
+  .fade-in{animation:fadeInPanel .28s ease}
+  @keyframes fadeInPanel{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-nav{display:flex;gap:14px;margin-bottom:18px}
+  .page-nav a{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;
+    color:var(--muted);text-decoration:none;transition:color .15s ease}
+  .page-nav a:hover{color:var(--accent)}
+
+  @media (max-width: 700px){
+    .row{flex-direction:column}
+    .arrow{transform:rotate(90deg);padding:2px 0;align-self:center}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-nav">
+    <a href="../">← LLM Foundations 導覽</a>
+    <a href="../../">🏠 回首頁</a>
+  </div>
+  <header>
+    <div class="kicker">Interactive · LLM Foundations · Beyond Transformer</div>
+    <h1>Transformer 是必須的嗎? — 換引擎,還是連目的地都換</h1>
+    <p class="tagline">
+      不是必須,是目前最有效——而且「有效」裡面混了一部分基礎建設慣性。至少有兩層挑戰正在
+      鬆動「Transformer 必須」這個假設:一層是換掉 self-attention 這個引擎、但目的地(接龍
+      生成)不變(Mamba/RWKV/RetNet);另一層更激進,連「一個字一個字接龍」這件事本身都不是
+      必須的(diffusion language models)。目前公開已知最頂尖的旗艦模型,骨幹仍以 Transformer
+      或 Transformer 混血為主——這條假設正在被鬆動,還沒被推翻。
+    </p>
+  </header>
+
+  <!-- ============ SECTION 1: 兩層不同的「不一定要」 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 1 · 先分清楚在挑戰什麼</div>
+    <div class="sec-title">兩層不同的「不一定要」</div>
+    <p class="sec-sub">
+      這整套接龍機制像一台車:next-token prediction 是「目的地」(每次都往合理的下一個字
+      開一步),Transformer 是「引擎」(「整排一起看」這個具體做法)。「一定要 Transformer 嗎」
+      這個問題裡藏著兩層——引擎能不能換(還是朝著同一個目的地開)、連目的地開法都能不能換。
+      點卡片看兩層各自在挑戰什麼。
+    </p>
+
+    <div class="row" id="tierRow">
+      <div class="node active" data-key="engine">
+        <div class="idx">第一層 · 換引擎,目的地不變</div>
+        <h3>引擎能不能換?</h3>
+        <div class="q">接龍還是接龍,只是換掉「整排一起看」這個做法</div>
+      </div>
+      <div class="arrow">vs</div>
+      <div class="node" data-key="destination">
+        <div class="idx">第二層 · 連目的地開法都換</div>
+        <h3>連「接龍」本身能不能換?</h3>
+        <div class="q">更激進:不接龍,同時對整片文字反覆修正</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelTier"></div>
+  </section>
+
+  <!-- ============ SECTION 2: 核心圖表 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 2 · 眼見為憑</div>
+    <div class="sec-title">句子拉長,成本怎麼被拉開 — Transformer vs 線性方案</div>
+    <p class="sec-sub">
+      Transformer「整排一起看」的代價:每張牌都要對整排牌打分,成本隨句子長度<b>平方</b>
+      成長;Mamba/RWKV/RetNet 這類替代方案換掉這個機制,成本隨句子長度<b>線性</b>成長。
+      拖動下面的滑桿,看句子長度拉長時,兩條曲線的差距怎麼被拉開——<b>座標與比例是教學示意,
+      不是真實模型測到的效能數字</b>,重點是「平方 vs 線性」這個成長型態本身的差別。
+    </p>
+
+    <div class="slider-row">
+      <span class="ctl-label">句子長度</span>
+      <input type="range" id="lenSlider" min="2" max="50" step="1" value="20">
+      <span class="temp-val" id="lenVal">L = 20(示意單位)</span>
+    </div>
+
+    <div class="scene-box">
+      <div id="costChartBox" style="display:flex;justify-content:center"></div>
+      <div class="scene-note">橫軸、縱軸的座標與比例是教學示意,用來表達「平方 vs 線性」的成長型態差異,不是真實模型的效能測量值</div>
+    </div>
+
+    <div class="round-caption" id="costCaption"></div>
+
+    <div class="exclusions">
+      <div class="exclusion"><b>句子還短的時候差不了多少</b> — 長度還小時,兩條曲線靠得很近,差距是隨長度變大才逐漸拉開的——這也是為什麼這個問題在短對話裡不明顯,長文件/長對話場景才真正吃緊。</div>
+      <div class="exclusion"><b>推論記憶體也是同一個故事</b> — 不只是算得慢,Transformer 推論時還要留著全部舊牌的讀牌紀錄(KV cache),記憶體用量跟著長度一起長;Mamba 這類方案推論時記憶體用量固定,不會隨句子變長而膨脹。</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 3: 架構家族卡片 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 3 · 五個引擎,各自的算盤</div>
+    <div class="sec-title">架構家族 — 核心機制一句話 + 代價/優點</div>
+    <p class="sec-sub">
+      點卡片看每個架構在做什麼、代價在哪裡、有沒有具體案例證明它真的能打。
+    </p>
+
+    <div class="row" id="famRow">
+      <div class="node" data-key="transformer">
+        <div class="idx">目前的預設引擎</div>
+        <h3>Transformer</h3>
+        <div class="q">整排一起看(self-attention)</div>
+      </div>
+      <div class="node" data-key="mamba">
+        <div class="idx">第一層挑戰 · SSM</div>
+        <h3>Mamba</h3>
+        <div class="q">選擇性記住/忘記的狀態機制</div>
+      </div>
+      <div class="node" data-key="rwkv">
+        <div class="idx">同一方向</div>
+        <h3>RWKV</h3>
+        <div class="q">把 RNN 為 Transformer 時代重新發明</div>
+      </div>
+      <div class="node" data-key="retnet">
+        <div class="idx">同一方向 · 微軟</div>
+        <h3>RetNet</h3>
+        <div class="q">Retention 機制,推論每步固定成本</div>
+      </div>
+      <div class="node" data-key="diffusion">
+        <div class="idx">第二層挑戰 · 更激進</div>
+        <h3>Diffusion</h3>
+        <div class="q">不接龍,同時對整片去噪</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panelFam"></div>
+  </section>
+
+  <!-- ============ SECTION 4: 誠實提醒 ============ -->
+  <section>
+    <div class="sec-kicker">區塊 4 · 誠實提醒</div>
+    <div class="sec-title">曲線好看,不代表世界已經換過去了</div>
+    <p class="sec-sub">
+      成本曲線跟架構卡片容易讓人覺得「Mamba 全面贏了」——這裡是幾個容易被過度解讀的地方。
+    </p>
+    <div class="exclusions">
+      <div class="exclusion"><b>現狀是混血,不是全面換血</b> — 目前業界最主流的做法,不是整台車全部換引擎,是換成混血引擎——多數新架構拿 SSM/線性注意力當骨幹,但每隔幾層還是保留幾層真正的 self-attention(例如 AI21 的 Jamba)。純 SSM 在中小規模已經證明能打平甚至贏過同量級 Transformer,但公開已知的最頂尖旗艦模型,骨幹仍然是 Transformer 或這種混血版本,還沒有純 SSM 站上最前沿。</div>
+      <div class="exclusion"><b>Transformer 還是預設選項,不完全是技術原因</b> — 除了引擎/目的地本身的技術權衡,整個業界過去八年的訓練框架、硬體 co-design、除錯工具、人才經驗,全部是圍著 Transformer 這個特定架構堆出來的。換一種架構,不只是架構本身要打平甚至打贏,還要打贏這整套已經堆了八年的基礎建設慣性——這是「已經有更好的引擎」跟「大家真的換過去用」中間,還隔著一段真實距離的原因(這是這篇筆記自己的推論,不是引用某篇論文的結論,但邏輯上站得住)。</div>
+      <div class="exclusion"><b>兩層挑戰都還在鬆動假設,還沒推翻</b> — 換引擎(Mamba/RWKV/RetNet)跟換目的地(diffusion)這兩層挑戰都真實存在、都有具體案例證明能打,但目前公開已知最頂尖的旗艦模型,骨幹仍以 Transformer 或 Transformer 混血為主——「Transformer 是必須的」這個假設正在被鬆動,還沒被推翻。</div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCES ============ -->
+  <section>
+    <div class="sec-kicker">References · 參考資料</div>
+    <div class="sec-title">這一頁的內容從哪裡來</div>
+    <p class="sec-sub">
+      跟本頁對應的完整技術筆記(含逐條信心等級標記),見
+      <a href="../docs/2026-07-04-beyond-transformer-architectures.md" style="color:var(--accent)">2026-07-04-beyond-transformer-architectures.md</a>。
+    </p>
+    <div class="refs">
+      <div class="ref-group">
+        <div class="ref-head">原始論文</div>
+        <a href="https://arxiv.org/abs/2312.00752">Gu &amp; Dao, 2023 — Mamba: Linear-Time Sequence Modeling with Selective State Spaces(Mamba 原始論文;標題、arXiv 編號 VERIFIED,Falcon Mamba 7B、Mamba-2 SSD 效率提升倍數來自搜尋摘要,未逐篇原文核對細節數字,LIKELY)</a>
+      </div>
+      <div class="ref-group">
+        <div class="ref-head">置信度較低、未逐篇核對原文的部分</div>
+        <p>RWKV(<i>Reinventing RNNs for the Transformer Era</i>)、RetNet——LIKELY(標題、機制描述經 WebSearch 交叉確認多個來源,未逐篇讀原文)。Diffusion language models(LLaDA、Dream、DiffuLLaMA、Gemini Diffusion)——LIKELY(經 WebSearch 交叉確認多個 2025-2026 來源一致,「Gemini Diffusion 2025 年 5 月首次商用等級追平」這個具體說法沒有找到 Google 官方一手公告核對,是第三方摘要)。完整出處見對應的技術筆記。</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    互動教學頁 · 最後同步 2026-07-06
+  </footer>
+</div>
+
+<script>
+  function fadeIn(el){ if(!el) return; el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+
+  /* ============ 區塊 1:兩層不同的「不一定要」 ============ */
+  const TIERS = {
+    engine: {
+      tag: '第一層 · 換引擎,目的地不變',
+      title: '引擎能不能換?',
+      what: '目的地不變——next-token prediction(接龍生成)還是同一個目的地,每次都往合理的下一個字開一步。換的是「引擎」:Transformer 靠「整排一起看」(self-attention)做到這件事,Mamba/RWKV/RetNet 想用別的機制達到同樣目的地,同時甩掉「整排一起看」成本隨長度平方成長的問題。',
+      ex: '這一層目前最亮眼的挑戰者是 State Space Models(Mamba),見下方架構家族卡片。',
+      deeper: '同一輛車換了引擎,還是往同一個方向開——這是目前多數新架構在做的事,也是「現狀是混血,不是全面換血」這句話的背景(見區塊 4)。'
+    },
+    destination: {
+      tag: '第二層 · 連目的地開法都換',
+      title: '連「接龍」本身能不能換?',
+      what: '這層更激進,直接挑戰「一個字一個字往後猜」這個前提本身。Diffusion 語言模型不接龍——從一整片雜訊開始,同時對所有位置反覆去噪,一輪一輪把雜訊修正成合理的文字,跟 Stable Diffusion 生圖片是同一種數學框架,只是套用到文字上。',
+      ex: '這條路線見下方架構家族卡片的 Diffusion 卡。',
+      deeper: '兩層挑戰性質不一樣:第一層還認同「接龍」這個目的地,只是想換更省成本的引擎;第二層連「接龍」本身要不要當目的地都提出質疑——這層跟 tool use、in-context learning 這些 agent 能力具體怎麼互動,是另外的筆記在處理,這頁只講架構本身。'
+    }
+  };
+  const panelTier = document.getElementById('panelTier');
+  function renderTier(key){
+    const d = TIERS[key];
+    document.querySelectorAll('#tierRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelTier.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>在挑戰什麼</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+      <div class="deeper"><b>更深一層</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelTier);
+  }
+  document.querySelectorAll('#tierRow .node').forEach(el => el.addEventListener('click', () => renderTier(el.dataset.key)));
+
+  /* ============ 區塊 2:成本曲線圖表 ============ */
+  const LEN_MIN = 2, LEN_MAX = 50;
+  const TOP = 40, BOTTOM = 258, X0 = 78, X1 = 600;
+
+  function transformerCost(L){ return L * L; }
+  function mambaCost(L){ return L; }
+  const MAX_COST = transformerCost(LEN_MAX);
+
+  function yForCost(cost){ return BOTTOM - (cost / MAX_COST) * (BOTTOM - TOP - 10); }
+  function xForLen(L){ return X0 + (L - LEN_MIN) / (LEN_MAX - LEN_MIN) * (X1 - X0); }
+
+  function pathFor(costFn){
+    let d = '';
+    for(let L = LEN_MIN; L <= LEN_MAX; L++){
+      const x = xForLen(L), y = yForCost(costFn(L));
+      d += (L === LEN_MIN ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+    }
+    return d.trim();
+  }
+
+  const state1 = { len: 20 };
+
+  function costChartSVG(){
+    const L = state1.len;
+    const xk = xForLen(L);
+    const yTrans = yForCost(transformerCost(L));
+    const yMamba = yForCost(mambaCost(L));
+
+    const xTicks = [LEN_MIN, 14, 26, 38, LEN_MAX].map(v => {
+      const x = xForLen(v);
+      return `<line x1="${x}" y1="${BOTTOM}" x2="${x}" y2="${BOTTOM+5}" stroke="var(--faint)" stroke-width="1"/>
+        <text x="${x}" y="${BOTTOM+18}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--faint)">${v}</text>`;
+    }).join('');
+
+    return `<svg width="640" height="300" viewBox="0 0 640 300">
+      <line x1="${X0}" y1="${TOP-8}" x2="${X0}" y2="${BOTTOM}" stroke="var(--faint)" stroke-width="1.4"/>
+      <line x1="${X0}" y1="${BOTTOM}" x2="${X1+8}" y2="${BOTTOM}" stroke="var(--faint)" stroke-width="1.4"/>
+      ${xTicks}
+      <text x="${(X0+X1)/2}" y="292" text-anchor="middle" font-size="11.5" fill="var(--muted)">句子長度(教學示意單位,幾個字牌)→</text>
+      <text x="20" y="${(TOP+BOTTOM)/2}" text-anchor="middle" font-size="11.5" fill="var(--muted)" transform="rotate(-90 20 ${(TOP+BOTTOM)/2})">相對成本(教學示意,越高越貴)</text>
+
+      <path d="${pathFor(transformerCost)}" fill="none" stroke="var(--rose)" stroke-width="3"/>
+      <path d="${pathFor(mambaCost)}" fill="none" stroke="var(--green)" stroke-width="3"/>
+
+      <line x1="${xk}" y1="${TOP-8}" x2="${xk}" y2="${BOTTOM}" stroke="var(--faint)" stroke-width="1.3" stroke-dasharray="4 4"/>
+      <circle cx="${xk}" cy="${yTrans}" r="6" fill="var(--panel)" stroke="var(--rose)" stroke-width="2.4"/>
+      <circle cx="${xk}" cy="${yMamba}" r="6" fill="var(--panel)" stroke="var(--green)" stroke-width="2.4"/>
+
+      <text x="${Math.min(xk+12, 640-160)}" y="${Math.max(yTrans-10, TOP+2)}" font-size="10.5" font-family="var(--mono)" fill="var(--rose)">Transformer ≈ ${transformerCost(L)}</text>
+      <text x="${Math.min(xk+12, 640-160)}" y="${yMamba+18}" font-size="10.5" font-family="var(--mono)" fill="var(--green)">Mamba/RWKV ≈ ${mambaCost(L)}</text>
+
+      <text x="${(X0+X1)/2}" y="22" text-anchor="middle" font-size="11.5" fill="var(--faint)">
+        <tspan fill="var(--rose)">■</tspan> Transformer(成本 ∝ 長度²) ·
+        <tspan fill="var(--green)">■</tspan> Mamba/RWKV 類線性方案(成本 ∝ 長度)
+      </text>
+    </svg>`;
+  }
+
+  const costChartBox = document.getElementById('costChartBox');
+  const costCaption = document.getElementById('costCaption');
+  const lenSlider = document.getElementById('lenSlider');
+  const lenVal = document.getElementById('lenVal');
+
+  function renderCostChart(){
+    const L = state1.len;
+    costChartBox.innerHTML = costChartSVG();
+    fadeIn(costChartBox);
+    lenVal.textContent = `L = ${L}(示意單位)`;
+    costCaption.textContent = `句子長度拉到 ${L} 個字牌(教學示意單位)時:Transformer 的相對成本 ≈ ${transformerCost(L)}(隨長度平方成長),Mamba/RWKV 這類線性方案的相對成本 ≈ ${mambaCost(L)}(隨長度線性成長)——示意比例上差了 ${L} 倍(長度² ÷ 長度 = 長度本身)。這只是「平方 vs 線性」成長型態的示意比例,不是任何真實模型測到的效能數字。`;
+  }
+  lenSlider.addEventListener('input', (e) => { state1.len = +e.target.value; renderCostChart(); });
+
+  /* ============ 區塊 3:架構家族卡片 ============ */
+  const FAMILY = {
+    transformer: {
+      tag: '目前的預設引擎',
+      title: 'Transformer — Self-attention',
+      what: '「整排一起看」——每張字牌同時對整排字牌(含自己)打關聯分數,把相關的資訊按比例混進來,重複很多輪(細節見 101 頁圖 B)。',
+      ex: '<b>代價</b>:每張牌都要對整排牌打分,成本隨句子長度<b>平方</b>成長,句子一長,讀牌費用爆炸;推論時還要留著全部舊牌的讀牌紀錄(KV cache),記憶體跟著長度一起長。<b>優點</b>:整段可以平行訓練,而且過去八年整個業界的訓練框架、硬體 co-design、除錯工具、人才經驗都是圍著它堆出來的——這是它至今還是預設選項最大的理由之一(見區塊 4)。',
+      deeper: 'Vaswani et al., 2017,《Attention Is All You Need》提出的原始架構,機制細節見 101 頁與 transformer-self-attention.md。'
+    },
+    mamba: {
+      tag: '第一層挑戰 · State Space Models',
+      title: 'Mamba — 選擇性記住/忘記的狀態機制',
+      what: '不用「整排一起看」,改用一種可以「選擇性記住/忘記」的狀態機制——每讀一張新牌,只跟「目前濃縮出來的狀態」互動,不用回頭跟每一張舊牌重新打分。',
+      ex: '<b>代價/優點</b>:成本隨句子長度<b>線性</b>成長、推論時記憶體用量固定,不會像 Transformer 那樣越長越貴。<b>存在證明</b>:Falcon Mamba 7B(純 Mamba 架構,5.8 兆 token 訓練)真的訓練出來,在多項評測上贏過同量級的 Transformer 模型(如 Mistral 7B)。後續 Mamba-2 用一種叫 SSD(state space duality)的技巧讓訓練效率再提升 2-8 倍。',
+      deeper: 'Gu &amp; Dao, 2023,《Mamba: Linear-Time Sequence Modeling with Selective State Spaces》,見下方參考資料。'
+    },
+    rwkv: {
+      tag: '同一方向 · 把 RNN 重新發明',
+      title: 'RWKV — 為 Transformer 時代重新發明的 RNN',
+      what: '追的是同一個目標:保留 Transformer 訓練時能平行運算的優點,甩掉推論成本隨長度爆炸的缺點——只是用不同的數學形式做到,概念上是「把 RNN 為 Transformer 時代重新發明」。',
+      ex: '跟 Mamba、RetNet 屬於同一波「換引擎、不換目的地」的嘗試。',
+      deeper: '機制描述經多方交叉確認,置信度 LIKELY,未逐篇讀原文核對細節,見下方參考資料。'
+    },
+    retnet: {
+      tag: '同一方向 · 微軟提出',
+      title: 'RetNet — Retention 機制',
+      what: '靠一種叫 retention 的機制,做到推論時<b>每一步固定成本</b>,同時讓精度打平 Transformer。',
+      ex: '跟 Mamba、RWKV 一樣是「換引擎,目的地不變」陣營的一員——訓練時能平行運算,推論時不必再為每個新字重新掃過所有舊字。',
+      deeper: '機制描述經多方交叉確認,置信度 LIKELY,未逐篇讀原文核對細節,見下方參考資料。'
+    },
+    diffusion: {
+      tag: '第二層挑戰 · 更激進',
+      title: 'Diffusion Language Models — 連接龍本身都換掉',
+      what: '不接龍——從一整片雜訊開始,<b>同時對所有位置</b>反覆去噪,一輪一輪把雜訊修正成合理的文字,跟 Stable Diffusion 生圖片是同一種數學框架,只是套用到文字上。',
+      ex: '好處是生成可以平行,不用等前一個字生完才生下一個字。LLaDA、Dream、DiffuLLaMA 是這條線幾個十億參數級的具體案例;Google 的 Gemini Diffusion(2025 年 5 月)是目前查到第一個「商用等級品質追平自迴歸模型」的案例。',
+      deeper: '這層跟 tool use、in-context learning 這些 agent 相關能力具體怎麼互動,是另外兩篇筆記在處理,這頁只講架構本身。'
+    }
+  };
+  const panelFam = document.getElementById('panelFam');
+  function renderFam(key){
+    const d = FAMILY[key];
+    document.querySelectorAll('#famRow .node').forEach(el => el.classList.toggle('active', el.dataset.key === key));
+    panelFam.innerHTML = `
+      <div class="ph">${d.tag}</div>
+      <h2>${d.title}</h2>
+      <div class="meta"><b>核心機制</b><span>${d.what}</span></div>
+      <div class="ex">${d.ex}</div>
+      <div class="deeper"><b>出處</b> — ${d.deeper}</div>
+    `;
+    fadeIn(panelFam);
+  }
+  document.querySelectorAll('#famRow .node').forEach(el => el.addEventListener('click', () => renderFam(el.dataset.key)));
+
+  /* 初始狀態 */
+  renderTier('engine');
+  renderCostChart();
+  renderFam('transformer');
+</script>
+</body>
+</html>
